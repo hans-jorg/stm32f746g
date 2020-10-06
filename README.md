@@ -172,8 +172,13 @@ Installation
 
 2 - Install the STM32CubeF7 library from (3)
 
-3 - Configure Makefile
+3 - Install stlink-tools (sudo apt install stlink-tools stlink-gui).
 
+4 - Configure Makefile
+
+Now it is possible to compile, flash and debug a project using make.
+
+OBS: stm32flash (sudo apt install stm32flash) flash a STM32 device using serial interface.
 
 
 
@@ -304,7 +309,7 @@ prescaler value (HPRE bits), respectively, in the RCC_CFGR register
 reading the FLASH_ACR register
 
 To unlock write access to FLASH_ACR.
-ACR 
+
 1. Write KEY1 = 0x45670123 in the Flash key register (FLASH_KEYR)
 2. Write KEY2 = 0xCDEF89AB in the Flash key register (FLASH_KEYR)
 
