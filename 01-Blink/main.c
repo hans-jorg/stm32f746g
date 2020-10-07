@@ -2,7 +2,7 @@
  * @file     main.c
  * @brief    Blink LEDs using counting delays and CMSIS (Heavy use of macros)
  * @version  V1.0
- * @date     23/01/2016
+ * @date     06/10/2020
  *
  * @note     The blinking frequency depends on core frequency
  * @note     Direct access to registers
@@ -11,114 +11,98 @@
  *
  ******************************************************************************/
 
-
 #include "stm32f746xx.h"
 #include "system_stm32f746.h"
 
 /**
- * @brief Quick and dirty delay routine
+ * @brief Macros for bit and SHIFTLEFTs manipulation
  *
- * It gives approximately 1ms delay at 4 MHz (MSI)
+ * @note                    Least Significant Bit (LSB) is 0
+ *
+ * BIT(N)                   Creates a bit mask with only the bit N set
+ * SHIFTLEFT(V,N)           Shifts the value V so its LSB is at position N
+ */
+
+///@{
+#define BIT(N)                          (1UL<<(N))
+#define SHIFTLEFT(V,N)                  ((V)<<(N))
+///@}
+
+/**
+ * @brief LED Symbols
+ *
+ * @note    It is at pin 1 of Port I.
+ *
+ * @note    Not documented. See schematics
  *
  */
 
+#define LEDPIN              (1)
+#define LEDGPIO             GPIOI
+#define LEDMASK             BIT(LEDPIN)
+
+
+/**
+ * @brief   Quick and dirty delay routine
+ *
+ * @note    It gives approximately 1ms delay at 16 MHz
+ *
+ * @note    The COUNTERFOR1MS must be adjusted by trial and error
+ *
+ * @note    Do not use this or similar in production code
+ */
+
+#define COUNTERFOR1MS 300000
+
+
 void ms_delay(volatile int ms) {
    while (ms-- > 0) {
-      volatile int x=14000;
+      volatile int x=COUNTERFOR1MS;
       while (x-- > 0)
          __NOP();
    }
 }
 
 /**
- * @brief Macros for bit and bitfields manipulation
+ * @brief   GPIO Configuration Symbols for LED
  *
- * BIT(N)                Creates a bit mask with only the bit N set
- * BITFIELD(V,N)         Creates a bit mask with value V LSB at position N
+ * @note    For many applications, the LEDMASK is enough. This is the case of
+ *          the ODR. Each port has 16 pins so only the 16 least significant bits
+ *          of a 32 bit register are used.
+ *
+ * @note    Many registers like MODER,OSPEER and PUPDR use a 2-bit field
+ *          to configure pin.So the configuration of pin 6 is done in field in bits 13-12
+ *          of these registers. All bits of the field must be zeroed before it is
+ *          OR'ed with the mask. This is done by AND'ing the register with a mask, which
+ *          is all 1 except for the bits in the specified field. The easy way to do it is
+ *          complementing (exchangig 0 and 1) a mask with 1s in the desired field and 0
+ *          everywhere else.
+ *
+ * @note    The MODE register is the most important. The LED pin must be configured
+ *          for output. The field must be set to 1. The mask for the field is GPIO_MODE_M
+ *          and the mask for the desired value is GPIO_MODE_V.
+ *
+ * @note    The OSSPEED,
+ *
+ * @note
  */
 
-///@{
-#define BIT(N)                     (1UL<<(N))
-#define BITFIELD(V,N)               ((V)<<(N))
-///@}
+// Pin configuration
+#define LEDMODE             1
+#define LEDOTYPE            0
+#define LEDOSPEED           3
+#define LEDPUPD             0
 
-
-/**
- * @brief  GPIO configuration
- *
- * MODEx Register : Mode register
- *           2 bits for each pin, MODE15..0
- *           00 : Input
- *           01 : Output
- *           10 : Alternate Function
- *           11 : Analog
- *
- * OSPEEDx Register : Output speed register
- *           2 bits for each pin, OSPEED15..0
- *           00 : Low speed
- *           01 : Medium speed
- *           10 : High speed
- *           11 : Very high speed
- *
- * PUPDRx Register : Pullup/Pulldown register
- *           2 bits for each pin, PUPD15..0
- *           00 : No pullup/pulldown
- *           01 : Pullup
- *           10 : Pulldown
- *           11 : Reserved
- *
- * ODRx Register : output data register
- *           1 bit for each pin, OD15..0
- */
-///@{
-#define GPIO_MODE_INP           0
-#define GPIO_MODE_OUT           1
-#define GPIO_MODE_ALT           2
-#define GPIO_MODE_ANA           3
-#define GPIO_MODE_MASK          3
-
-#define GPIO_OSPEED_LOW         0
-#define GPIO_OSPEED_MED         1
-#define GPIO_OSPEED_HIGH        2
-#define GPIO_OSPEED_VERYHIGH    3
-#define GPIO_OSPEED_MASK        3
-
-#define GPIO_PUPD_NONE          0
-#define GPIO_PUPD_UP            1
-#define GPIO_PUPD_DOWN          2
-#define GPIO_PUPD_RES           3
-#define GPIO_PUPD_MASK          3
-///#}
-
-/**
- * @brief LED Symbols
- *
- *     LEDs are in different ports.
- *     In order to avoid wrong use, the port identifier should be appended to the symbol.
- *
- *     It is necessary to have different symbols to configure the GPIO
- *     One to specify bit in the ODR register and another to specify a 2-bit wide field in
- *     MODER,OSPEER and PUPDR registers.
- *     To write on a 2-bit wide field it is necessary to erase all bits on it using a mask.
- *
- */
-/* Bit numbers for LEDS
- * LED     GPIO      Pin
- * Green   PI         1
- */
-
-#define LED_GREEN_PI_PIN   (1)
-
-// Bit masks for ODR (data) register
-#define LED_GREEN               BIT(LED_GREEN_PI_PIN)
-// Bit masks for MODER, OSPEEDR and PUPDR register (2 bit fields)
-// Green LED on Port E
-#define LED_GREEN_PI_MODE       BITFIELD(GPIO_MODE_OUT,LED_GREEN_PI_PIN*2)
-#define LED_GREEN_PI_MODE_M     BITFIELD(GPIO_MODE_MASK,LED_GREEN_PI_PIN*2)
-#define LED_GREEN_PI_OSPEED     BITFIELD(GPIO_OSPEED_VERYHIGH,LED_GREEN_PI_PIN*2)
-#define LED_GREEN_PI_OSPEED_M   BITFIELD(GPIO_OSPEED_MASK,LED_GREEN_PI_PIN*2)
-#define LED_GREEN_PI_PUPD       BITFIELD(GPIO_PUPD_UP,LED_GREEN_PI_PIN*2)
-#define LED_GREEN_PI_PUPD_M     BITFIELD(GPIO_PUPD_MASK,LED_GREEN_PI_PIN*2)
+// Register masks
+#define FIELD2MASK          3
+#define GPIO_MODER_V        SHIFTLEFT(LEDMODE,LEDPIN*2)
+#define GPIO_MODER_M        SHIFTLEFT(FIELD2MASK,LEDPIN*2)
+#define GPIO_OTYPER_V       SHIFTLEFT(LEDOTYPE,LEDPIN*2)
+#define GPIO_OTYPER_M       SHIFTLEFT(FIELD2MASK,LEDPIN*2)
+#define GPIO_OSPEEDR_V      SHIFTLEFT(LEDOSPEED,LEDPIN*2)
+#define GPIO_OSPEEDR_M      SHIFTLEFT(FIELD2MASK,LEDPIN*2)
+#define GPIO_PUPDR_V        SHIFTLEFT(LEDPUPD,LEDPIN*2)
+#define GPIO_PUPDR_M        SHIFTLEFT(FIELD2MASK,LEDPIN*2)
 
 //@}
 
@@ -126,15 +110,23 @@ int main(void) {
 
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOIEN;        // Enable GPIO Port I
 
-    // Configurate GPIO for Green LED
-    GPIOI->MODER    = (GPIOI->MODER&~LED_GREEN_PI_MODE_M)|LED_GREEN_PI_MODE;        // Set to output
-    GPIOI->OSPEEDR  = (GPIOI->OSPEEDR&~LED_GREEN_PI_OSPEED_M)|LED_GREEN_PI_OSPEED;  // Set to high speed
-    GPIOI->PUPDR    = (GPIOI->PUPDR&~LED_GREEN_PI_PUPD_M)|LED_GREEN_PI_PUPD_M;      // Turn on pull up
-    GPIOI->ODR     &=  ~LED_GREEN;                                                // Turn off LED
+    /*
+     *
+     */
+    // Set LED pin to output
+    LEDGPIO->MODER    = (LEDGPIO->MODER&~GPIO_MODER_M)|GPIO_MODER_V;
+    // Set pin type
+    LEDGPIO->OTYPER   = (LEDGPIO->OTYPER&~GPIO_OTYPER_M)|GPIO_OTYPER_V;
+    // Set pin SPEED)
+    LEDGPIO->OSPEEDR  = (LEDGPIO->OSPEEDR&~GPIO_OSPEEDR_M)|GPIO_OSPEEDR_V;
+    // Set pullup/pushdown resistors configuration
+    LEDGPIO->PUPDR    = (LEDGPIO->PUPDR&~GPIO_PUPDR_M)|GPIO_PUPDR_V;
+    // Turn off LED
+    LEDGPIO->ODR     &=  ~LEDMASK;
 
 
     for (;;) {
        ms_delay(500);
-       GPIOI->ODR ^= LED_GREEN;     // Use XOR to toggle output
+       LEDGPIO->ODR ^= LEDMASK;     // Use XOR to toggle output
     }
 }
