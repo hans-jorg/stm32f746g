@@ -145,14 +145,13 @@ int main(void) {
        LEDGPIO->ODR ^= LEDMASK;             // Use XOR to toggle output
 #else
        /* Alternative
-        * Writing a 1 to lower 16 bits of BSSR set the corresponding bit
-        * Writing a 1 to upper 16 bits of BSSR clear the correspoding bit
+        * Writing a 1 to lower 16 bits of BSRR set the corresponding bit
+        * Writing a 1 to upper 16 bits of BSRR clear the correspoding bit
        */
         ms_delay(500);
         LEDGPIO->BSSR = LEDMASK;            // Turn on LED
         ms_delay(500);
         LEDGPIO->BSSR = (LEDMASK<<16);      // Turn off LED
-        ms_delay(500);
 #endif
     }
 }
