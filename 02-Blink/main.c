@@ -28,6 +28,9 @@
 #define SHIFTLEFT(V,N)                  ((V)<<(N))
 ///@}
 
+
+/**************************************************************************************************/
+
 /**
  * @brief LED Symbols
  *
@@ -43,26 +46,6 @@
 #define LEDMASK             BIT(LEDPIN)
 ///@}
 
-/**
- * @brief   Quick and dirty delay routine
- *
- * @note    It gives approximately 1ms delay at 16 MHz
- *
- * @note    The COUNTERFOR1MS must be adjusted by trial and error
- *
- * @note    Do not use this or similar in production code
- */
-
-#define COUNTERFOR1MS 300000
-
-
-void ms_delay(volatile int ms) {
-   while (ms-- > 0) {
-      volatile int x=COUNTERFOR1MS;
-      while (x-- > 0)
-         __NOP();
-   }
-}
 
 /**
  * @brief   GPIO Configuration Symbols for LED
@@ -107,16 +90,8 @@ void ms_delay(volatile int ms) {
 #define GPIO_PUPDR_M        SHIFTLEFT(FIELD2MASK,LEDPIN*2)
 ///@}
 
-/**
- * @brief   main
- *
- * @note    Initializes GPIO and blinks LED
- *
- * @note    Really a bad idea to blink LED
- */
 
-int main(void) {
-
+void LED_Init(void) {
     /*
      * Enable clock for GPIOI
      */
@@ -135,6 +110,59 @@ int main(void) {
     LEDGPIO->PUPDR    = (LEDGPIO->PUPDR&~GPIO_PUPDR_M)|GPIO_PUPDR_V;
     // Turn off LED
     LEDGPIO->ODR     &=  ~LEDMASK;
+}
+
+static inline void LED_Set() {
+        LEDGPIO->BSRR = LEDMASK;            // Turn on LED
+}
+
+static inline void LED_Clear() {
+        LEDGPIO->BSRR = (LEDMASK<<16);      // Turn off LED
+}
+
+static inline void LED_Toggle() {
+       LEDGPIO->ODR ^= LEDMASK;             // Use XOR to toggle output
+}
+
+
+/**************************************************************************************************/
+
+
+
+/**
+ * @brief   Quick and dirty delay routine
+ *
+ * @note    It gives approximately 1ms delay at 16 MHz
+ *
+ * @note    The COUNTERFOR1MS must be adjusted by trial and error
+ *
+ * @note    Do not use this or similar in production code
+ */
+
+#define COUNTERFOR1MS 300000
+
+
+void ms_delay(volatile int ms) {
+   while (ms-- > 0) {
+      volatile int x=COUNTERFOR1MS;
+      while (x-- > 0)
+         __NOP();
+   }
+}
+
+
+
+/**
+ * @brief   main
+ *
+ * @note    Initializes GPIO and blinks LED
+ *
+ * @note    Really a bad idea to blink LED
+ */
+
+int main(void) {
+
+    LED_Init();
 
     /*
      * Blink LED
@@ -142,16 +170,17 @@ int main(void) {
     for (;;) {
 #if 1
        ms_delay(500);
-       LEDGPIO->ODR ^= LEDMASK;             // Use XOR to toggle output
+       LED_Toggle();
 #else
        /* Alternative
         * Writing a 1 to lower 16 bits of BSRR set the corresponding bit
         * Writing a 1 to upper 16 bits of BSRR clear the correspoding bit
        */
         ms_delay(500);
-        LEDGPIO->BSRR = LEDMASK;            // Turn on LED
+        LED_Set();
         ms_delay(500);
-        LEDGPIO->BSRR = (LEDMASK<<16);      // Turn off LED
+        LED_Clear();
+        ms_delay(500);
 #endif
     }
 }

@@ -39,7 +39,7 @@ MEMORY
      *ITCMFLASH (rx)   : ORIGIN = 0x00200000, LENGTH = 1024K
      *AXIMFLASH (rx)   : ORIGIN = 0x00800000, LENGTH = 1024K
     */
-    FLASH (rx)         : ORIGIN = 0x00800000, LENGTH = 1024K
+    FLASH (rx)         : ORIGIN = 0x00200000, LENGTH = 1024K
     /* Contiguous RAM
      *DTCMRAM (rwx)    : ORIGIN = 0x20000000, LENGTH = 64K
      *SRAM1 (rwx)      : ORIGIN = 0x20010000, LENGTH = 240K
