@@ -174,11 +174,11 @@ Installation
 
 3 - Install stlink-tools (sudo apt install stlink-tools stlink-gui).
 
-4 - Configure Makefile
+4 - Configure Makefile, specially the location of CMSIS include files in STM32CubeF7
 
 Now it is possible to compile, flash and debug a project using make.
 
-OBS: stm32flash (sudo apt install stm32flash) flash a STM32 device using serial interface.
+OBS: stm32flash (sudo apt install stm32flash) flashes a STM32 device using serial interface.
 
 
 

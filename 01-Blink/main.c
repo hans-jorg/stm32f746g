@@ -37,10 +37,11 @@
  *
  */
 
+///@{
 #define LEDPIN              (1)
 #define LEDGPIO             GPIOI
 #define LEDMASK             BIT(LEDPIN)
-
+///@}
 
 /**
  * @brief   Quick and dirty delay routine
@@ -87,6 +88,7 @@ void ms_delay(volatile int ms) {
  * @note
  */
 
+///@{
 // Pin configuration
 #define LEDMODE             1
 #define LEDOTYPE            0
@@ -103,16 +105,26 @@ void ms_delay(volatile int ms) {
 #define GPIO_OSPEEDR_M      SHIFTLEFT(FIELD2MASK,LEDPIN*2)
 #define GPIO_PUPDR_V        SHIFTLEFT(LEDPUPD,LEDPIN*2)
 #define GPIO_PUPDR_M        SHIFTLEFT(FIELD2MASK,LEDPIN*2)
+///@}
 
-//@}
+/**
+ * @brief   main
+ *
+ * @note    Initializes GPIO and blinks LED
+ *
+ * @note    Really a bad idea to blink LED
+ */
 
 int main(void) {
 
-    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOIEN;        // Enable GPIO Port I
-
     /*
-     *
+     * Enable clock for GPIOI
      */
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOIEN;
+    /*
+     * Configure GPIO to drive LED
+     */
+
     // Set LED pin to output
     LEDGPIO->MODER    = (LEDGPIO->MODER&~GPIO_MODER_M)|GPIO_MODER_V;
     // Set pin type
@@ -124,7 +136,9 @@ int main(void) {
     // Turn off LED
     LEDGPIO->ODR     &=  ~LEDMASK;
 
-
+    /*
+     * Blink LED
+     */
     for (;;) {
        ms_delay(500);
        LEDGPIO->ODR ^= LEDMASK;     // Use XOR to toggle output
