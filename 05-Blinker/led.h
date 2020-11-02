@@ -1,3 +1,5 @@
+#ifndef LED_H
+#define LED_H
 /**
  * @file    led.h
  *
@@ -39,4 +41,5 @@ static inline void LED_Toggle() {
         /* This is a read/modify/write sequence */
        LEDGPIO->ODR ^= LEDMASK;             // Use XOR to toggle output
 }
+#endif
 

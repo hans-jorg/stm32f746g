@@ -165,6 +165,247 @@ Before using a peripheral unit, its clock must be enabled.
 There is a PLL unit to generate clock signal for the SAI unit and another one for the I2S units.
 
 
+### LED and buttons
+
+There is one LED under direct control of software. It is the LD1 (Green) connected to PI1 and to the PIN 6 of CN7 (Arduino D13).
+
+There is a button (USER/WAKE-UP) connected to the board signal B_USER and to the PI11 (Active low)
+
+The other LEDs (not controlled by software) are:
+
+* LD2 : 5V Power Supply (Red)
+* LD3 : USB HS overcurrent (Red)
+* LD4 : USB HS power switch (Green)
+* LD5 : USB FS power switch (Green)
+* LD6 : USB FS overcurrent (Red)
+* LD7 : Controlled by the STLINK (Red/Green)
+
+
+The other button (RESET) is connected to the NRST board line and NRST MCU input.
+
+### Serial
+
+There are two serial communication with the host. One uses two lines to the Debug MCU as below.
+
+ST_LINK TX |  VCP_RX | SB13 | PB7  | UART1_RX (AF7)
+ST_LINK_RX |  VCP_TX | SB12 | PA9  | UART1_TX (AF7)
+
+(Alternative to OTG_FS_VBUS)
+
+The other is the semihosting, which uses the debug lines to communicate. To output a character, a BKPT is used (new generations, above Cortex M1 and M3) or a SWI instruction.
+
+
+There is another technology called ITM serial, which uses the debug lines to transfer information. It works only when using SWD interface.
+
+To use it, one must call the following routines:
+
+	ITM_SendChar(char c);
+
+
+### External RAM
+
+The board uses a MT48LC4M32B2B5-6A SDRAM integrated circuit to expand its RAM using the Flexible Memory Controller.
+
+The device is a PC133 compatible SDRAM and it has four banks of 1 M cell with 32 bits. In total, it has then 128 MBits (=16 Mbytes) but only half of them will be reached due to limitations in the MCU.
+
+It has the following interface
+
+Signal    | Type |     Description
+----------|------------------------------------
+DQ31..0   |  I/O | 32-bit data bus
+A11..0    |  I   | 12 bit address input
+BA1..0    |  I   | 2 bit bank selector
+DQM3..0   |  I   | 4 bit mask input to enable byte write operation
+CAS#      |  I   | Column Address Selector
+RAS#      |  I   | Row Address Selector
+WE#       |  I   | Write operation
+CS#       |  I   | Chip select
+CKE       |  I   | Clock enable
+CLK       |  I   | Clock
+
+Only 16 bits of data bus are used. So it is not neccessary to use full DQM. Only DQM0 and DQ1 are used.
+
+It is connected to the MCU as showm below.
+
+Chip signal | Board signal | MCU Signal
+------------|--------------|---------|------------
+DQ0         |  FMC_D0      | PD14    |  AF12
+DQ1         |  FMC_D1      | PD15    |  AF12
+DQ2         |  FMC_D2      | PD0     |  AF12
+DQ3         |  FMC_D3      | PD1     |  AF12
+DQ4         |  FMC_D4      | PE7     |  AF12
+DQ5         |  FMC_D5      | PE8     |  AF12
+DQ6         |  FMC_D6      | PE9     |  AF12
+DQ7         |  FMC_D7      | PE10    |  AF12
+DQ8         |  FMC_D8      | PE11    |  AF12
+DQ9         |  FMC_D9      | PE12    |  AF12
+DQ10        |  FMC_D10     | PE13    |  AF12
+DQ11        |  FMC_D11     | PE14    |  AF12
+DQ12        |  FMC_D12     | PE15    |  AF12
+DQ13        |  FMC_D13     | PD8     |  AF12
+DQ14        |  FMC_D14     | PD9     |  AF12
+DQ15        |  FMC_D15     | PD10    |  AF12
+A0          |  FMC_A0      | PF0     |  AF12
+A1          |  FMC_A1      | PF1     |  AF12
+A2          |  FMC_A2      | PF2     |  AF12
+A3          |  FMC_A3      | PF3     |  AF12
+A4          |  FMC_A4      | PF4     |  AF12
+A5          |  FMC_A5      | PF5     |  AF12
+A6          |  FMC_A6      | PF12    |  AF12
+A7          |  FMC_A7      | PF13    |  AF12
+A8          |  FMC_A8      | PF14    |  AF12
+A9          |  FMC_A9      | PF15    |  AF12
+A10         |  FMC_A10     | PG0     |  AF12
+A11         |  FMC_A11     | PG1     |  AF12 ????
+BA0         |  FMC_BA0     | PG4     |  AF12
+BA1         |  FMC_BA1     | PG5     |  AF12
+RAS         |  FMC_SDNRAS  | PF11    |  AF12
+CAS         |  FMC_SDNCAS  | PG15    |  AF12
+WE          |  FMC_SNDWE   | PH5     |  AF12
+CLK         |  FMC_SDCLK   | PG8     |  AF12
+CLKE        |  FMC_SDCKE0  | PC3     |  AF12
+CS          |  FMC_SDNE0   | PH3     |  AF12
+DQM0        |  FMC_NBL0    | PE0     |  AF12
+DQM1        |  FMC_NBL1    | PE1     |  AF12
+
+
+
+### LCD
+
+The STM32F646 tem uma unidade de controle de LCD (LTDC) e também uma acelerado ChromeART (DMA2D)
+
+The LCD unit is a 4.3" Liquid Crystal Display (LCD) display with Capacitive Touch Panel (CTP). It is produced by Rocktech under the code RK043FN48H-CT672B.
+
+It can display 16777216 colors (RGB888 interface).
+
+The main features are:
+
+| Feature        | Description
+|----------------|------------------
+| Part No.       | RK043FN02H-CT
+| Size           | 4.3"
+| Resolution     | 480*272
+| AA             | 95.04 x 53.86
+| Outline Size   | 105.50 x 67.20 x 4.35
+| Interface      | RGB for TFT,I2C for CTP
+| Brightness     | 400(after TP)
+| Contrast       | 500:1
+| View angle     | 70/50/70/70
+| Touch Panel    | Optional
+| Remarks        | 4.3" TFT with CTP
+| Application    | Mobile Devices,POS, GPS,black Box, Security,Evaluation Kits etc
+
+
+The most importante parameters are:
+
+Parameter         |	Min   |   Typ     |  Max    | Unit
+------------------|----------|-----------|---------|----------
+DCLK Frequency    |     5    |    9      |    12   | MHz
+------------------|----------|-----------|---------|----------
+HSYNC Period      |   490    |  531      |   605   | DCLK
+HSYNC Display     |          |  480      |         | DCLK
+HSYNC Back porch  |     8    |   43      |         | DCLK
+HSYNC Front porch |     2    |    8      |         | DCLK
+------------------|----------|-----------|---------|----------
+VSYNC Period      |   275    |  288      |   335   | DCLK
+VSYNC Display     |          | 272       |         | H
+VSYNC Back porch  |     1    |  12       |         | H
+VSYNC Front porch |     1    |  40       |         | H
+
+#### I2C
+
+Board signal       | MCU Pin
+-------------------|-------------------|------------------
+LCD_SCL, AUDIO_SCL | PH7
+LCD_SDA, AUDIO_SDA | PH8
+
+
+
+#### Clock
+
+The LCD unit is driven by three clock signals:
+
+* HCLK:  For data transfer
+* APB2 PLCK2: For configuration registers
+* LCD_CLK: Pixel clock domain. It is connected to the LCD
+
+The LCD unit is driven by a clock derived from PLLSAI.The R divisor is used to driven it. The valid range is 2 to 7. 
+An aditional divider can be set on PLLSAIDIVR (2,4,8,16) of RCC_DCKCFGR1.
+
+The Pixel Clock frequency of 9.5 MHz is shown as an example for 480x272 display
+
+The LCD support a frequency in the range 5-12 MHz.
+The HSYNC can take 490-605 of clock pulses.
+The VSYNC can take 274 to 335 horizontal hsync pulses.
+
+#### Aditional signals
+
+It LCD unit be reset by setting pin LTDCRST (26) of RCC_APB2RSTR.
+
+There is a global interrupt for event and error for LCD-TFT unit on position 88 and 89 of vector table, respectively.
+
+
+The backlight is controlled by LCD_BL_CTRL.
+
+
+The capacitive control panel (CTP) is connected to a I2C interface pin of the MCU. It is shared with the Audio I2C.
+
+#### Connection
+
+The connection to MCU is
+
+LCD signal  | Board signal      |   MCU signal
+------------|-------------------|--------------------
+CLK         | LCD_CLK           | PI14
+LCD_R       | LCD_R0-7          | PI15 PJ1-7
+LCD_G       | LCD_G0-7          | PJ7-11 PK0-2
+LCD_B       | LCD_B0-7          | PE4 PJ13-15 PG12 PK4-6
+HSYNC       | LCD_HSYNC         | PI10
+VSYNC       | LCD_VSYNC         | PI9
+DE          | LCD_DE            | PK7
+INT         | LCD_INT           | PI13
+SCL         | LCD_SCL           | PH7
+SDA         | LCD_SDA           | PH8
+SDA         | LCD_RST/NRST      | NRST
+->VBL-/VBL+ | LCD_BL_CTRL       | PK3
+
+The LCD is powered by a 3.3 V and it is controled by a PWM signal on LCD_BL_CTRL.
+
+
+#### Memory
+
+It uses a one or two frame buffers. 
+Each buffer must be 383 KByte (=480*272*3=391680 bytes=382,5 KByte).
+
+
+Memory organization
+
+word     | Pixel
+---------|-----------------
+0        | B1 R0 G0 B0
+1        | G2 B2 R1 G1
+2        | R3 G3 B3 R2
+
+
+
+#### Programming
+
+1. Enable LTDC clock on RCC
+2. Configure pixel clock
+3. Configure VSYNC, HSYNC, Porch, active data area from LCD datasheet
+4. Configure synchronous signal and clock polarity
+5. Configure Backlight on LTDC->BCCR
+6. Configure interrupts on LTDC->IER and LTDC->LIPCR
+7. Configure Layer parameters
+   * Etc
+8. Enable layer
+9. Enable dithering on LTDC->GCR and LTDC->LxCKCR
+10. Reload shadow registers thru LTDC->SRCR
+11. Enable LCD-TFT thru LTDC->GCR
+
+
+
+
 Installation
 ------------
 

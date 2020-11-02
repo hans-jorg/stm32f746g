@@ -1,3 +1,5 @@
+#ifndef GPIO_H
+#define GPIO_H
 /**
  * @file    gpio.h
  *
@@ -28,4 +30,5 @@ static inline void GPIO_Toggle(GPIO_TypeDef *gpio, uint32_t mask) {
 static inline uint32_t GPIO_Read(GPIO_TypeDef *gpio, uint32_t mask) {
        return gpio->IDR;
 }
+#endif
 
