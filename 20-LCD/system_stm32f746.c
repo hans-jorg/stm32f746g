@@ -55,26 +55,12 @@ static uint32_t hpre_table[] = {
 };
 
 
-
-/**
- * @brief   Maximal clock frequencies
- *
- * @note    APB1 (Low Speed Prescaler)  : 54 MHz
- * @note    APB2 (High Speed Prescaler) : 108 MHz
-
- */
-///@{
-#define MAXAPB1FREQ      54000000
-#define MAXAPB2FREQ     108000000
-#define MAXAHB1FREQ     216000000
-///@}
-
 /**
  * @brief   Tables relating Flash Wait States to Clock Frequency and Supply Voltage
  *
  * @note    Is used the info on Table 5 of Section 3.3.2 of RM
  */
-///@{
+//{
 typedef struct {
         uint32_t    vmin;          /* minimum voltage in mV */
         uint32_t    freqmax[11];   /* maximal frequency in MHz for the number of WS */
@@ -92,7 +78,7 @@ FlashWaitStates_Type flashwaitstates_tab[] = {
 
 /// Used when increasing clock frequency
 #define MAXWAITSTATES 9
-///@}
+//}
 
 /**
  * @brief iabs: find absolute value of an integer
@@ -103,7 +89,7 @@ static inline int iabs(int k) { return k<0?-k:k; }
  * @brief HSE Clock Enable/Disable
  *
  */
-///@{
+//{
 static inline void EnableHSE(void) {
 #ifdef HSE_EXTERNAL_OSCILLATOR
     RCC->CR |= RCC_CR_HSEON|RCC_CR_HSEBYP;
@@ -116,13 +102,13 @@ static inline void EnableHSE(void) {
 static inline void DisableHSE(void) {
     RCC->CR &= ~(RCC_CR_HSEON|RCC_CR_HSEBYP);
 }
-///@}
+//}
 
 /**
  * @brief HSI Clock Enable/Disable
  *
  */
-///@{
+//{
 static inline void EnableHSI(void) {
     RCC->CR |= RCC_CR_HSION;
     while( (RCC->CR&RCC_CR_HSIRDY) == 0 ) {}
@@ -131,14 +117,14 @@ static inline void EnableHSI(void) {
 static inline void DisableHSI(void) {
     RCC->CR &= ~(RCC_CR_HSION);
 }
-///@}
+//}
 
 /**
- * @brief   Main PLL Enable/Disable
+ * @brief   Main PLL Disable
  *
  * @note    Do not disable it, if it drives the core
  */
-///@{
+//{
 static inline void EnableMainPLL(void) {
 
     RCC->CR |= RCC_CR_PLLON;
@@ -146,61 +132,19 @@ static inline void EnableMainPLL(void) {
     // Wait until it stabilizes
     while( (RCC->CR&RCC_CR_PLLRDY)!=RCC_CR_PLLRDY ) {}
 }
-
 static inline void DisableMainPLL(void) {
 
     RCC->CR &= ~RCC_CR_PLLON;
 
 }
-///@}
-
-/**
- * @brief   PLLSAI Enable/Disable
- *
- */
-///@{
-static inline void EnablePLLSAI(void) {
-
-    RCC->CR |= RCC_CR_PLLSAION;
-
-    // Wait until it stabilizes
-    while( (RCC->CR&RCC_CR_PLLSAIRDY)!=RCC_CR_PLLSAIRDY ) {}
-}
-
-static inline void DisablePLLSAI(void) {
-
-    RCC->CR &= ~RCC_CR_PLLSAION;
-
-}
-///@}
-
-/**
- * @brief   PLLI2S Enable/Disable
- *
- */
-///@{
-static inline void EnablePLLI2S(void) {
-
-    RCC->CR |= RCC_CR_PLLI2SON;
-
-    // Wait until it stabilizes
-    while( (RCC->CR&RCC_CR_PLLI2SRDY)!=RCC_CR_PLLI2SRDY ) {}
-}
-
-static inline void DisablePLLI2S(void) {
-
-    RCC->CR &= ~RCC_CR_PLLI2SON;
-
-}
-///@}
-
+//}
 
 
 /**
  * @brief LSE Clock Enable/Disable
  *
  */
-///@{
+//{
 static inline void EnableLSE(void) {
 #ifdef LSE_EXTERNAL_OSCILLATOR
     RCC->BDCR |= RCC_BDCR_LSEON|RCC_BDCR_LSEBYP;
@@ -213,7 +157,7 @@ static inline void EnableLSE(void) {
 static inline void DisableLSE(void) {
     RCC->BDCR &= ~(RCC_BDCR_LSEON|RCC_BDCR_LSEBYP);
 }
-///@}
+//}
 
 
 /**
@@ -283,36 +227,8 @@ uint32_t ws;
 
 }
 
-
 /**
- * @brief   FindHPRE
- *
- * @note    Given a divisor, find the best HPRE returning its encoding
- *
- * @note    Could use the hpre_table table above, as the alternative below.
- */
-static uint32_t FindHPRE(uint32_t divisor) {
-uint32_t k;
-
-    k = SystemFindLargestPower2(divisor);   // 2 exponent of divisor
-#if 1
-    if( k == 0 )
-        return 0;
-    if( k < 5 ) {
-        return 0x8+k-1;
-    } else { // There is no divisor 32. It is changed to 64
-        return 0x8+k-2;
-    }
-#else
-    for(int i=0;i<sizeof(hpre_table)/sizeof(uint32_t);i++) {
-        if( hpre_table[i]>=divisor)
-            return i;
-    }
-#endif
-}
-
-/**
- * @brief   SetPrescalers for AHB, APB1 and APB2
+ * @brief   SetAHBxPrescaler
  *
  * @note    This prescaler divides the SYSCLK to generate the HCLK, i.e, core clock frequency
  *
@@ -322,27 +238,8 @@ uint32_t k;
  * @note    APB2 is the high speed prescaler. It must be set so the APB2 frequency is not greater
  *          than 108 MHz.
  */
- ///@{
-
-void
-SystemSetAHB1Prescaler(uint32_t newdiv) {
-uint32_t hpre, div;
-uint32_t newhpre;
-
-
-        hpre = (RCC->CFGR&RCC_CFGR_HPRE_Msk)>>RCC_CFGR_HPRE_Pos;
-        div = hpre_table[hpre];
-        newhpre = FindHPRE(newdiv);
-        if( newdiv < div ) {                    // Increasing clock frequency
-            SetFlashWaitStates(MAXWAITSTATES);  // Worst case
-        }
-        RCC->CFGR = (RCC->CFGR&~RCC_CFGR_HPRE)|(newhpre<<RCC_CFGR_HPRE_Pos);
-
-}
- 
-
-void
-SystemSetAPB1Prescaler(uint32_t div) {
+ //{
+static inline void SetAPB1Prescaler(uint32_t div) {
 uint32_t ppre1;
 uint32_t p2;
 
@@ -360,9 +257,7 @@ uint32_t p2;
     RCC->CFGR =  (RCC->CFGR&~RCC_CFGR_PPRE1)|(ppre1)<<RCC_CFGR_PPRE1_Pos;
 
 }
-
-void
-SystemSetAPB2Prescaler(uint32_t div) {
+static inline void SetAPB2Prescaler(uint32_t div) {
 uint32_t ppre2;
 uint32_t p2;
 
@@ -380,27 +275,7 @@ uint32_t p2;
     RCC->CFGR =  (RCC->CFGR&~RCC_CFGR_PPRE2)|(ppre2)<<RCC_CFGR_PPRE2_Pos;
 
 }
-///@}
-
-
-/**
- * @brief   SystemSetPeripheralClocks
- *
- * @note    Set Peripheral Prescalers so the APBx maximal clock frequencies are not
- *          exceeded.
- */
-static void SetPeripheralClocks(uint32_t div1, uint32_t div2) {
-uint32_t div1min,div2min;
-
-    div1min = (SystemCoreClock+MAXAPB1FREQ-1)/MAXAPB1FREQ;
-    if( div1 < div1min ) div1 = div1min;
-
-    div2min = (SystemCoreClock+MAXAPB2FREQ-1)/MAXAPB2FREQ;
-    if( div2 < div2min ) div2 = div2min;
-    
-    SystemSetAPB1Prescaler(div1);
-    SystemSetAPB2Prescaler(div2);
-}
+//}
 
 /**
  * @brief   CalculateMainPLLOutFrequency
@@ -530,373 +405,94 @@ uint32_t sysclk_freq, prescaler, hpre;
     return sysclk_freq/prescaler;
 }
 
+
 /**
- * @brief   In any PLL already configured?
+ * @brief   FindHPRE
  *
- * @note    Indicates if any PLL unit has been configured
+ * @note    Given a divisor, find the best HPRE returning its encoding
  *
- * @note    It is used to avoid the reconfiguration of common parts
- *          like clock source and M divider
- *
+ * @note    Could use the hpre_table table above, as the alternative below.
  */
-///@{
-static uint32_t MainPLLConfigured = 0;
-static uint32_t PLLSAIConfigured = 0;
-static uint32_t PLLI2SConfigured = 0;
+static uint32_t FindHPRE(uint32_t divisor) {
+uint32_t k;
 
-static inline int IsAnyPLLConfigured(void) {
-
-    return RCC->CR&(RCC_CR_PLLON|RCC_CR_PLLSAION|RCC_CR_PLLI2SON)
-        | (MainPLLConfigured + PLLSAIConfigured + PLLI2SConfigured);
-}
-///@}
-/**
- * @brief   Find P divisor encoding
- *
- * @note    Only values 2,4,6,8 are valid and encoded as 0,1,2,3 respesctively
-
- * @note    Invalid values are rounded to next large one
- *
- */
-
-///@{
-//                           div:  0, 1, 2, 3, 4, 5, 6, 7, 8
-static uint32_t p_encoding[] = {   0 ,0, 0, 1, 1, 2, 2, 3, 3 };
-
-static inline uint32_t
-FindPDivEncoding(uint32_t div) {
-
-    if( div <= 8 ) return p_encoding[div];
-    else return 3;
-
-#if 0
-uint32_t newp;
-    if( pllconfig->P <= 2 ) newp = 0x0;
-    else if (pllconfig->P > 2 && pllconfig <= 4 ) newp = 0x1;
-    else if (pllconfig->P > 4 && pllconfig <= 6 ) newp = 0x2;
-    else if newp = 0x3;
-    return newp;
+    k = SystemFindLargestPower2(divisor);   // 2 exponent of divisor
+#if 1
+    if( k == 0 )
+        return 0;
+    if( k < 5 ) {
+        return 0x8+k-1;
+    } else { // There is no divisor 32. It is changed to 64
+        return 0x8+k-2;
+    }
+#else
+    for(int i=0;i<sizeof(hpre_table)/sizeof(uint32_t);i++) {
+        if( hpre_table[i]>=divisor)
+            return i;
+    }
 #endif
 }
-///@}
 
-/**
- * @brief   CheckPLLConfiguration
- *
- */
-int
-CheckPLLConfiguration(PLL_Configuration *pllconfig) {
-
-    if( pllconfig->M < 2 ) pllconfig->M = 2;
-    if( pllconfig->M > 63 ) pllconfig->M = 63;
-
-    if( pllconfig->N < 50 ) pllconfig->N = 50;
-    if( pllconfig->N > 432 ) pllconfig->N = 432;
-
-    if( pllconfig->P < 2 ) pllconfig->P = 2;
-    else if (pllconfig->P == 3 ) pllconfig->P = 4;
-    else if ( pllconfig->P > 4 ) pllconfig->P = 8;
-
-    if( pllconfig->P <= 2 ) pllconfig->P = 2;
-    else if (pllconfig->P > 2 && pllconfig->P <= 4 ) pllconfig->P = 4;
-    else if (pllconfig->P > 4 && pllconfig->P <= 6 ) pllconfig->P = 6;
-    else pllconfig->P = 8;
-
-    if( pllconfig->Q < 2 ) pllconfig->Q = 2;
-    if( pllconfig->Q > 15 ) pllconfig->Q = 15;
-
-    if( pllconfig->R < 2 ) pllconfig->R = 2;
-    if( pllconfig->R > 7 ) pllconfig->R = 7;
-
-}
-
-
-/**
- * @brief   GetPLLConfiguration
- *
- */
-uint32_t SystemGetPLLConfiguration(uint32_t whichone,PLL_Configuration *pllconfig) {
-uint32_t rc = 0;
-
-    // Source and M registers are shared by all PLL units
-    pllconfig->M = (RCC->PLLCFGR&RCC_PLLCFGR_PLLM)>>RCC_PLLCFGR_PLLM_Pos;
-    if( (RCC->PLLCFGR&RCC_PLLCFGR_PLLSRC) == RCC_PLLCFGR_PLLSRC_HSI )
-        pllconfig->source = HSI_FREQ;
-    else
-        pllconfig->source = HSE_FREQ;
-
-    switch(whichone) {
-    case PLL_MAIN:
-        pllconfig->N = (RCC->PLLCFGR&RCC_PLLCFGR_PLLN)>>RCC_PLLCFGR_PLLN_Pos;
-        pllconfig->P = 2*(RCC->PLLCFGR&RCC_PLLCFGR_PLLQ)>>RCC_PLLCFGR_PLLP_Pos+2;
-        pllconfig->Q = (RCC->PLLCFGR&RCC_PLLCFGR_PLLQ)>>RCC_PLLCFGR_PLLQ_Pos;
-        pllconfig->R = 1;
-        rc = RCC->CR&RCC_CR_PLLON;
-        break;
-    case PLL_SAI:
-        pllconfig->N = (RCC->PLLSAICFGR&RCC_PLLSAICFGR_PLLSAIN)>>RCC_PLLSAICFGR_PLLSAIN_Pos;
-        pllconfig->P = 2*(RCC->PLLSAICFGR&RCC_PLLSAICFGR_PLLSAIP)>>RCC_PLLSAICFGR_PLLSAIP_Pos+2;
-        pllconfig->Q = (RCC->PLLSAICFGR&RCC_PLLSAICFGR_PLLSAIQ)>>RCC_PLLSAICFGR_PLLSAIQ_Pos;
-        pllconfig->R = (RCC->PLLSAICFGR&RCC_PLLSAICFGR_PLLSAIR)>>RCC_PLLSAICFGR_PLLSAIR_Pos;
-        rc = RCC->CR&RCC_CR_PLLSAION;
-        break;
-    case PLL_I2S:
-        pllconfig->N = (RCC->PLLSAICFGR&RCC_PLLI2SCFGR_PLLI2SN)>>RCC_PLLI2SCFGR_PLLI2SN_Pos;
-        pllconfig->P = 2*(RCC->PLLI2SCFGR&RCC_PLLI2SCFGR_PLLI2SP)>>RCC_PLLI2SCFGR_PLLI2SP_Pos+2;
-        pllconfig->Q = (RCC->PLLI2SCFGR&RCC_PLLI2SCFGR_PLLI2SQ)>>RCC_PLLI2SCFGR_PLLI2SQ_Pos;
-        pllconfig->R = (RCC->PLLI2SCFGR&RCC_PLLI2SCFGR_PLLI2SR)>>RCC_PLLI2SCFGR_PLLI2SR_Pos;
-        rc = RCC->CR&RCC_CR_PLLI2SON;
-        break;
-    }
-    return rc;
-}
 /**
  * @brief   SystemMainPLLConfig
  *
  * @note    Configure Main PLL unit
  *
  * @note    If core clock source (HCLK) is PLL, it is changed to HSI
- *          and restored at the end
  *
  * @note    It does not switch the core clock source (HCLK) to PLL
  */
 
-///@{
+//{
+static uint32_t MainPLLConfigured = 0;
 void
-SystemMainPLLConfig(PLL_Configuration *pllconfig) {
-uint32_t rcc_pllcfgr,freq;
-uint32_t returntopll = 0;
-uint32_t newp = 0;
-
-    // Filter bad parameters
-    CheckPLLConfiguration(pllconfig);
+SystemMainPLLConfig(uint32_t clocksource, PLL_Configuration *pllconfig) {
+uint32_t freq,src;
+uint32_t rcc_pllcfgr;
 
     // If core clock source is PLL change it to HSI and disable PLL
     if( RCC->CFGR&RCC_CFGR_SWS == RCC_CFGR_SWS_PLL ) {
         EnableHSI();
         RCC->CFGR = (RCC->CFGR&RCC_CFGR_SW)|RCC_CFGR_SW_HSI;
         DisableMainPLL();
-        returntopll = 1;
     }
-    
-    // Clear all fields except
+
+    // Configure it
+    switch(clocksource) {
+    case CLOCKSRC_HSI:
+        freq = HSI_FREQ;
+        src  = RCC_CFGR_SW_HSI;
+        break;
+    case CLOCKSRC_HSE:
+        freq = HSE_FREQ;
+        src  = RCC_CFGR_SW_HSE;
+        break;
+    default:
+        return;
+    }
+    // Get PLLCFGR and clear fields to be set
     rcc_pllcfgr = RCC->PLLCFGR
              &  ~(  RCC_PLLCFGR_PLLQ
+                   |RCC_PLLCFGR_PLLSRC
                    |RCC_PLLCFGR_PLLP
                    |RCC_PLLCFGR_PLLN
+                   |RCC_PLLCFGR_PLLM
                  );
 
-
-    // Only configure source and M, it is not previously configured
-    if( IsAnyPLLConfigured() ) {
-        // If already configure, update M in pllconfig
-        pllconfig->M = (RCC->PLLCFGR&RCC_PLLCFGR_PLLM)>>RCC_PLLCFGR_PLLM_Pos;
-        // Get frequency from registers
-        if( (RCC->PLLCFGR&RCC_PLLCFGR_PLLSRC) == RCC_PLLCFGR_PLLSRC_HSI )
-            freq = HSI_FREQ;
-        else
-            freq = HSE_FREQ;
-
-    } else {
-        //  Clear fields for source and M
-        rcc_pllcfgr &= ~(RCC_PLLCFGR_PLLM|RCC_PLLCFGR_PLLSRC);
-        // Configure them
-
-        rcc_pllcfgr  |= pllconfig->source;
-        rcc_pllcfgr |= pllconfig->M<<RCC_PLLCFGR_PLLM_Pos;
-        if( pllconfig->source ==  RCC_PLLCFGR_PLLSRC_HSI)
-            freq = HSI_FREQ;
-        else
-            freq = HSE_FREQ;
-    }
-
-    // New configuration
-    newp = FindPDivEncoding(pllconfig->P);
-    rcc_pllcfgr |= (newp<<RCC_PLLCFGR_PLLP_Pos)
+    rcc_pllcfgr |= (pllconfig->P<<RCC_PLLCFGR_PLLP_Pos)
                   |(pllconfig->N<<RCC_PLLCFGR_PLLN_Pos)
-                  |(pllconfig->Q<<RCC_PLLCFGR_PLLQ_Pos);
+                  |(pllconfig->M<<RCC_PLLCFGR_PLLM_Pos)
+                  |(pllconfig->Q<<RCC_PLLCFGR_PLLQ_Pos)
+                  |src;
 
-    // Calculate frequencies
-    pllconfig->infreq = freq;
-    pllconfig->pllinfreq = freq/pllconfig->M;
-    pllconfig->vcofreq = (freq*pllconfig->N)/pllconfig->M;
-    pllconfig->poutfreq = pllconfig->vcofreq/pllconfig->P;
-    pllconfig->qoutfreq = pllconfig->vcofreq/pllconfig->Q;
-    pllconfig->routfreq = 0;
-
-    // Set new configuration
     RCC->PLLCFGR = rcc_pllcfgr;
 
     EnableMainPLL();
 
-    if( returntopll ) {
-        RCC->CFGR = (RCC->CFGR&~RCC_CFGR_SW)|RCC_CFGR_SW_PLL;
-    }
     MainPLLConfigured = 1;
 }
-//@}
+//}
 
-
-/**
- * @brief   SystemPLLSAIConfig
- *
- * @note    Configure PLL SAI unit
- *
- * @note    It shares the M divider and clock source with Main PLL
- *
- * @note    Main before PLLSAI and PLLI2S ??????
- */
-
-///@{
-void
-SystemPLLSAIConfig(PLL_Configuration *pllconfig) {
-uint32_t freq,src;
-uint32_t rcc_pllcfgr;
-uint32_t rcc_pllsaicfgr;
-uint32_t newp;
-
-    // Filter bad parameters
-    CheckPLLConfiguration(pllconfig);
-
-    // Disable PLLSAI
-    DisablePLLSAI();
-
-    // Clear all fields of PLLSAICFGR
-    rcc_pllsaicfgr = RCC->PLLSAICFGR
-             &  ~(  RCC_PLLSAICFGR_PLLSAIQ
-                   |RCC_PLLSAICFGR_PLLSAIP
-                   |RCC_PLLSAICFGR_PLLSAIN
-                   |RCC_PLLSAICFGR_PLLSAIR
-                 );
-
-    // Get PLLCFGR in case it is neccessary to configurate clock source and M
-    rcc_pllcfgr = RCC->PLLCFGR;
-
-    // Only configure source and M, it is not previously configured
-    if( IsAnyPLLConfigured() ) {
-        // If already configure, update M in pllconfig
-        pllconfig->M = (RCC->PLLCFGR&RCC_PLLCFGR_PLLM)>>RCC_PLLCFGR_PLLM_Pos;
-        // Get frequency from registers
-        if( (RCC->PLLCFGR&RCC_PLLCFGR_PLLSRC) == RCC_PLLCFGR_PLLSRC_HSI )
-            freq = HSI_FREQ;
-        else
-            freq = HSE_FREQ;
-    } else {
-        //  Clear fields for source and M
-        rcc_pllcfgr &= ~(RCC_PLLCFGR_PLLM|RCC_PLLCFGR_PLLSRC);
-        // Configure them
-        rcc_pllcfgr |= pllconfig->source;
-        rcc_pllcfgr |= pllconfig->M<<RCC_PLLCFGR_PLLM_Pos;
-        if( pllconfig->source == RCC_CFGR_SW_HSI )
-            freq = HSI_FREQ;
-        else
-            freq = HSE_FREQ;
-    }
-
-    // New configuration
-    newp = FindPDivEncoding(pllconfig->P);
-    rcc_pllsaicfgr |= (newp<<RCC_PLLSAICFGR_PLLSAIP_Pos)
-                  |(pllconfig->N<<RCC_PLLSAICFGR_PLLSAIN_Pos)
-                  |(pllconfig->Q<<RCC_PLLSAICFGR_PLLSAIQ_Pos)
-                  |(pllconfig->R<<RCC_PLLSAICFGR_PLLSAIR_Pos);
-
-    // Calculate frequencies
-    pllconfig->infreq = freq;
-    pllconfig->pllinfreq = freq/pllconfig->M;
-    pllconfig->vcofreq = (freq*pllconfig->N)/pllconfig->M;
-    pllconfig->poutfreq = pllconfig->vcofreq/pllconfig->P;
-    pllconfig->qoutfreq = pllconfig->vcofreq/pllconfig->Q;
-    pllconfig->routfreq = pllconfig->vcofreq/pllconfig->R;
-
-    // Set new configuration
-    RCC->PLLCFGR    = rcc_pllcfgr;
-    RCC->PLLSAICFGR    = rcc_pllsaicfgr;
-    
-    EnablePLLSAI();
-
-    PLLSAIConfigured = 1;
-}
-
-
-/**
- * @brief   SystemPLLI2SConfig
- *
- * @note    Configure PLL SAI unit
- *
- * @note    It shares the M divider and clock source with Main PLL
- *
- * @note    Main before PLLSAI and PLLI2S ????????
- */
-
-///@{
-void
-SystemPLLI2SConfig(PLL_Configuration *pllconfig) {
-uint32_t freq,src;
-uint32_t rcc_pllcfgr;
-uint32_t rcc_plli2scfgr;
-uint32_t newp;
-
-    // Filter bad parameters
-    CheckPLLConfiguration(pllconfig);
-
-    // Disable PLLI2S
-    DisablePLLI2S();
-
-    // Clear all fields of PLLI2SCFGR
-    rcc_plli2scfgr = RCC->PLLI2SCFGR
-             &  ~(  RCC_PLLI2SCFGR_PLLI2SQ
-                   |RCC_PLLI2SCFGR_PLLI2SP
-                   |RCC_PLLI2SCFGR_PLLI2SN
-                   |RCC_PLLI2SCFGR_PLLI2SR
-                 );
-
-    // Get PLLCFGR in case it is neccessary to configurate clock source and M
-    rcc_pllcfgr = RCC->PLLCFGR;
-
-    // Only configure source and M, it is not previously configured
-    if( IsAnyPLLConfigured() ) {
-        // If already configure, update M in pllconfig
-        pllconfig->M = (RCC->PLLCFGR&RCC_PLLCFGR_PLLM)>>RCC_PLLCFGR_PLLM_Pos;
-        // Get frequency from registers
-        if( (RCC->PLLCFGR&RCC_PLLCFGR_PLLSRC) == RCC_PLLCFGR_PLLSRC_HSI )
-            freq = HSI_FREQ;
-        else
-            freq = HSE_FREQ;
-    } else {
-        //  Clear fields for source and M
-        rcc_pllcfgr &= ~(RCC_PLLCFGR_PLLM|RCC_PLLCFGR_PLLSRC);
-        // Configure them
-        rcc_pllcfgr |= pllconfig->source;
-        rcc_pllcfgr |= pllconfig->M<<RCC_PLLCFGR_PLLM_Pos;
-        if( pllconfig->source == CLOCKSRC_HSI )
-            freq = HSI_FREQ;
-        else
-            freq = HSE_FREQ;
-    }
-
-    // New configuration
-    newp = FindPDivEncoding(pllconfig->P);
-    rcc_plli2scfgr |= (newp<<RCC_PLLI2SCFGR_PLLI2SP_Pos)
-                  |(pllconfig->N<<RCC_PLLI2SCFGR_PLLI2SN_Pos)
-                  |(pllconfig->Q<<RCC_PLLI2SCFGR_PLLI2SQ_Pos)
-                  |(pllconfig->R<<RCC_PLLI2SCFGR_PLLI2SR_Pos);
-
-    // Calculate frequencies
-    pllconfig->infreq = freq;
-    pllconfig->pllinfreq = freq/pllconfig->M;
-    pllconfig->vcofreq = (freq*pllconfig->N)/pllconfig->M;
-    pllconfig->poutfreq = pllconfig->vcofreq/pllconfig->P;
-    pllconfig->qoutfreq = pllconfig->vcofreq/pllconfig->Q;
-    pllconfig->routfreq = pllconfig->vcofreq/pllconfig->R;
-
-    // Set new configuration
-    RCC->PLLCFGR    = rcc_pllcfgr;
-    RCC->PLLI2SCFGR = rcc_plli2scfgr;
-    
-    EnablePLLI2S();
-
-    PLLI2SConfigured = 1;
-}
 
 /**
  * @brief   SystemCoreClockSet
@@ -933,10 +529,14 @@ uint32_t hpre,newhpre;
 
     src = RCC->CFGR & RCC_CFGR_SW;
 
-    SetPeripheralClocks(2,2); // Worst case values
-
     if( newsrc == src ) { // Just change the prescaler
-        SystemSetAHB1Prescaler(newdiv);
+        hpre = (RCC->CFGR&RCC_CFGR_HPRE_Msk)>>RCC_CFGR_HPRE_Pos;
+        div = hpre_table[hpre];
+        newhpre = FindHPRE(newdiv);
+        if( newdiv < div ) {                    // Increasing clock frequency
+            SetFlashWaitStates(MAXWAITSTATES);  // Worst case
+        }
+        RCC->CFGR = (RCC->CFGR&~RCC_CFGR_HPRE)|(newhpre<<RCC_CFGR_HPRE_Pos);
     } else {
         // There is a change of clock source
 
@@ -960,11 +560,6 @@ uint32_t hpre,newhpre;
     // Set SystemCoreClock to the new frequency and adjust flash wait states
     SystemCoreClockUpdate();
     ConfigureFlashWaitStates(SystemCoreClock,VSUPPLY);
-
-    // Adjust peripheral clocks
-    SetPeripheralClocks(0,0);
-
-    
     return 0;
  }
 
@@ -1108,7 +703,5 @@ SystemInit(void) {
     /* Additional initialization here */
 
 }
-
-
 
 

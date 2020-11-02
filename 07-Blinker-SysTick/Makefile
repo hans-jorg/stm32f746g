@@ -36,7 +36,7 @@
 #
 # Program name
 #
-PROGNAME=extram
+PROGNAME=blink
 
 #
 # Defines the part type that this project uses.
@@ -192,9 +192,8 @@ PREFIX:=arm-none-eabi
 
 # Set the compiler CPU/FPU options.
 #
-CPUFLAGS=-mcpu=cortex-m7+nofp
-#FPUFLAGS=-mthumb -mcpu=cortex-m7 -mfloat-abi=hard -mfpu=fpv5-sp-d16
-FPUFLAGS=-mthumb 
+CPUFLAGS=-mcpu=cortex-m7
+FPUFLAGS=-mthumb -mcpu=cortex-m7 -mfloat-abi=hard -mfpu=fpv5-d16
 #
 # Terminal application (used to open new windows in debug)
 #

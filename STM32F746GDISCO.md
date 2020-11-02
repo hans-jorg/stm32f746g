@@ -154,11 +154,18 @@ There are two additional clock sources, used by certain peripherals:
 
 ![Clock-Source](Figures/Clock-Source2.gif)
 
-The HCLK clock for core, memory, DMA and AHB bus is derived from SYSCLK signal through a prescaler.
-This prescaler is a power of 2 in the range 1 to 512. 
+The HCLK is derived from the SYSCLK through a prescaler. It is used as a clock signal for the core, the memory, DMA and the Advanced High Speed Bus (AHB). Following CMSIS, its frequency is stored in the *SystemCoreClock* variable and is updated by the *SystemCoreClockUpdate* function.
 
-The APB bus clock is derived from HCLK through a prescaler, which is a power of 2 
-in the range 1 to 16.
+There are two Advanced Peripheral Bus clock signals, both are derived from the HCLK through prescalers. The prescalers are power of 2 in the range 1 to 16.
+
+
+Clock signal |	Max. Freq	| Source         | Prescaler     |  Prescaler range 
+-------------|--------------|----------------|---------------|--------------------
+SYSCLK       |	216 MHz     | PLL, HSI, HSE  |  -            |     -
+HCLK         |  216 MHz     | SYSCLK         | RCC_CFGR_HPRE | 1, 2, 4, 8, 16, 64, 128, 256, 512
+APB1         |   54 MHz     | HCLK           | RCC_CFGR_PPRE1| 1,2,4,8,16
+APB2         |  108 MHz     | HCLK           | RCC_CFGR_PPRE2| 1,2,4,8,16
+
 
 Before using a peripheral unit, its clock must be enabled.
 
@@ -185,10 +192,12 @@ The other button (RESET) is connected to the NRST board line and NRST MCU input.
 
 ### Serial
 
-There are two serial communication with the host. One uses two lines to the Debug MCU as below.
+There are two serial communication channels with the host. One uses two lines to the Debug MCU as below.
 
-ST_LINK TX |  VCP_RX | SB13 | PB7  | UART1_RX (AF7)
-ST_LINK_RX |  VCP_TX | SB12 | PA9  | UART1_TX (AF7)
+Signal     |  Board signal      | Jumper    | STM32F746G Pin  |  Unit
+-----------|--------------------|----- -----|-----------------|-------------------
+ST_LINK TX |  VCP_RX            | SB13      |      PB7        | UART1_RX (AF7)
+ST_LINK_RX |  VCP_TX            | SB12      |      PA9        | UART1_TX (AF7)
 
 (Alternative to OTG_FS_VBUS)
 
@@ -484,7 +493,16 @@ The output frequency is given by the formulas and must obey the limits shown.
 
 ![Clock-Source](Figures/Formulas2.png)
 
- 
+The values for the PLL registers are specified in the following table.
+
+Register | Range
+---------|-------------------------
+M        | 2-63
+N        | 50-432
+P        | 2,4,6,8
+Q        | 2-15
+R        | 2-7
+
 The M, N and P factors are shared with the other PLL units. The Q factor is a prescaler for these other clock signals.
 The f_USBCLK must be 48 MHz.
 

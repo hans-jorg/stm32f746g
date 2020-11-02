@@ -7,6 +7,7 @@
  *  @date   27/10/2020
  */
 
+#include "sdram.h"
 
 /**
  *  @brief  Size definition
@@ -14,15 +15,15 @@
 ///@{
 /// Total size of area to be managed. Must be a power of 2
 #ifndef BUDDYTOTALSIZE
-#define BUDDYTOTALSIZE   16384
+#define BUDDYTOTALSIZE  SDRAMSIZE
 #endif
 /// Minimal size of a block
 #ifndef BUDDYMINSIZE
-#define BUDDYMINSIZE     1024
+#define BUDDYMINSIZE     8192
 #endif
 /// Address of area to be managed
 #ifndef BUDDYBASE
-#define BUDDYBASE        0x1000000
+#define BUDDYBASE        SDRAMAREA
 #endif
 ///@}
 

@@ -157,32 +157,20 @@ uint32_t SystemFindLargestPower2Exp(uint32_t divisor);
 
 
 /**
- * @brief   PLL parameters
- *
- * @note   f_PLLIN = f_IN / M
- *         f_VCO   = f_PLLIN * N
- *         f_P     = f_VCO/P
- *         f_Q     = f_VCO/Q
- *         f_R     = f_VCO/R
- *
- * @note   All frequency calculation done in integeres
- *
+ * @brief PLL parameters
  */
 
 typedef struct {
-    uint32_t    source;         // = RCC_CFGR_SWS_HSI or RCC_CFGR_SWS_HSI
     uint32_t    M;
     uint32_t    N;
     uint32_t    P;
-    uint32_t    Q;
+    uint32_t    Q;              /* for other PLL units */
     uint32_t    R;
-    /* filled by CalculatePLLOutFrequencies and when configuring */
-    uint32_t    infreq;         // = SYSFREQ
-    uint32_t    pllinfreq;      // = SYSFREQ/M
-    uint32_t    vcofreq;        // = PLLINFREQ*N
-    uint32_t    poutfreq;       // = VCOFREQ/P
-    uint32_t    qoutfreq;       // = VCOFREQ/Q
-    uint32_t    routfreq;       // = VCOFREQ/R
+    /* filled by CalculatePLLOutFrequencies */
+    uint32_t    poutfreq;
+    uint32_t    qoutfreq;
+    uint32_t    routfreq;
+
 } PLL_Configuration;
 
 /**
@@ -222,27 +210,12 @@ void SystemInit(void);
 //{
 
 uint32_t SystemCoreClockGet(void);
+void     SystemMainPLLConfig(uint32_t clocksource, PLL_Configuration *pllconfig);
 uint32_t SystemCoreClockSet(uint32_t newsrc, uint32_t newdiv);
-
-void SystemSetAHB1Prescaler(uint32_t newdiv);
-void SystemSetAPB1Prescaler(uint32_t newdiv);
-void SystemSetAPB2Prescaler(uint32_t newdiv);
-
-#define PLL_MAIN (0)
-#define PLL_SAI  (1)
-#define PLL_I2S  (2)
-
-void SystemMainPLLConfig(PLL_Configuration *pllconfig);
-void SystemPLLSAIConfig(PLL_Configuration *pllconfig);
-void SystemPLLI2SConfig(PLL_Configuration *pllconfig);
-uint32_t SystemGetPLLConfiguration(uint32_t whichone, PLL_Configuration *pllconfig);
-
 uint32_t SystemFindNearestPower2(uint32_t divisor);
 uint32_t SystemFindNearestPower2Exp(uint32_t divisor);
 uint32_t SystemFindLargestPower2(uint32_t divisor);
 uint32_t SystemFindLargestPower2Exp(uint32_t divisor);
-
-
 //}
 
 
