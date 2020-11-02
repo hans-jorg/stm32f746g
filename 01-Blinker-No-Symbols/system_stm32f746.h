@@ -13,8 +13,8 @@
  * @note     Define symbols for Clock Sources
  * @note     This code must be adapted for processor and compiler
  *
- * @note     System Core Clock (SYSCLK) is named HCLK and is derived from SYSCLK
- *           thru AHB prescaler
+ * @note     System Core Clock (SYSCLK) is named HCLK and AHB CLock
+ *           and is derived from SYSCLK thru AHB prescaler
  *
  * @author   Hans
  *
@@ -49,18 +49,6 @@ uint32_t SystemCoreClockGet(void);
  * @note    CMSIS standard function
  */
 void SystemInit(void);
-
-/**
- * @brief   Auxiliary routines
- *
- * @note    Implementation at the end of this file
- */
-
-uint32_t SystemFindNearestPower2(uint32_t divisor);
-uint32_t SystemFindNearestPower2Exp(uint32_t divisor);
-uint32_t SystemFindLargestPower2(uint32_t divisor);
-uint32_t SystemFindLargestPower2Exp(uint32_t divisor);
-
 
 
 //------8<-------8<-------8<-------8<-------8<-------8<-------8<-------8<-------8<-------8<-------
@@ -125,13 +113,6 @@ uint32_t SystemFindLargestPower2Exp(uint32_t divisor);
 //}
 
 
-
-//------8<-------8<-------8<-------8<-------8<-------8<-------8<-------8<-------8<-------8<-------
-
-/**
- * @brief Clock frequencies
- */
-
 /**
  * @brief  Maximal system core frequency (HCLK_max)
  */
@@ -145,6 +126,14 @@ uint32_t SystemFindLargestPower2Exp(uint32_t divisor);
 #define LSI_FREQ               32000UL          /* Internal RCC low precision [17..47 KHz]) */
 //}
 
+
+
+//------8<-------8<-------8<-------8<-------8<-------8<-------8<-------8<-------8<-------8<-------
+
+/**
+ * @brief Clock Management
+ */
+
 /**
  * @brief Clocks sources for System Clock SYSCLK
  */
@@ -153,8 +142,6 @@ uint32_t SystemFindLargestPower2Exp(uint32_t divisor);
 #define CLOCKSRC_HSE        RCC_CFGR_SWS_HSE
 #define CLOCKSRC_PLL        RCC_CFGR_SWS_PLL
 //}
-
-
 
 /**
  * @brief PLL parameters
@@ -174,50 +161,29 @@ typedef struct {
 } PLL_Configuration;
 
 /**
- * @brief   SystemCoreClock
- *
- * @note    Variable containing the System Core Clock Frequency
- *
- * @note    CMSIS
- */
-extern uint32_t SystemCoreClock;
-
-
-/**
- * @brief   SystemCoreClockUpdate
- *
- * @note    Procedure to set the variable to the System Core Clock Frequency
- *
- * @note    CMSIS
- */
-
-void SystemCoreClockUpdate(void);
-
-
-/**
- * @brief   SystemInit
- *
- * @note    Overrides function on start_DEVICE.c
- *
- * @note    CMSIS
- */
-void SystemInit(void);
-
-
-/**
  * @note    Additional functions
  */
-//{
+// Get routines
+uint32_t SystemGetCoreClock(void);
+uint32_t SystemGetSYSCLKFrequency(void);
+uint32_t SystemGetAPB1Frequency(void);
+uint32_t SystemGetAPB2Frequency(void);
+uint32_t SystemGetAHBFrequency(void);
+uint32_t SystemGetHCLKFrequency(void);
+uint32_t SystemGetCoreClock(void);
 
-uint32_t SystemCoreClockGet(void);
-void     SystemMainPLLConfig(uint32_t clocksource, PLL_Configuration *pllconfig);
-uint32_t SystemCoreClockSet(uint32_t newsrc, uint32_t newdiv);
+// Set routines
+uint32_t SystemSetCoreClock(uint32_t newsrc, uint32_t newdiv);
+uint32_t SystemSetCoreClockFrequency(uint32_t freq);
+void     SystemConfigMainPLL(uint32_t clocksource, PLL_Configuration *pllconfig);
+void     SystemSetAPB1Prescaler(uint32_t div);
+void     SystemSetAPB2Prescaler(uint32_t div);
+
+// Auxiliary routines
+
 uint32_t SystemFindNearestPower2(uint32_t divisor);
 uint32_t SystemFindNearestPower2Exp(uint32_t divisor);
 uint32_t SystemFindLargestPower2(uint32_t divisor);
 uint32_t SystemFindLargestPower2Exp(uint32_t divisor);
-//}
-
-
 
 #endif

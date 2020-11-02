@@ -18,7 +18,6 @@
 #include "stm32f746xx.h"
 #include "system_stm32f746.h"
 
-
 /**
  * @brief   SystemCoreClock
  * @note    Global variable holding System Clock Frequency (HCLK)
@@ -26,32 +25,46 @@
  */
 uint32_t SystemCoreClock = HSI_FREQ;
 
+
+//////////////// Clock Management /////////////////////////////////////////////
+
 /**
- * @brief SystemCoreClockUpdate
- *
- * @note Updates the SystemCoreClock variable using information contained in the
- *       Clock Register Values (RCC)
- *
- * @note This function must be called to update SystemCoreClock variable every time
- *       the clock configuration is modified.
- *
- * @note It is part of CMSIS
+ * @brief   Flag to indicate that the Main PLL was configured
  */
+static uint32_t MainPLLConfigured = 0;
 
-void
-SystemCoreClockUpdate(void) {
-
-    SystemCoreClock = SystemCoreClockGet();
-
-}
 
 /**
  * @brief   AHB prescaler table
  * @note    It is a power of 2 in range 1 to 512 but different to 32
  */
-static uint32_t hpre_table[] = {
+static const uint32_t hpre_table[] = {
     1,1,1,1,1,1,1,1,                /* 0xxx: No division */
     2,4,8,16,64,128,256,512         /* 1000-1111: division by */
+};
+
+
+/**
+ * @brief   APB prescaler table
+ * @note    It is a power of 2 in range 1 to 16
+ */
+static const uint32_t ppre_table[] = {
+    1,1,1,1,                        /* 0xxx: No division */
+    2,4,8,16                        /* 1000-1111: division by */
+};
+
+
+/**
+ * @brief   Clock Configuration for 200 MHz
+ * @note    It is a power of 2 in range 1 to 16
+ */
+static PLL_Configuration ClockConfiguration200MHz = {
+    .source = CLOCKSRC_HSE,     /* Clock source = HSE */
+    .M = HSE_FREQ/1000000,      /* f_IN = 1 MHz   */
+    .N = 400,                   /* f_PLL = 400 MHz*/
+    .P = 2,                     /* f_OUT = 200 MHz*/
+    .Q = 2,                     /* Not used */
+    .R = 2                      /* Not used */
 };
 
 
@@ -60,13 +73,13 @@ static uint32_t hpre_table[] = {
  *
  * @note    Is used the info on Table 5 of Section 3.3.2 of RM
  */
-//{
+///@{
 typedef struct {
         uint32_t    vmin;          /* minimum voltage in mV */
         uint32_t    freqmax[11];   /* maximal frequency in MHz for the number of WS */
 } FlashWaitStates_Type;
 
-FlashWaitStates_Type flashwaitstates_tab[] = {
+FlashWaitStates_Type const flashwaitstates_tab[] = {
     /*  minimum                 Maximum frequency for Wait states                   */
     /*  voltage      0    1     2     3      4     5     6     7     8     9        */
     {   2700,     { 30,   60,   90,  120,  150,  180,  210,  216,    0,    0,   0}  },
@@ -78,18 +91,20 @@ FlashWaitStates_Type flashwaitstates_tab[] = {
 
 /// Used when increasing clock frequency
 #define MAXWAITSTATES 9
-//}
+///@}
 
 /**
  * @brief iabs: find absolute value of an integer
  */
 static inline int iabs(int k) { return k<0?-k:k; }
 
+
 /**
  * @brief HSE Clock Enable/Disable
  *
- */
-//{
+ * @note    Do not disable it, if it drives the core
+ **/
+///@{
 static inline void EnableHSE(void) {
 #ifdef HSE_EXTERNAL_OSCILLATOR
     RCC->CR |= RCC_CR_HSEON|RCC_CR_HSEBYP;
@@ -102,13 +117,14 @@ static inline void EnableHSE(void) {
 static inline void DisableHSE(void) {
     RCC->CR &= ~(RCC_CR_HSEON|RCC_CR_HSEBYP);
 }
-//}
+///@}
 
 /**
  * @brief HSI Clock Enable/Disable
  *
- */
-//{
+ * @note    Do not disable it, if it drives the core
+ **/
+///@{
 static inline void EnableHSI(void) {
     RCC->CR |= RCC_CR_HSION;
     while( (RCC->CR&RCC_CR_HSIRDY) == 0 ) {}
@@ -117,14 +133,14 @@ static inline void EnableHSI(void) {
 static inline void DisableHSI(void) {
     RCC->CR &= ~(RCC_CR_HSION);
 }
-//}
+///@}
 
 /**
  * @brief   Main PLL Disable
  *
  * @note    Do not disable it, if it drives the core
- */
-//{
+ **/
+///@{
 static inline void EnableMainPLL(void) {
 
     RCC->CR |= RCC_CR_PLLON;
@@ -137,14 +153,13 @@ static inline void DisableMainPLL(void) {
     RCC->CR &= ~RCC_CR_PLLON;
 
 }
-//}
+///@}
 
 
 /**
  * @brief LSE Clock Enable/Disable
- *
- */
-//{
+ **/
+///@{
 static inline void EnableLSE(void) {
 #ifdef LSE_EXTERNAL_OSCILLATOR
     RCC->BDCR |= RCC_BDCR_LSEON|RCC_BDCR_LSEBYP;
@@ -157,12 +172,12 @@ static inline void EnableLSE(void) {
 static inline void DisableLSE(void) {
     RCC->BDCR &= ~(RCC_BDCR_LSEON|RCC_BDCR_LSEBYP);
 }
-//}
+///@}
 
 
 /**
  * @brief   UnlockFlashRegisters
- */
+ **/
 static inline void UnlockFlashRegisters(void) {
     FLASH->KEYR = 0x45670123;
     FLASH->KEYR = 0xCDEF89AB;
@@ -170,7 +185,7 @@ static inline void UnlockFlashRegisters(void) {
 
 /**
  * @brief   LockFlashRegisters
- */
+ **/
 static inline void LockFlashRegisters(void) {
     FLASH->CR |= FLASH_CR_LOCK;
 }
@@ -179,7 +194,7 @@ static inline void LockFlashRegisters(void) {
  * @brief   SetFlashWaitStates
  *
  * @note    Set FLASH to have n wait states
- */
+ **/
 
 static void inline SetFlashWaitStates(int n) {
 
@@ -193,7 +208,7 @@ static void inline SetFlashWaitStates(int n) {
  *
  * @note    Given Core Clock Frequency and Voltage, find the number of Wait States
  *          needed for correct access to flash memory
- */
+ **/
 static int
 FindFlashWaitStates(uint32_t freq, uint32_t voltage) {
 int i,j;
@@ -214,7 +229,7 @@ int i,j;
 /**
  * @brief   Configure Flash Wait State according core frequency and voltage
  *
- */
+ **/
 static void inline ConfigureFlashWaitStates(uint32_t freq, uint32_t voltage) {
 uint32_t ws;
 
@@ -228,21 +243,38 @@ uint32_t ws;
 }
 
 /**
- * @brief   SetAHBxPrescaler
+ * @brief   Get APB1 Prescaler
  *
- * @note    This prescaler divides the SYSCLK to generate the HCLK, i.e, core clock frequency
+ * @note    This prescaler divides the HCLK to generate the APB1 clock, the high speed
+ *          peripheral clock
  *
- * @note    APB1 is the low speed prescaler. It must be set so the APB1 frequency is not greater
- *          than 54 MHz.
+ * @note    It must be set so the APB1 frequency is not greater than 54 MHz.
  *
- * @note    APB2 is the high speed prescaler. It must be set so the APB2 frequency is not greater
- *          than 108 MHz.
  */
- //{
-static inline void SetAPB1Prescaler(uint32_t div) {
+
+uint32_t SystemGetAPB1Prescaler(void) {
+    return ppre_table[(RCC->CFGR&~RCC_CFGR_PPRE1_Msk)>>RCC_CFGR_PPRE1_Pos];
+}
+
+
+/**
+ * @brief   SetAPB1 Prescaler
+ *
+ * @note    This prescaler divides the HCLK to generate the APB1, that is
+ *          the slow speed peripheral bus
+ *
+ * @note    It must be set so the APB1 frequency is not greater than 54 MHz.
+ *
+ */
+
+void SystemSetAPB1Prescaler(uint32_t div) {
 uint32_t ppre1;
 uint32_t p2;
 
+
+    if( SystemCoreClock/div > 54000000 )
+        return;
+        
     p2 = SystemFindLargestPower2Exp(div);
 
     if (p2 == 0)
@@ -251,16 +283,42 @@ uint32_t p2;
         ppre1 = 4+p2-1;
     }
 
-    if( SystemCoreClock/div > 54000000 )
-        return;
-
-    RCC->CFGR =  (RCC->CFGR&~RCC_CFGR_PPRE1)|(ppre1)<<RCC_CFGR_PPRE1_Pos;
+    RCC->CFGR =  (RCC->CFGR&~RCC_CFGR_PPRE1_Msk)|(ppre1)<<RCC_CFGR_PPRE1_Pos;
 
 }
-static inline void SetAPB2Prescaler(uint32_t div) {
+
+/**
+ * @brief   Get APB2 Prescaler
+ *
+ * @note    This prescaler divides the HCLK to generate the APB1 clock, the high speed
+ *          peripheral clock
+ *
+ * @note    It must be set so the APB1 frequency is not greater than 108 MHz.
+ *
+ */
+
+uint32_t SystemGetAPB2Prescaler(void) {
+    return ppre_table[(RCC->CFGR&~RCC_CFGR_PPRE2_Msk)>>RCC_CFGR_PPRE2_Pos];
+}
+
+
+/**
+ * @brief   SetAPB2 Prescaler
+ *
+ * @note    This prescaler divides the HCLK to generate the APB1, the high speed
+ *          peripheral clock
+ *
+ * @note    It must be set so the APB1 frequency is not greater than 108 MHz.
+ *
+ */
+
+void SystemSetAPB2Prescaler(uint32_t div) {
 uint32_t ppre2;
 uint32_t p2;
 
+    if( SystemCoreClock/div > 54000000 )
+        return;
+        
     p2 = SystemFindLargestPower2Exp(div);
 
     if (p2 == 0)
@@ -269,13 +327,10 @@ uint32_t p2;
         ppre2 = 4+p2-1;
     }
 
-    if( SystemCoreClock/div > 54000000 )
-        return;
-
-    RCC->CFGR =  (RCC->CFGR&~RCC_CFGR_PPRE2)|(ppre2)<<RCC_CFGR_PPRE2_Pos;
+    RCC->CFGR =  (RCC->CFGR&~RCC_CFGR_PPRE2_Msk)|(ppre2)<<RCC_CFGR_PPRE2_Pos;
 
 }
-//}
+///@}
 
 /**
  * @brief   CalculateMainPLLOutFrequency
@@ -285,9 +340,12 @@ uint32_t p2;
  *          SYSCLK = PLL_VCO / PLL_R
  */
 static uint32_t
-CalculateMainPLLOutFrequency(uint32_t clocksource, PLL_Configuration *pllconfig) {
+CalculateMainPLLOutFrequency(PLL_Configuration *pllconfig) {
 uint32_t outfreq,infreq;
+uint32_t clocksource;
 
+    clocksource = pllconfig->source;
+    
     if( clocksource == CLOCKSRC_HSI) {
         infreq = HSI_FREQ;
     } else if ( clocksource == CLOCKSRC_HSE ){
@@ -313,8 +371,11 @@ uint32_t outfreq,infreq;
  *          MAINOUT = PLLCLK = PLLSAIP = OUTP
  */
 static uint32_t
-CalculatePLLOutFrequencies(uint32_t clocksource, PLL_Configuration *pllconfig) {
+CalculatePLLOutFrequencies(PLL_Configuration *pllconfig) {
 uint32_t outfreq,infreq;
+uint32_t clocksource;
+
+    clocksource = pllconfig->source;
 
     if( clocksource == CLOCKSRC_HSI) {
         infreq = HSI_FREQ;
@@ -340,8 +401,7 @@ uint32_t outfreq,infreq;
  * @note    returns the SYSCLK, i.e., the Core Clock before the prescaler
  */
 
-static uint32_t
-GetSYSCLKFreq(void) {
+uint32_t SystemGetSYSCLKFrequency(void) {
 uint32_t rcc_cr, rcc_cfgr, rcc_pllcfgr;
 uint32_t src;
 uint32_t sysclk_freq;
@@ -370,32 +430,30 @@ PLL_Configuration pllconfig;
             pllsrc = CLOCKSRC_HSI;
         else
             pllsrc = CLOCKSRC_HSE;
-            
+
+        pllconfig.source = pllsrc;
         pllconfig.M = (rcc_pllcfgr & RCC_PLLCFGR_PLLM)>>RCC_PLLCFGR_PLLM_Pos;
         pllconfig.N = (rcc_pllcfgr & RCC_PLLCFGR_PLLN)>>RCC_PLLCFGR_PLLN_Pos;
         pllconfig.P = (rcc_pllcfgr & RCC_PLLCFGR_PLLP)>>RCC_PLLCFGR_PLLP_Pos;
-        sysclk_freq = CalculateMainPLLOutFrequency(pllsrc,&pllconfig);
+        sysclk_freq = CalculateMainPLLOutFrequency(&pllconfig);
       break;
     }
 
     return sysclk_freq;
 }
 
-
-
-  
 /**
- * @brief   SystemCoreClockGet
+ * @brief   SystemGetCoreClock
  *
  * @note    Returns the System Core Clock based on information contained in the
  *          Clock Register Values (RCC)
  */
 
 uint32_t
-SystemCoreClockGet(void) {
+SystemGetCoreClock(void) {
 uint32_t sysclk_freq, prescaler, hpre;
 
-    sysclk_freq = GetSYSCLKFreq();
+    sysclk_freq = SystemGetSYSCLKFrequency();
     
     /* Get HCLK prescaler */
     hpre = (RCC->CFGR&RCC_CFGR_HPRE_Msk)>>RCC_CFGR_HPRE_Pos;
@@ -405,6 +463,59 @@ uint32_t sysclk_freq, prescaler, hpre;
     return sysclk_freq/prescaler;
 }
 
+/**
+ * @brief   SystemGetAPB1Frequency
+ *
+ * @note    Returns the APB1 (low speed peripheral) clock frequency 
+ */
+uint32_t SystemGetAPB1Frequency(void) {
+uint32_t freq;
+uint32_t ppre1;
+
+    freq = SystemGetCoreClock();
+    ppre1 = (RCC->CFGR&RCC_CFGR_PPRE1_Msk)>>RCC_CFGR_PPRE1_Pos;
+    return freq/ppre_table[ppre1];
+}
+
+/**
+ * @brief   SystemGetAPB1Frequency
+ *
+ * @note    Returns the System Core Clock based on information contained in the
+ *          Clock Register Values (RCC)
+ */
+
+uint32_t SystemGetAPB2Frequency(void) {
+uint32_t freq;
+uint32_t ppre2;
+
+    freq = SystemGetCoreClock();
+    ppre2 = (RCC->CFGR&RCC_CFGR_PPRE2_Msk)>>RCC_CFGR_PPRE2_Pos;
+    return freq/ppre_table[ppre2];
+}
+
+/**
+ * @brief   SystemGetAHBFrequency
+ *
+ * @note    It is the same as SystemCoreClock and HCLK
+ */
+
+uint32_t SystemGetAHBFrequency(void) {
+
+    return SystemGetCoreClock();
+
+}
+
+/**
+ * @brief   SystemGetHCLKFrequency
+ *
+ * @note    It is the same as SystemCoreClock and HCLK
+ */
+
+uint32_t SystemGetHCLKFrequency(void) {
+
+    return SystemGetCoreClock();
+
+}
 
 /**
  * @brief   FindHPRE
@@ -434,7 +545,7 @@ uint32_t k;
 }
 
 /**
- * @brief   SystemMainPLLConfig
+ * @brief   SystemConfigMainPLL
  *
  * @note    Configure Main PLL unit
  *
@@ -443,12 +554,13 @@ uint32_t k;
  * @note    It does not switch the core clock source (HCLK) to PLL
  */
 
-//{
-static uint32_t MainPLLConfigured = 0;
 void
-SystemMainPLLConfig(uint32_t clocksource, PLL_Configuration *pllconfig) {
+SystemConfigMainPLL(PLL_Configuration *pllconfig) {
 uint32_t freq,src;
 uint32_t rcc_pllcfgr;
+uint32_t clocksource;
+
+    clocksource = pllconfig->source;
 
     // If core clock source is PLL change it to HSI and disable PLL
     if( RCC->CFGR&RCC_CFGR_SWS == RCC_CFGR_SWS_PLL ) {
@@ -491,50 +603,66 @@ uint32_t rcc_pllcfgr;
 
     MainPLLConfigured = 1;
 }
-//}
+///@}
 
 
 /**
- * @brief   SystemCoreClockSet
+ * @brief   SystemSetCoreClock
  *
  * @note    Configure to use clock source. If not enabled, enable it and wait for
  *          stabilization
  *
- * @note    PLL must be previously configured by calling SystemMainPLLConfig
+ * @note    If the PLL clock is not configure, it is configured to generate a
+ *          200 MHz clock signal
  *
  * @note    To increase the clock frequency (Section 3.3.2 of RM)
- *          1. Program the new number of wait states to the LATENCY bits in the FLASH_ACR register
- *          2. Check that the new number of wait states is taken into account to access the
- *             Flash memory by reading the FLASH_ACR register
- *          3. Modify the CPU clock source by writing the SW bits in the RCC_CFGR register
- *          4  If needed, modify the CPU clock prescaler by writing the HPRE bits in RCC_CFGR
- *          5. Check that the new CPU clock source or/and the new CPU clock prescaler value
- *              is/are taken into account by reading the clock source status (SWS bits)
- *              or/and the AHB prescaler value (HPRE bits), respectively, in the RCC_CFGR register.
+ *          1. Program the new number of wait states to the LATENCY bits
+ *             in the FLASH_ACR register
+ *          2. Check that the new number of wait states is taken into account
+ *             to access the Flash memory by reading the FLASH_ACR register
+ *          3. Modify the CPU clock source by writing the SW bits in the RCC_CFGR
+ *             register
+ *          4  If needed, modify the CPU clock prescaler by writing the HPRE bits
+ *             in RCC_CFGR
+ *          5. Check that the new CPU clock source or/and the new CPU clock prescaler
+ *             value is/are taken into account by reading the clock source status
+ *             (SWS bits) or/and the AHB prescaler value (HPRE bits), respectively,
+ *             in the RCC_CFGR register.
  *
  * @note   To decrease the clock frequency (Section 3.3.2 of RM)
- *         1. Modify the CPU clock source by writing the SW bits in the RCC_CFGR register
- *         2. If needed, modify the CPU clock prescaler by writing the HPRE bits in RCC_CFGR
- *         3. Check that the new CPU clock source or/and the new CPU clock prescaler value is/are
- *            taken into account by reading the clock source status (SWS bits) or/and the AHB
- *            prescaler value (HPRE bits), respectively, in the RCC_CFGR register
+ *         1. Modify the CPU clock source by writing the SW bits in
+ *            the RCC_CFGR register
+ *         2. If needed, modify the CPU clock prescaler by writing the HPRE
+ *            bits in RCC_CFGR
+ *         3. Check that the new CPU clock source or/and the new CPU clock
+ *            prescaler value is/are taken into account by reading the
+ *            clock source status (SWS bits) or/and the AHB prescaler value
+ *            (HPRE bits), respectively, in the RCC_CFGR register
  *         4. Program the new number of wait states to the LATENCY bits in FLASH_ACR
- *         5. Check that the new number of wait states is used to access the Flash memory by
- *            reading the FLASH_ACR register
+ *         5. Check that the new number of wait states is used to access
+ *            the Flash memory by reading the FLASH_ACR register
  *
  */
-uint32_t SystemCoreClockSet(uint32_t newsrc, uint32_t newdiv) {
+uint32_t SystemSetCoreClock(uint32_t newsrc, uint32_t newdiv) {
 uint32_t src,div;
 uint32_t hpre,newhpre;
+uint32_t ppre1;
+uint32_t ppre2;
 
     src = RCC->CFGR & RCC_CFGR_SW;
 
+    // Save APBx prescaler configuration */
+    ppre1 = SystemGetAPB1Prescaler();
+    ppre2 = SystemGetAPB2Prescaler();
+    
     if( newsrc == src ) { // Just change the prescaler
         hpre = (RCC->CFGR&RCC_CFGR_HPRE_Msk)>>RCC_CFGR_HPRE_Pos;
         div = hpre_table[hpre];
         newhpre = FindHPRE(newdiv);
         if( newdiv < div ) {                    // Increasing clock frequency
             SetFlashWaitStates(MAXWAITSTATES);  // Worst case
+            SystemSetAPB1Prescaler(4);          // Safe
+            SystemSetAPB2Prescaler(2);          // Safe
         }
         RCC->CFGR = (RCC->CFGR&~RCC_CFGR_HPRE)|(newhpre<<RCC_CFGR_HPRE_Pos);
     } else {
@@ -551,20 +679,50 @@ uint32_t hpre,newhpre;
             RCC->CFGR = (RCC->CFGR&~RCC_CFGR_SW)|RCC_CFGR_SW_HSE;
             break;
         case CLOCKSRC_PLL:
-            if( MainPLLConfigured ) {
-                RCC->CFGR = (RCC->CFGR&~RCC_CFGR_SW)|RCC_CFGR_SW_PLL;
+            if( !MainPLLConfigured ) {
+                SystemSetAPB1Prescaler(4);                  // Safe
+                SystemSetAPB2Prescaler(2);                  // Safe
+                SystemConfigMainPLL(&ClockConfiguration200MHz);
             }
+            RCC->CFGR = (RCC->CFGR&~RCC_CFGR_SW)|RCC_CFGR_SW_PLL;
         }
     }
 
     // Set SystemCoreClock to the new frequency and adjust flash wait states
     SystemCoreClockUpdate();
     ConfigureFlashWaitStates(SystemCoreClock,VSUPPLY);
+    // Try to restore APBx prescalers
+    SystemSetAPB1Prescaler(ppre1);
+    SystemSetAPB2Prescaler(ppre2); 
     return 0;
  }
 
 
-///////////////////////////Auxiliary functions ///////////////////////////////////////////////////
+/**
+ * @brief   SystemSetCoreClockFrequency
+ *
+ * @note    Configure to use PLL as a clock source and to run at the given
+ *          frequency.
+  */
+uint32_t SystemSetCoreClockFrequency(uint32_t freq) {
+PLL_Configuration clockconf;
+
+    if( freq >= HCLKMAX ) {
+        freq = HCLKMAX;
+    }
+    clockconf.source = CLOCKSRC_HSE;     /* Clock source   */
+    clockconf.M = HSE_FREQ/1000000;      /* f_IN = 1 MHz   */
+    clockconf.N = 2*freq;                /* f_PLL = 400 MHz*/
+    clockconf.P = 2;                     /* f_OUT = 200 MHz*/
+    clockconf.Q = 2;                     /* Not used */
+    clockconf.R = 2;                     /* Not used */
+
+    SystemConfigMainPLL(&clockconf);
+    SystemSetCoreClock(CLOCKSRC_PLL,1);
+    return freq;
+}
+
+///////////////////////////Auxiliary functions ////////////////////////////////
 
 /**
  * @brief   FindNearestPower2Divisor
@@ -644,15 +802,37 @@ int i;
     return i;
 }
 
-///////////////////////////SystemInit//////////////////////////////////////////////////////////////
+
+//////////////// CMSIS  ///////////////////////////////////////////////////////
+
+/**
+ * @brief SystemCoreClockUpdate
+ *
+ * @note Updates the SystemCoreClock variable using information contained in the
+ *       Clock Register Values (RCC)
+ *
+ * @note This function must be called to update SystemCoreClock variable every time
+ *       the clock configuration is modified.
+ *
+ * @note It is part of CMSIS
+ */
+
+void
+SystemCoreClockUpdate(void) {
+
+    SystemCoreClock = SystemGetCoreClock();
+
+}
+
 
 /**
  * @brief SystemInit
  *
- * @note Resets to default configuration for clock and disables all interrupts
+ * @note  Resets to default configuration for clock and disables all interrupts
  *
- * @note Replaces the one (dummy) contained in start_DEVICE.c
+ * @note  It is part of CMSIS
  *
+ * @note  Replaces the one (dummy) contained in start_DEVICE.c
  */
 
 void
@@ -703,5 +883,6 @@ SystemInit(void) {
     /* Additional initialization here */
 
 }
+
 
 

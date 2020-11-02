@@ -45,7 +45,7 @@ void SysTick_Handler(void) {
 int main(void) {
 
     /* configure clock to 200 MHz */
-    SystemCoreClockSet(CLOCKSRC_PLL,1);
+    SystemSetCoreClock(CLOCKSRC_PLL,1);
 
     SysTick_Config(SystemCoreClock/1000);
 
