@@ -36,7 +36,7 @@
 #
 # Program name
 #
-PROGNAME=extram
+PROGNAME=blink
 
 #
 # Defines the part type that this project uses.
@@ -55,9 +55,21 @@ PARTCLASSCMSIS=STM32F7xx
 #
 FLASHBUS=itcm
 #FLASHBUS=axim
+
+
+#
+# Suppress warnings
+# Comment out to have verbose output
+#MAKEFLAGS+= --silent
+.SILENT:
+
 #
 # Include path for CMSIS headers
 #
+
+# CMSIS Dir
+CMSISDIR=../../STM32CubeF7/Drivers/CMSIS
+
 CMSISDEVINCDIR=${CMSISDIR}/Device/ST/$(PARTCLASSCMSIS)/Include
 CMSISINCDIR=${CMSISDIR}/Include
 INCLUDEPATH=${CMSISDEVINCDIR} ${CMSISINCDIR}
@@ -192,9 +204,10 @@ PREFIX:=arm-none-eabi
 
 # Set the compiler CPU/FPU options.
 #
-CPUFLAGS=-mcpu=cortex-m7+nofp
-#FPUFLAGS=-mthumb -mcpu=cortex-m7 -mfloat-abi=hard -mfpu=fpv5-sp-d16
-FPUFLAGS=-mthumb 
+CPUFLAGS=-mcpu=cortex-m7
+FPUFLAGS=-mthumb -mcpu=cortex-m7 -mfloat-abi=hard
+#FPUFLAGS=-mthumb -mcpu=cortex-m7 -mfloat-abi=softfp  -mfpu=fpv5-d16
+
 #
 # Terminal application (used to open new windows in debug)
 #
@@ -216,12 +229,6 @@ default: build
 # Default debugger
 #
 debug: gdb
-
-#
-# Suppress warnings
-# Comment out to have verbose output
-#MAKEFLAGS+= --silent
-.SILENT:
 
 #
 # Serial terminal communication
@@ -269,11 +276,6 @@ EDITOR=gedit
 # Path
 #
 OPENOCDDIR=/usr/share/openocd
-
-
-# CMSIS Dir
-CMSISDIR=../../STM32CubeF7/Drivers/CMSIS
-
 
 #
 # Additional libraries
@@ -339,11 +341,6 @@ OBJNM=${PREFIX}-nm
 ###############################################################################
 
 #
-# The flags passed to the linker.
-#
-LDFLAGS=--gc-sections
-
-#
 # The flags passed to the debugger
 #
 GDBFLAGS=-x $(GDBINIT) -n
@@ -372,17 +369,17 @@ ODFLAGS=-S -D
 #
 # Get the location of libgcc.a from the GCC front-end.
 #
-LIBGCC:=${shell ${CC} ${CFLAGS} -print-libgcc-file-name}
+LIBGCC:=${shell ${CC} ${CFLAGS} ${FPUFLAGS} -print-libgcc-file-name}
 
 #
 # Get the location of libc.a from the GCC front-end.
 #
-LIBC:=${shell ${CC} ${CFLAGS} -print-file-name=libc.a}
+LIBC:=${shell ${CC} ${CFLAGS} ${FPUFLAGS} -print-file-name=libc.a}
 
 #
 # Get the location of libm.a from the GCC front-end.
 #
-LIBM:=${shell ${CC} ${CFLAGS} -print-file-name=libm.a}
+LIBM:=${shell ${CC} ${CFLAGS} ${FPUFLAGS} -print-file-name=libm.a}
 
 #
 # Object files
@@ -411,6 +408,13 @@ CFLAGS=-mthumb             \
        -std=c99            \
        -pedantic           \
        -DPART_${PART}
+
+
+#
+# The flags passed to the linker.
+#
+LDFLAGS=--gc-sections
+
 
 #
 # Tell the compiler to include debugging information if the DEBUG environment
@@ -443,6 +447,7 @@ ENTRY=Reset_Handler
 # RULES                                                                       #
 ###############################################################################
 
+COMMA=,
 #
 # The rule for building the object file from each C source file.
 #
@@ -469,9 +474,10 @@ ${OBJDIR}/%.a:
 #
 ${OBJDIR}/%.axf:  $(OBJFILES)
 	@echo "  Linking             ${@} ";
-	${LD} -T '${LINKERSCRIPT}' --entry '${ENTRY}' \
-	      ${LDFLAGS} -o ${@} $(OBJFILES) \
-	      '${LIBM}' '${LIBC}' '${LIBGCC}'
+	${CC} -T '${LINKERSCRIPT}' --entry '${ENTRY}' \
+	        ${CPUFLAGS} ${FPUFLAGS} \
+	        ${addprefix -Wl${COMMA},${LDFLAGS} } -o ${@} $(OBJFILES) \
+	        '${LIBM}' '${LIBC}' '${LIBGCC}'
 
 ${OBJDIR}/%.bin: ${OBJDIR}/%.axf
 	@echo "  Generating binary   ${@} ";
@@ -661,6 +667,11 @@ docs: doxygen
 doxygen:
 	$(DOXYGEN) *.c *.h
 
+#
+#
+#
+cproto:
+	cproto -c $(addprefix -I ,${INCLUDEPATH}) -D${PARTCLASS} $(SRCFILES)
 #
 # These labels are not files !!!
 #
