@@ -39,6 +39,7 @@ void SysTick_Handler(void) {
  */
 
 static PLL_Configuration Clock200MHz = {
+    .source = CLOCKSRC_HSE,
     .M = HSE_OSCILLATOR_FREQ/1000000,       // f_INT = 1 MHz
     .N = 400,                               // f_VCO = 400 MHz
     .P = 2,                                 // f_OUT = 200 MHz
@@ -57,8 +58,8 @@ static PLL_Configuration Clock200MHz = {
 int main(void) {
 
     /* configure clock to 200 MHz */
-    SystemMainPLLConfig(CLOCKSRC_HSE,&Clock200MHz);
-    SystemCoreClockSet(CLOCKSRC_PLL,2);
+    SystemConfigMainPLL(&Clock200MHz);
+    SystemSetCoreClock(CLOCKSRC_PLL,2);
 
     SysTick_Config(SystemCoreClock/1000);
 

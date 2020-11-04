@@ -148,16 +148,19 @@ void SystemInit(void);
  */
 
 typedef struct {
+    uint32_t    source;
     uint32_t    M;
     uint32_t    N;
     uint32_t    P;
     uint32_t    Q;              /* for other PLL units */
     uint32_t    R;
     /* filled by CalculatePLLOutFrequencies */
-    uint32_t    poutfreq;
-    uint32_t    qoutfreq;
-    uint32_t    routfreq;
-
+    uint32_t    infreq;         // = SYSFREQ
+    uint32_t    pllinfreq;      // = SYSFREQ/M
+    uint32_t    vcofreq;        // = PLLINFREQ*N
+    uint32_t    poutfreq;       // = VCOFREQ/P
+    uint32_t    qoutfreq;       // = VCOFREQ/Q
+    uint32_t    routfreq;       // = VCOFREQ/R
 } PLL_Configuration;
 
 /**
@@ -171,11 +174,14 @@ uint32_t SystemGetAPB2Frequency(void);
 uint32_t SystemGetAHBFrequency(void);
 uint32_t SystemGetHCLKFrequency(void);
 uint32_t SystemGetCoreClock(void);
+uint32_t SystemGetAPB1Prescaler(void);
+uint32_t SystemGetAPB2Prescaler(void);
+uint32_t SystemGetSYSCLKFrequency(void);
+
 
 // Set routines
 uint32_t SystemSetCoreClock(uint32_t newsrc, uint32_t newdiv);
 uint32_t SystemSetCoreClockFrequency(uint32_t freq);
-void     SystemConfigMainPLL(uint32_t clocksource, PLL_Configuration *pllconfig);
 void     SystemSetAPB1Prescaler(uint32_t div);
 void     SystemSetAPB2Prescaler(uint32_t div);
 
@@ -185,5 +191,16 @@ uint32_t SystemFindNearestPower2(uint32_t divisor);
 uint32_t SystemFindNearestPower2Exp(uint32_t divisor);
 uint32_t SystemFindLargestPower2(uint32_t divisor);
 uint32_t SystemFindLargestPower2Exp(uint32_t divisor);
+
+// Additional PLL routines
+#define PLL_MAIN (0)
+#define PLL_SAI  (1)
+#define PLL_I2S  (2)
+
+void SystemConfigMainPLL(PLL_Configuration *pllconfig);
+void SystemConfigSAIPLL(PLL_Configuration *pllconfig);
+void SystemConfigI2SPLL(PLL_Configuration *pllconfig);
+uint32_t SystemGetPLLConfiguration(uint32_t whichone, PLL_Configuration *pllconfig);
+
 
 #endif

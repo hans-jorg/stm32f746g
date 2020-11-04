@@ -148,6 +148,7 @@ void SystemInit(void);
  */
 
 typedef struct {
+    uint32_t    source;
     uint32_t    M;
     uint32_t    N;
     uint32_t    P;
@@ -171,11 +172,15 @@ uint32_t SystemGetAPB2Frequency(void);
 uint32_t SystemGetAHBFrequency(void);
 uint32_t SystemGetHCLKFrequency(void);
 uint32_t SystemGetCoreClock(void);
+uint32_t SystemGetAPB1Prescaler(void);
+uint32_t SystemGetAPB2Prescaler(void);
+uint32_t SystemGetSYSCLKFrequency(void);
+
 
 // Set routines
 uint32_t SystemSetCoreClock(uint32_t newsrc, uint32_t newdiv);
 uint32_t SystemSetCoreClockFrequency(uint32_t freq);
-void     SystemConfigMainPLL(uint32_t clocksource, PLL_Configuration *pllconfig);
+void     SystemConfigMainPLL(PLL_Configuration *pllconfig);
 void     SystemSetAPB1Prescaler(uint32_t div);
 void     SystemSetAPB2Prescaler(uint32_t div);
 

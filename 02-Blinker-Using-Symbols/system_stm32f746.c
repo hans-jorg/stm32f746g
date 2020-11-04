@@ -252,7 +252,7 @@ uint32_t ws;
  *
  */
 
-uint32_t SystemGetAPB1Prescaler(uint32_t div) {
+uint32_t SystemGetAPB1Prescaler(void) {
     return ppre_table[(RCC->CFGR&~RCC_CFGR_PPRE1_Msk)>>RCC_CFGR_PPRE1_Pos];
 }
 
@@ -297,7 +297,7 @@ uint32_t p2;
  *
  */
 
-uint32_t SystemGetAPB2Prescaler(uint32_t div) {
+uint32_t SystemGetAPB2Prescaler(void) {
     return ppre_table[(RCC->CFGR&~RCC_CFGR_PPRE2_Msk)>>RCC_CFGR_PPRE2_Pos];
 }
 
@@ -646,17 +646,23 @@ uint32_t clocksource;
 uint32_t SystemSetCoreClock(uint32_t newsrc, uint32_t newdiv) {
 uint32_t src,div;
 uint32_t hpre,newhpre;
+uint32_t ppre1;
+uint32_t ppre2;
 
     src = RCC->CFGR & RCC_CFGR_SW;
 
+    // Save APBx prescaler configuration */
+    ppre1 = SystemGetAPB1Prescaler();
+    ppre2 = SystemGetAPB2Prescaler();
+    
     if( newsrc == src ) { // Just change the prescaler
         hpre = (RCC->CFGR&RCC_CFGR_HPRE_Msk)>>RCC_CFGR_HPRE_Pos;
         div = hpre_table[hpre];
         newhpre = FindHPRE(newdiv);
         if( newdiv < div ) {                    // Increasing clock frequency
             SetFlashWaitStates(MAXWAITSTATES);  // Worst case
-            SystemSetAPB1Prescaler(4);
-            SystemSetAPB2Prescaler(2);
+            SystemSetAPB1Prescaler(4);          // Safe
+            SystemSetAPB2Prescaler(2);          // Safe
         }
         RCC->CFGR = (RCC->CFGR&~RCC_CFGR_HPRE)|(newhpre<<RCC_CFGR_HPRE_Pos);
     } else {
@@ -674,8 +680,8 @@ uint32_t hpre,newhpre;
             break;
         case CLOCKSRC_PLL:
             if( !MainPLLConfigured ) {
-                SystemSetAPB1Prescaler(4);
-                SystemSetAPB2Prescaler(2);
+                SystemSetAPB1Prescaler(4);                  // Safe
+                SystemSetAPB2Prescaler(2);                  // Safe
                 SystemConfigMainPLL(&ClockConfiguration200MHz);
             }
             RCC->CFGR = (RCC->CFGR&~RCC_CFGR_SW)|RCC_CFGR_SW_PLL;
@@ -685,6 +691,9 @@ uint32_t hpre,newhpre;
     // Set SystemCoreClock to the new frequency and adjust flash wait states
     SystemCoreClockUpdate();
     ConfigureFlashWaitStates(SystemCoreClock,VSUPPLY);
+    // Try to restore APBx prescalers
+    SystemSetAPB1Prescaler(ppre1);
+    SystemSetAPB2Prescaler(ppre2); 
     return 0;
  }
 

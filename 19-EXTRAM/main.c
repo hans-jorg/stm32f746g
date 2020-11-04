@@ -75,8 +75,10 @@ void ms_delay(volatile int ms) {
 
 int main(void) {
 
+    ///??
     RCC->DCKCFGR1 = (RCC->DCKCFGR1&~RCC_DCKCFGR1_PLLSAIDIVR)|(8<<RCC_DCKCFGR1_PLLSAIDIVR_Pos);
-    SystemPLLSAIConfig(&pllsaiconfig);
+
+    SystemConfigSAIPLL(&pllsaiconfig);
 
     LED_Init();
 
