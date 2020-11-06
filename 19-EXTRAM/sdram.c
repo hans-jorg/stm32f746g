@@ -768,7 +768,7 @@ uint32_t mAND,mOR; // Mask
 }
 #else
 
-static const GPIO_PinConfiguration configtable[] = {
+static GPIO_PinConfiguration configtable[] = {
    {  GPIOD,   14,      12  },       //     DQ0
    {  GPIOD,   15,      12  },       //     DQ1
    {  GPIOD,   0,       12  },       //     DQ2
@@ -1093,7 +1093,11 @@ SDRAM_Init(void) {
     ConfigureFMCSDRAMPins();
 #else
     /* Configure pins from table*/
-    GPIO_ConfigureAlternateFunctionMultiple(configtable);
+    GPIO_PinConfiguration *config = configtable;
+    while ( config->gpio ) {
+        GPIO_ConfigurePinFunction(config->gpio,config->pin,config->af);
+        config++;
+    }
 #endif
 
     ConfigureFMCSDRAM();

@@ -23,7 +23,7 @@
 
 #include "stm32f746xx.h"
 #include "system_stm32f746.h"
-
+#include "gpio.h"
 #include "uart.h"
 
 /**
@@ -51,21 +51,12 @@
 ///@}
 
 /**
- * @brief   Pin configuration
- */
-typedef struct {
-    GPIO_TypeDef   *gpio;
-    int             pin;
-    int             af;
-} PinConfiguration;
-
-/**
  ** @brief Info and data area for UARTS
  **/
 typedef struct {
     USART_TypeDef      *device;
-    PinConfiguration    txpinconf;
-    PinConfiguration    rxpinconf;
+    GPIO_PinConfiguration    txpinconf;
+    GPIO_PinConfiguration    rxpinconf;
 } UART_Info;
 
 /**
@@ -84,41 +75,11 @@ static UART_Info uarttab[] = {
     { UART5,     { GPIOC,12, 7 }, { GPIOD, 2, 8 } },
     { USART6,    { GPIOC, 6, 8 }, { GPIOC, 7, 8 } },
     { UART7,     { GPIOE, 8, 8 }, { GPIOE, 7, 8 } },
-    { UART8,     { GPIOE, 1, 8 }, { GPIOE, 0, 8 } }
+    { UART8,     { GPIOE, 1, 8 }, { GPIOE, 0, 8 } },
+    { 0,         { 0,     0, 0 }, { 0,     0, 0 } }
 };
-static const int uarttabsize = sizeof(uarttab)/sizeof(UART_Info);
+static const int uarttabsize = sizeof(uarttab)/sizeof(UART_Info)-1;
 //@}
-
-/**
- * @brief   Enable GPIO
- *
- * @note    Should be in gpio.[ch]
- *
- */
-void GPIO_Enable(GPIO_TypeDef *gpio) {
-
-    if( gpio == GPIOA ) {
-        RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
-    } else if ( gpio == GPIOB ) {
-        RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
-    } else if ( gpio == GPIOC ) {
-        RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN;
-    } else if ( gpio == GPIOD ) {
-        RCC->AHB1ENR |= RCC_AHB1ENR_GPIODEN;
-    } else if ( gpio == GPIOE ) {
-        RCC->AHB1ENR |= RCC_AHB1ENR_GPIOEEN;
-    } else if ( gpio == GPIOF ) {
-        RCC->AHB1ENR |= RCC_AHB1ENR_GPIOFEN;
-    } else if ( gpio == GPIOG ) {
-        RCC->AHB1ENR |= RCC_AHB1ENR_GPIOGEN;
-    } else if ( gpio == GPIOH ) {
-        RCC->AHB1ENR |= RCC_AHB1ENR_GPIOHEN;
-    } else if ( gpio == GPIOI ) {
-        RCC->AHB1ENR |= RCC_AHB1ENR_GPIOIEN;
-    } else if ( gpio == GPIOJ ) {
-        RCC->AHB1ENR |= RCC_AHB1ENR_GPIOJEN;
-    }
-}
 
 /**
  * @brief   Enable UART
@@ -144,26 +105,6 @@ void UART_Enable(USART_TypeDef *uart) {
     }
 }
 
-/**
- * @brief   Configure Pin
- */
-static void ConfigurePin(PinConfiguration *conf) {
-GPIO_TypeDef *gpio;
-int pos;
-
-    gpio = conf->gpio;
-
-    // Enable clock for GPIOx, if it is not already enabled
-    GPIO_Enable(gpio);
-
-    if( conf->pin > 7 ) {
-        pos = (conf->pin - 7)*4;
-        gpio->AFR[1] = (gpio->AFR[1]&~(0xF<<pos))|(conf->af<<pos);
-    } else {
-        pos = (conf->pin)*4;
-        gpio->AFR[0] = (gpio->AFR[0]&~(0xF<<pos))|(conf->af<<pos);
-    }
-}
 
 /**
  ** @brief UART Initialization
@@ -175,11 +116,13 @@ UART_Init(int uartn, uint32_t info) {
 uint32_t baudrate,div,t,over;
 USART_TypeDef * uart;
 
+    if( uartn >= uarttabsize ) return -1;
+
     uart = uarttab[uartn].device;
 
     // Configure pins
-    ConfigurePin(&uarttab[uartn].txpinconf);
-    ConfigurePin(&uarttab[uartn].rxpinconf);
+    GPIO_ConfigureSinglePin(&uarttab[uartn].txpinconf);
+    GPIO_ConfigureSinglePin(&uarttab[uartn].rxpinconf);
 
     // Select clock source
     t = RCC->DCKCFGR2&~BITVALUE(3,uartn*2-2);
@@ -244,6 +187,7 @@ int
 UART_WriteChar(int uartn, uint32_t c) {
 USART_TypeDef *uart;
 
+    if( uartn >= uarttabsize ) return -1;
 
     uart = uarttab[uartn].device;
 
@@ -262,6 +206,8 @@ USART_TypeDef *uart;
 int
 UART_WriteString(int uartn, char s[]) {
 
+    if( uartn >= uarttabsize ) return -1;
+
     while(*s) {
         UART_WriteChar(uartn,*s++);
     }
@@ -277,6 +223,8 @@ UART_WriteString(int uartn, char s[]) {
 int
 UART_ReadChar(int uartn) {
 USART_TypeDef *uart;
+
+    if( uartn >= uarttabsize ) return -1;
 
     uart = uarttab[uartn].device;
 
@@ -298,6 +246,8 @@ int
 UART_ReadString(int uartn, char *s, int n) {
 int i;
 
+    if( uartn >= uarttabsize ) return -1;
+
     for(i=0;i<n-1;i++) {
         s[i] = UART_ReadChar(uartn);
         if( s[i] == '\n' || s[i] == '\r' )
@@ -316,6 +266,8 @@ int i;
 int
 UART_GetStatus(int uartn) {
 USART_TypeDef *uart;
+
+    if( uartn >= uarttabsize ) return -1;
 
     uart = uarttab[uartn].device;
 
