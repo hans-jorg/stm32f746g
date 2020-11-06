@@ -73,49 +73,40 @@
  *
  */
 
+static GPIO_PinConfiguration defaultinput = {
+    .gpio   = 0,    // not used
+    .pin    = 0,    // not used
+    .mode   = 1,    // input
+    .otype  = 0,    //
+    .ospeed = 0,    //
+    .pupd   = 0,    // pull-up or pull-down
+    .initial= 0
+};
+
+static GPIO_PinConfiguration defaultoutput = {
+    .gpio   = 0,    // not used
+    .pin    = 0,    // not used
+    .mode   = 2,    // output
+    .otype  = 0,    //
+    .ospeed = 0,    //
+    .pupd   = 0,    // pull-up or pull-down
+    .initial= 0
+};
+
+
 void
 GPIO_Init(GPIO_TypeDef *gpio, uint32_t imask, uint32_t omask) {
 uint32_t m;
 uint32_t f;
-int i,i2;
+int pos,pos2;
 uint32_t moder, otyper, ospeedr, pupdr, odr;
 
     /* Enable clock for gpio unit */
     GPIO_EnableClock(gpio);
 
-    /* Configure GPIO according parameters imask e omask */
-    moder   = gpio->MODER;
-    otyper  = gpio->OTYPER;
-    ospeedr = gpio->OSPEEDR;
-    pupdr   = gpio->PUPDR;
-    odr     = gpio->ODR;
+    GPIO_ConfigureMultiplePinsEqual( gpio, imask, &defaultinput );
+    GPIO_ConfigureMultiplePinsEqual( gpio, omask, &defaultoutput );
 
-    for(i=0;i<16;i++) {
-        m =  1<<i;               /* mask for bit for pin            */
-        i2 = 2*i;
-        f =  3<<i2;             /* mask for 2 bit field for pin    */
-
-        if( imask&m ) {         /* pin is input */
-            moder    = (moder&~f)|(INPUTMODE<<i2);
-        } else if( omask&m ) {  /* pin is output */
-            moder    = (moder&~f)|(OUTPUTMODE<<i2);
-            // Set pin type
-            otyper   = (otyper&~f)|(OUTPUTTYPE<<i2);
-            // Set pin SPEED)
-            ospeedr  = (ospeedr&~f)|(OUTPUTSPEED<<i2);
-            // Set pullup/pushdown resistors configuration
-            pupdr    = (pupdr&~f)|(OUTPUTPUPDR<<i2);
-            // Set pin to 0
-            odr     &=  ~(BIT(i));
-        }
-    }
-
-    // Apply changes
-    gpio->MODER   = moder;
-    gpio->OTYPER  = otyper;
-    gpio->OSPEEDR = ospeedr;
-    gpio->PUPDR   = pupdr;
-    gpio->ODR     = odr;
 }
 
 /**
@@ -280,6 +271,9 @@ void GPIO_ConfigureMultiplePinsEqual( GPIO_TypeDef *gpio,
                                 GPIO_PinConfiguration *conf ) {
 int pin;
 unsigned m;
+
+    /* Enable clock for gpio unit */
+    GPIO_EnableClock(gpio);
 
     conf->gpio = gpio;
     for(pin=0;pin<16;pin++) {
