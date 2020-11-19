@@ -141,29 +141,43 @@ uint32_t m;
 void GPIO_ConfigureSinglePin(const GPIO_PinConfiguration *conf) {
 GPIO_TypeDef *gpio;
 int pos2,pos4;
-int pin;
+int pos;
 
     gpio = conf->gpio;
 
     GPIO_EnableClock(gpio);
 
-    pin = conf->pin;
-    pos2 = pin*2;
-    pos4 = pin*4;
+    pos = conf->pin;
+    pos2 = pos*2;
+    pos4 = pos*4;
 
     if ( conf->af != 0 ) {
-        gpio->MODER = (gpio->MODER&~(3<<pos2))|(conf->mode<<pos2);
+        /* Configure pin to use alternate function */
+        if( pos < 8 ) {     // Use AFRL
+            gpio->AFR[0] = (gpio->AFR[0]&~(0xF<<pos4))|(conf->af<<pos4);
+        } else {            // Use AFRH
+            pos4 -= 32;
+            gpio->AFR[1] = (gpio->AFR[1]&~(0xF<<pos4))|(conf->af<<pos4);
+        }
+        // Set remain configurations to default
+        gpio->MODER   = (gpio->MODER&~(3<<pos2));
+        gpio->OSPEEDR = (gpio->OSPEEDR&~(3<<pos2));
+        gpio->PUPDR   = (gpio->PUPDR&~(3<<pos2));
+        gpio->OTYPER  = (gpio->OTYPER&~(BIT(pos)));
+        gpio->ODR     = (gpio->ODR&~BIT(pos));
+    } else {
+        /* Configure pin to use GPIO function */
+        if( pos < 8 ) {     // Use AFRL
+            gpio->AFR[0] = (gpio->AFR[0]&~(0xF<<pos4));
+        } else {            // Use AFRH
+            gpio->AFR[1] = (gpio->AFR[1]&~(0xF<<(pos4-32)));
+        }
+        gpio->MODER   = (gpio->MODER&~(3<<pos2))|(conf->mode<<pos2);
+        gpio->OSPEEDR = (gpio->OSPEEDR&~(3<<pos2))|(conf->ospeed<<pos2);
+        gpio->PUPDR   = (gpio->PUPDR&~(3<<pos2))|(conf->pupd<<pos2);
+        gpio->OTYPER  = (gpio->OTYPER&~(BIT(pos)))|(conf->otype<<pos);
+        gpio->ODR     = (gpio->ODR&~BIT(pos))|(conf->initial<<pos);
     }
-    if( pin < 8 ) { // Use AFRL
-        gpio->AFR[0] = (gpio->AFR[0]&~(0xF<<pos4))|(conf->af<<pos4);
-    } else {            // Use AFRH
-        gpio->AFR[1] = (gpio->AFR[1]&~(0xF<<(pos4-32)))|(conf->af<<(pos4-32));
-    }
-    /* Configure pin to use alternate function */
-    gpio->OSPEEDR = (gpio->OSPEEDR&~(3<<pos2))|(conf->ospeed<<pos2);
-    gpio->PUPDR   = (gpio->PUPDR&~(3<<pos2))|(conf->pupd<<pos2);
-    gpio->OTYPER  = (gpio->OTYPER&~(BIT(pin)))|(conf->otype<<pin);
-    gpio->ODR     = (gpio->ODR&~BIT(pin))|(conf->initial<<pin);
 }
 
 /**

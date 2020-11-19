@@ -14,11 +14,6 @@
 #include "stm32f746xx.h"
 #include "system_stm32f746.h"
 #include "led.h"
-#include "lcd.h"
-
-
-
-#define OPERATING_FREQUENCY (200000000)
 
 /*
  * @brief   Configuration for PLLSAI
@@ -80,16 +75,12 @@ void ms_delay(volatile int ms) {
 
 int main(void) {
 
-
-    SystemSetCoreClockFrequency(OPERATING_FREQUENCY);
-
-    LED_Init();
-
-    LCD_SetClock(8);
+    ///??
+    RCC->DCKCFGR1 = (RCC->DCKCFGR1&~RCC_DCKCFGR1_PLLSAIDIVR)|(8<<RCC_DCKCFGR1_PLLSAIDIVR_Pos);
 
     SystemConfigSAIPLL(&pllsaiconfig);
 
-    LCD_Init();
+    LED_Init();
 
     /*
      * Blink LED

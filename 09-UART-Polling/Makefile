@@ -515,6 +515,7 @@ usage:
 # The default rule, which causes the $(PROGNAME) example to be built.
 #
 build: ${OBJDIR} ${OBJDIR}/$(PROGNAME).bin
+	echo "Done."
 
 #
 # The rule to clean out all the build products.
@@ -529,10 +530,10 @@ flash: deploy
 burn: deploy
 ifeq ($(FLASHER),st-flash)
 deploy: ${OBJDIR}/$(PROGNAME).bin
-	sudo ${FLASHER} write $^ 0x08000000
+	${FLASHER} write $^ 0x08000000
 else
 deploy: ${OBJDIR}/$(PROGNAME).bin $(OPENOCDFLASHSCRIPT)
-	sudo ${FLASHER} -f $(OPENOCDBOARD) -f $(OPENOCDFLASHSCRIPT)
+	${FLASHER} -f $(OPENOCDBOARD) -f $(OPENOCDFLASHSCRIPT)
 endif
 
 #

@@ -8,6 +8,9 @@
  * @note     Direct access to registers
  * @note     No library used
  *
+ * @note     There is a LED on pin 1 of GPIOI (see schematics).
+ *           Also in pin 6 of connector CN7 (ARD D13)
+ *
  *
  ******************************************************************************/
 
@@ -24,7 +27,7 @@
 
 void ms_delay(volatile int ms) {
    while (ms-- > 0) {
-      volatile int x=300000;
+      volatile int x=30000;
       while (x-- > 0)
          __NOP();
    }
@@ -45,14 +48,16 @@ int main(void) {
     /*
      * Enable clock for GPIOI
      */
-    RCC->AHB1ENR |= 0x000001000U;
+    RCC->AHB1ENR |= 0x00000100U;
     // Alternative (ughh!!))
     //*((uint32_t *) (0x40023C00+0x30) |= 0x000001000U;
 
+   __DSB();
     /*
      * Configure GPIO to drive LED
      */
     // Set LED pin to output
+
     GPIOI->MODER    = (GPIOI->MODER&~0x0000000CU)|0x00000004U;
     // Set pin type
     GPIOI->OTYPER   = GPIOI->OTYPER&~0x0000000CU;

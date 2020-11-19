@@ -32,8 +32,8 @@ extern RGB_t LCD_Frame1[LCD_DW][LCD_DH];
 extern RGB_t LCD_Frame2[LCD_DW][LCD_DH];
 #endif
 
-void LCD_FillFrameBuffer( RGB_t (*frame)[LCD_DH], RGB_t v );
-
+void LCD_FillFrameBuffer( RGB_t *frame, RGB_t v );
+void LCD_SetClock(uint32_t div);
 
 #endif
 

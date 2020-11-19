@@ -78,14 +78,21 @@ In the board, the VBAT is connected to VDD.
 
 ### Flash memory
 
-There is a 1 MByte Flash memory, which can be accessed through two address ranges.
-
-
+There is a 1 MByte Flash memory, which can be accessed through two interfaces.
 
 Area          | Size   | Bus  | Address Range           | Observations
 --------------|--------|------|-------------------------|------------------------
 ITCM Window   | 1 MB   | ITCM | 0x0020_0000-0x002F_FFFF | zero wait state, <br/> ART (Adaptive Real Time ) accelerator, <br/> 64 bit access
-AXIM window   | 1 MB   | AXIM | 0x0080_0000-0x008F_FFFF | 4 KB cache, 64 bit access
+AXIM window   | 1 MB   | AXIM | 0x0800_0000-0x080F_FFFF | 4 KB cache, 64 bit access
+
+The BOOT0 pin specifies which code is executed after reset. In the board, it is connected to GND thru a 10 K resistor. 
+
+BOOT0	|	Flash           | Address Range
+--------|-------------------|------------------
+0       | Flash with ITCM   | 0x0020_0000-0x002F_FFFF. 
+1       | System bootloader | 0x0010_0000-0x0010_FFFF. Can be set anywhere with 16k precision
+
+The address range can be set anywhere by configuring registers   and    .
 
 AXIM (Advanced eXtensible Interface) is a ARM technology. It has a 64 bit interface.
 ITCM (Tightly-Coupled Memory) is a ST technology.  It has a 64 bit interface split in two 32 bit ports: D0TCM and D1TCM.
@@ -236,7 +243,7 @@ Only 16 bits of data bus are used. So it is not neccessary to use full DQM. Only
 
 It is connected to the MCU as showm below.
 
-Chip signal | Board signal | MCU Signal
+Chip signal | Board signal | MCU Signal |  Alternate function
 ------------|--------------|---------|------------
 DQ0         |  FMC_D0      | PD14    |  AF12
 DQ1         |  FMC_D1      | PD15    |  AF12
@@ -307,7 +314,7 @@ The main features are:
 
 The most importante parameters are:
 
-Parameter         |	Min   |   Typ     |  Max    | Unit
+Parameter         |	Min      |   Typ     |  Max    | Unit
 ------------------|----------|-----------|---------|----------
 DCLK Frequency    |     5    |    9      |    12   | MHz
 ------------------|----------|-----------|---------|----------
@@ -320,6 +327,68 @@ VSYNC Period      |   275    |  288      |   335   | DCLK
 VSYNC Display     |          | 272       |         | H
 VSYNC Back porch  |     1    |  12       |         | H
 VSYNC Front porch |     1    |  40       |         | H
+
+The connection for LCD are:
+ 
+ LCD signal   | Board signal      | MCU signal             |
+--------------|-------------------|------------------------|
+  CLK         | LCD_CLK           | PI14                   |
+  LCD_R       | LCD_R0-7          | PI15 PJ0-6             |
+  LCD_G       | LCD_G0-7          | PJ7-11 PK0-2           |
+  LCD_B       | LCD_B0-7          | PE4 PJ13-15 PG12 PK4-6 |
+  HSYNC       | LCD_HSYNC         | PI10                   |
+  VSYNC       | LCD_VSYNC         | PI9                    |
+  DE          | LCD_DE            | PK7                    |
+  INT         | LCD_INT           | PI13                   |
+  SCL         | LCD_SCL           | PH7                    |
+  SDA         | LCD_SDA           | PH8                    |
+  SDA         | LCD_RST/NRST      | NRST                   |
+
+
+The alternative for LCD pins are shown below. The used for LCD connection are marked.
+
+
+LCD Signal   | ALT     |  Pin
+-------------|---------|--------------------
+LCD_CLK      |  AF14   | *PI14* PE14 PG7
+LCD_R0       |  AF14   | PG13 PH2 *PI15*
+LCD_R1       |  AF14   | PA2 PH3 *PJ0*
+LCD_R2       |  AF14   | PA1 PC10 PH8 *PJ1*
+LCD_R3       |  AF14   | PH9 *PJ2* PB0 (AF9)
+LCD_R4       |  AF14   | PA5 PA11 PH10 *PJ3*
+LCD_R5       |  AF14   | PA12 PC0 PH11 *PJ4*
+LCD_R6       |  AF14   | PA8 PH12 *PJ5* PB1(AF9)
+LCD_R7       |  AF14   | PE15 PG6 *PJ6*
+LCD_G0       |  AF14   | PE5 *PJ7*
+LCD_G1       |  AF14   | PE6 *PJ8*
+LCD_G2       |  AF14   | PA6 PH13 *PJ9*
+LCD_G3       |  AF14   | PE11 PH14 *PJ10* PG10(AF9)
+LCD_G4       |  AF14   | PB10 PH15 *PJ11*
+LCD_G5       |  AF14   | PB11 PI0 *PK0*
+LCD_G6       |  AF14   | PC7 PI1 *PK1*
+LCD_G7       |  AF14   | PD3 PI2 *PK2*
+LCD_B0       |  AF14   | *PE4* PG14 PJ12
+LCD_B1       |  AF14   | PG12 *PJ13*
+LCD_B2       |  AF14   | PD6 PG10 *PJ14*
+LCD_B3       |  AF14   | PD10 PG11 *PJ15*
+LCD_B4       |  AF14   | PE12 PG12 *PG12(AF9)* PI4 PK3
+LCD_B5       |  AF14   | PA3 PI5 *PK4*
+LCD_B6       |  AF14   | PB8 PI6 *PK5*
+LCD_B7       |  AF14   | PB9 PI7 *PK6*
+LCD_VSYNC    |  AF14   | PA4 *PI9* PI13
+LCD_HSYNC    |  AF14   | PC6 *PI10* PI12
+LCD_DE       |  AF14   | PE13 PF10 *PK7*
+
+
+The following uses GPIO I/O or other modes
+
+LCD Signal    |        |  Pin   |  Description
+--------------|--------|--------|------------------
+ LCD_DISP     | GPIO   | I12    |  Enable LCD
+ LCD_INT      | GPIO   | I13    |  LCD Interrupt
+ LCD_BL_CTRL  | GPIO   | K3     |  Backlight PWM
+
+
 
 #### I2C
 
@@ -406,7 +475,7 @@ word     | Pixel
 5. Configure Backlight on LTDC->BCCR
 6. Configure interrupts on LTDC->IER and LTDC->LIPCR
 7. Configure Layer parameters
-   * Etc
+* Etc
 8. Enable layer
 9. Enable dithering on LTDC->GCR and LTDC->LxCKCR
 10. Reload shadow registers thru LTDC->SRCR
@@ -462,10 +531,10 @@ The E5V line is powered by a LD1117S50TR regulator with 800 mA current capacity 
 
 The STM32F746NG MCU is powered by a 3.3 V line, obtained from the 5V USB line thru a LD39050PU33R regulator with 500 mA maximal current. This 5V line is configured by the JP1 connector to use one of the USB connector or the E5V. By default, it is energized by the ST_LINK USB connector. Furthermore, the powering of the STM32F746 is controlled by the ST-LINK MCU thru a ST890CDR switch. It asks the host to deliver 500 mA and only after confirmation, the rest of the board including the STM32F746NG is powered.
 
-    E5V ---------| 1   2 |
-    5V-ST_LINK---| 3<->4 |------ 5V
-    5V-USB-FS----| 5   6 |
-    5V_USB-HS----| 7   8 |
+E5V ---------| 1   2 |
+5V-ST_LINK---| 3<->4 |------ 5V
+5V-USB-FS----| 5   6 |
+5V_USB-HS----| 7   8 |
 
 There is LD3985M33R regulator (150 mA maximal current) to power the ST-LINK MCU, a STM32F103CBT6. It is powered automatically by one of the USB connectors or the E5V line. No jumps required.
 
@@ -550,11 +619,11 @@ Switch to the new one
 
 1. Program the new number of wait states to the LATENCY bits in the FLASH_ACR register
 2. Check that the new number of wait states is taken into account to access the Flash memory
- by reading the FLASH_ACR register
+by reading the FLASH_ACR register
 3. Modify the CPU clock source by writing the SW bits in the RCC_CFGR register
 4. If needed, modify the CPU clock prescaler by writing the HPRE bits in RCC_CFGR
 5. Check that the new CPU clock source or/and the new CPU clock prescaler value is/are 
- taken into account by reading the clock source status (SWS bits) or/and the AHB prescaler value (HPRE bits), respectively, in the RCC_CFGR register.
+taken into account by reading the clock source status (SWS bits) or/and the AHB prescaler value (HPRE bits), respectively, in the RCC_CFGR register.
 
 ### Procedure to decrease clock frequenncy
 

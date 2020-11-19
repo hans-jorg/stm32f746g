@@ -53,7 +53,7 @@
  * @note    Do not use this or similar in production code
  */
 
-#define COUNTERFOR1MS 300000
+#define COUNTERFOR1MS 5000
 
 
 void ms_delay(volatile int ms) {
@@ -92,7 +92,7 @@ void ms_delay(volatile int ms) {
 // Pin configuration
 #define LEDMODE             1
 #define LEDOTYPE            0
-#define LEDOSPEED           3
+#define LEDOSPEED           1
 #define LEDPUPD             0
 
 // Register masks
@@ -122,6 +122,9 @@ int main(void) {
      * Enable clock for GPIOI
      */
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOIEN;
+    __DSB();                /* Must wait before accessing GPIO registers */
+
+
     /*
      * Configure GPIO to drive LED
      */
@@ -136,6 +139,16 @@ int main(void) {
     LEDGPIO->PUPDR    = (LEDGPIO->PUPDR&~GPIO_PUPDR_M)|GPIO_PUPDR_V;
     // Turn off LED
     LEDGPIO->ODR     &=  ~LEDMASK;
+
+    /*
+     * Turn off LCD
+     */
+
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOKEN;
+    __DSB();
+    GPIOK->MODER  = (GPIOK->MODER&~GPIO_MODER_MODER3_Msk)|(1<<GPIO_MODER_MODER3_Pos);
+    GPIOK->ODR   &=  ~BIT(3);
+
 
     /*
      * Blink LED
