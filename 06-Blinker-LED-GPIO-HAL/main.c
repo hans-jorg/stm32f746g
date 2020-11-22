@@ -26,7 +26,7 @@
  * @note    Do not use this or similar in production code
  */
 
-#define COUNTERFOR1MS 300000
+#define COUNTERFOR1MS 10000
 
 
 void ms_delay(volatile int ms) {

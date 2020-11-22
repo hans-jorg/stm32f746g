@@ -18,6 +18,12 @@
 #include "stm32f746xx.h"
 #include "system_stm32f746.h"
 
+
+/**
+ *  internal functions
+ */
+static uint32_t FindHPRE(uint32_t divisor);
+
 /**
  * @brief   SystemCoreClock
  * @note    Global variable holding System Clock Frequency (HCLK)
@@ -242,6 +248,68 @@ uint32_t ws;
 
 }
 
+
+/**
+ * @brief   Get HPRE Prescaler
+ *
+ * @note    This prescaler divides the HCLK to generate the HCLK clock signal
+ *
+ */
+
+uint32_t SystemGetHPRE(void) {
+uint32_t hpre;
+
+    hpre = (RCC->CFGR&RCC_CFGR_HPRE)>>RCC_CFGR_HPRE_Pos;
+    return hpre;
+}
+
+
+/**
+ * @brief   Set HPRE Prescaler
+ *
+ * @note    This prescaler divides the HCLK to generate the HCLK clock signal
+ *
+ */
+
+uint32_t SystemSetHPRE(uint32_t hpre) {
+
+    RCC->CFGR = (RCC->CFGR&~RCC_CFGR_HPRE)|(hpre<<RCC_CFGR_HPRE_Pos);
+    return 0;
+}
+
+
+/**
+ * @brief   Get AHB Prescaler
+ *
+ * @note    This prescaler divides the HCLK to generate the HCLK clock signal
+ *
+ */
+
+uint32_t SystemGetAHBPrescaler(void) {
+uint32_t hpre,prescaler;
+
+    /* Get HCLK prescaler */
+    hpre = (RCC->CFGR&RCC_CFGR_HPRE_Msk)>>RCC_CFGR_HPRE_Pos;
+    prescaler = hpre_table[hpre];
+    return prescaler;
+}
+
+/**
+ * @brief   Set AHB Prescaler
+ *
+ * @note    This prescaler divides the HCLK to generate the HCLK clock signal
+ *
+ */
+
+uint32_t SystemSetAHBPrescaler(uint32_t div) {
+uint32_t hpre;
+
+    hpre = FindHPRE(div);
+    RCC->CFGR = (RCC->CFGR&~RCC_CFGR_HPRE)|(hpre<<RCC_CFGR_HPRE_Pos);
+
+    return 0;
+}
+
 /**
  * @brief   Get APB1 Prescaler
  *
@@ -341,7 +409,7 @@ uint32_t p2;
  */
 static uint32_t
 CalculateMainPLLOutFrequency(PLL_Configuration *pllconfig) {
-uint32_t outfreq,infreq;
+uint64_t outfreq,infreq;
 uint32_t clocksource;
 
     clocksource = pllconfig->source;
@@ -354,7 +422,7 @@ uint32_t clocksource;
         return 0;
     }
     outfreq  = (infreq*pllconfig->N)/pllconfig->M/pllconfig->P;  // Overflow possible ?
-    return outfreq;
+    return (uint32_t) outfreq;
 }
 
 /**
@@ -372,7 +440,7 @@ uint32_t clocksource;
  */
 static uint32_t
 CalculatePLLOutFrequencies(PLL_Configuration *pllconfig) {
-uint32_t outfreq,infreq;
+uint64_t outfreq,infreq;
 uint32_t clocksource;
 
     clocksource = pllconfig->source;
@@ -392,13 +460,13 @@ uint32_t clocksource;
     if( pllconfig->R )
         pllconfig->routfreq  = (infreq*pllconfig->N)/pllconfig->M/pllconfig->R;
 
-    return pllconfig->poutfreq;
+    return (uint32_t) pllconfig->poutfreq;
 }
 
 /**
- * @brief   SystemSystemClockGet
+ * @brief   SystemGetSYSCLKFrequency
  *
- * @note    returns the SYSCLK, i.e., the Core Clock before the prescaler
+ * @note    returns the SYSCLK, i.e., the System Core Clock before the prescaler
  */
 
 uint32_t SystemGetSYSCLKFrequency(void) {
@@ -423,10 +491,10 @@ PLL_Configuration pllconfig;
     case RCC_CFGR_SWS_HSE:  /* HSE used as system clock source */
         sysclk_freq = HSE_FREQ;
         break;
-    case RCC_CFGR_SW_PLL:  /* PLL used as system clock source */
+    case RCC_CFGR_SWS_PLL:  /* PLL used as system clock source */
 
         pllsrc = (rcc_pllcfgr & RCC_PLLCFGR_PLLSRC);
-        if ( (pllsrc & RCC_PLLCFGR_PLLSRC_HSI) == RCC_PLLCFGR_PLLSRC_HSI )
+        if ( (pllsrc & RCC_PLLCFGR_PLLSRC) == RCC_PLLCFGR_PLLSRC_HSI )
             pllsrc = CLOCKSRC_HSI;
         else
             pllsrc = CLOCKSRC_HSE;
@@ -455,9 +523,7 @@ uint32_t sysclk_freq, prescaler, hpre;
 
     sysclk_freq = SystemGetSYSCLKFrequency();
     
-    /* Get HCLK prescaler */
-    hpre = (RCC->CFGR&RCC_CFGR_HPRE_Msk)>>RCC_CFGR_HPRE_Pos;
-    prescaler = hpre_table[hpre];
+    prescaler = SystemGetAHBPrescaler();
 
     /* HCLK frequency */
     return sysclk_freq/prescaler;
@@ -527,15 +593,21 @@ uint32_t SystemGetHCLKFrequency(void) {
 static uint32_t FindHPRE(uint32_t divisor) {
 uint32_t k;
 
+    if( divisor >= 512 )                    // Maximum
+        return 15;
+        
     k = SystemFindLargestPower2(divisor);   // 2 exponent of divisor
 #if 1
     if( k == 0 )
         return 0;
     if( k < 5 ) {
         return 0x8+k-1;
-    } else { // There is no divisor 32. It is changed to 64
+    } else  if ( k == 5 ) { // There is no divisor 32. It is changed to 64
+        return 12;
+    } else {
         return 0x8+k-2;
     }
+
 #else
     for(int i=0;i<sizeof(hpre_table)/sizeof(uint32_t);i++) {
         if( hpre_table[i]>=divisor)
@@ -563,7 +635,7 @@ uint32_t clocksource;
     clocksource = pllconfig->source;
 
     // If core clock source is PLL change it to HSI and disable PLL
-    if( RCC->CFGR&RCC_CFGR_SWS == RCC_CFGR_SWS_PLL ) {
+    if( (RCC->CFGR&RCC_CFGR_SWS) == RCC_CFGR_SWS_PLL ) {
         EnableHSI();
         RCC->CFGR = (RCC->CFGR&RCC_CFGR_SW)|RCC_CFGR_SW_HSI;
         DisableMainPLL();
@@ -584,7 +656,8 @@ uint32_t clocksource;
     }
     // Get PLLCFGR and clear fields to be set
     rcc_pllcfgr = RCC->PLLCFGR
-             &  ~(  RCC_PLLCFGR_PLLQ
+             &  ~(  RCC_CFGR_SW
+                   |RCC_PLLCFGR_PLLQ
                    |RCC_PLLCFGR_PLLSRC
                    |RCC_PLLCFGR_PLLP
                    |RCC_PLLCFGR_PLLN
@@ -595,7 +668,7 @@ uint32_t clocksource;
                   |(pllconfig->N<<RCC_PLLCFGR_PLLN_Pos)
                   |(pllconfig->M<<RCC_PLLCFGR_PLLM_Pos)
                   |(pllconfig->Q<<RCC_PLLCFGR_PLLQ_Pos)
-                  |src;
+                  |(src<<RCC_PLLCFGR_PLLSRC_Pos);
 
     RCC->PLLCFGR = rcc_pllcfgr;
 
@@ -655,7 +728,7 @@ uint32_t ppre2;
     ppre1 = SystemGetAPB1Prescaler();
     ppre2 = SystemGetAPB2Prescaler();
     
-    if( newsrc == src ) { // Just change the prescaler
+    if( newsrc == src ) {   // Just change the prescaler
         hpre = (RCC->CFGR&RCC_CFGR_HPRE_Msk)>>RCC_CFGR_HPRE_Pos;
         div = hpre_table[hpre];
         newhpre = FindHPRE(newdiv);
@@ -665,10 +738,11 @@ uint32_t ppre2;
             SystemSetAPB2Prescaler(2);          // Safe
         }
         RCC->CFGR = (RCC->CFGR&~RCC_CFGR_HPRE)|(newhpre<<RCC_CFGR_HPRE_Pos);
-    } else {
-        // There is a change of clock source
-
-        SetFlashWaitStates(MAXWAITSTATES);  // Worst case
+    } else {                // There is a change of clock source
+        // Set HPRE Prescaler
+        newhpre = FindHPRE(newdiv);
+        RCC->CFGR = (RCC->CFGR&~RCC_CFGR_HPRE)|(newhpre<<RCC_CFGR_HPRE_Pos);
+        // Change clock source
         switch(newsrc) {
         case CLOCKSRC_HSI:
             EnableHSI();
@@ -861,8 +935,15 @@ SystemInit(void) {
     /* Enable HSE but do not switch to it */
     EnableHSE();
 
+
+    // Enable Peripheral Clocks
+    SystemSetAHBPrescaler(1);
+    SystemSetAPB1Prescaler(4);          // Safe
+    SystemSetAPB2Prescaler(2);          // Safe
+            
     /* Update SystemCoreClock */
     SystemCoreClockUpdate();
+
 
     /* Enable cache for Instruction and Data . Only for AXIM interface */
     SCB_EnableICache();
@@ -883,6 +964,8 @@ SystemInit(void) {
     /* Additional initialization here */
 
 }
+
+
 
 
 

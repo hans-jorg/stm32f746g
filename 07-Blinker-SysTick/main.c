@@ -40,7 +40,6 @@ void SysTick_Handler(void) {
  *
  * @note    Initializes GPIO and blinks LED
  *
- * @note    Really a bad idea to blink LED
  */
 
 int main(void) {

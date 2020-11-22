@@ -89,6 +89,7 @@ SECTIONS
           .           = ALIGN(4);
 
     } > FLASH                       /* All in flash memory */
+  .           = ALIGN(4);
   _text_end   = .;                  /* Remember end of text */
   _etext      = .;
 

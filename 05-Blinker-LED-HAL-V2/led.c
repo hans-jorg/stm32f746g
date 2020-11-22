@@ -76,6 +76,7 @@ void LED_Init(void) {
      * Enable clock for GPIOI
      */
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOIEN;
+    __DSB();
     /*
      * Configure GPIO to drive LED
      */

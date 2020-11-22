@@ -53,7 +53,7 @@
  * @note    Do not use this or similar in production code
  */
 
-#define COUNTERFOR1MS 300000
+#define COUNTERFOR1MS 10000
 
 
 void ms_delay(volatile int ms) {
@@ -109,6 +109,7 @@ void GPIO_Init(void) {
      * Enable clock for GPIOI
      */
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOIEN;
+    __DSB();
 }
 
 void GPIO_ConfigureOutputPin(int pin) {

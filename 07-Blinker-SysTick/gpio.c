@@ -72,6 +72,7 @@ int i,i2;
     else if ( gpio == GPIOK ) m=RCC_AHB1ENR_GPIOKEN;
     else    m = 0;
     RCC->AHB1ENR |= m;
+    __DSB();
 
     /*
      * Configure GPIO according parameters imask e omask

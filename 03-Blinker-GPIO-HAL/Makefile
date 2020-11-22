@@ -61,7 +61,7 @@ FLASHBUS=itcm
 # Suppress warnings
 # Comment out to have verbose output
 #MAKEFLAGS+= --silent
-.SILENT:
+#.SILENT:
 
 #
 # Include path for CMSIS headers
@@ -207,6 +207,7 @@ PREFIX:=arm-none-eabi
 CPUFLAGS=-mcpu=cortex-m7
 FPUFLAGS=-mthumb -mcpu=cortex-m7 -mfloat-abi=hard
 #FPUFLAGS=-mthumb -mcpu=cortex-m7 -mfloat-abi=softfp  -mfpu=fpv5-d16
+#FPUFLAGS=-mthumb -mcpu=cortex-m7 -mfloat-abi=softfp -mfpu=fpv5-sp-d16
 
 #
 # Terminal application (used to open new windows in debug)
@@ -474,10 +475,10 @@ ${OBJDIR}/%.a:
 #
 ${OBJDIR}/%.axf:  $(OBJFILES)
 	@echo "  Linking             ${@} ";
-	${CC} -T '${LINKERSCRIPT}' --entry '${ENTRY}' \
+	${CC} -Wl,-T '${LINKERSCRIPT}' --entry '${ENTRY}' \
 	        ${CPUFLAGS} ${FPUFLAGS} \
 	        ${addprefix -Wl${COMMA},${LDFLAGS} } -o ${@} $(OBJFILES) \
-	        '${LIBM}' '${LIBC}' '${LIBGCC}'
+	        '${LIBM}' '${LIBC}' '${LIBGCC}' -nostartfiles
 
 ${OBJDIR}/%.bin: ${OBJDIR}/%.axf
 	@echo "  Generating binary   ${@} ";
@@ -677,7 +678,7 @@ cproto:
 # These labels are not files !!!
 #
 .PHONY: nm size dump disassembly deploy burn clean editor force-flash gdbserver
-.PHONY: help build nemiver ddd gdb tui doxygen docs flash
+.PHONY: help build nemiver ddd gdb tui doxygen docs flash cproto
 
 #
 # Dependencies
