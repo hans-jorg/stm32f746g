@@ -676,8 +676,100 @@ uint32_t clocksource;
 
     MainPLLConfigured = 1;
 }
-///@}
 
+/**
+ * @brief   SystemConfigSAIPLL
+ *
+ * @note    Configure SAI PLL unit
+ *
+ * @note    If core clock source (HCLK) is PLL, it is changed to HSI
+ */
+
+void
+SystemConfigSAIPLL(PLL_Configuration *pllconfig) {
+uint32_t freq,src;
+uint32_t rcc_pllsaicfgr;
+uint32_t clocksource;
+
+    // Some parameter are shared with the Main PLL.
+    // It must be configured first
+    if( !MainPLLConfigured )
+        return;
+
+    // Disable SAI PLL
+    RCC->CR &= ~RCC_CR_PLLSAION;
+    
+    // Get PLLSAICFGR and clear fields to be set
+    rcc_pllsaicfgr = RCC->PLLSAICFGR
+                    &~(
+                        RCC_PLLSAICFGR_PLLSAIN
+                       |RCC_PLLSAICFGR_PLLSAIP
+                       |RCC_PLLSAICFGR_PLLSAIQ
+                       |RCC_PLLSAICFGR_PLLSAIR
+                      );
+
+    rcc_pllsaicfgr |= (
+                        ((pllconfig->N<<RCC_PLLSAICFGR_PLLSAIN_Pos)&RCC_PLLSAICFGR_PLLSAIN)
+                       |((pllconfig->P<<RCC_PLLSAICFGR_PLLSAIP_Pos)&RCC_PLLSAICFGR_PLLSAIP)
+                       |((pllconfig->Q<<RCC_PLLSAICFGR_PLLSAIQ_Pos)&RCC_PLLSAICFGR_PLLSAIQ)
+                       |((pllconfig->R<<RCC_PLLSAICFGR_PLLSAIR_Pos)&RCC_PLLSAICFGR_PLLSAIR)
+                      );
+
+    RCC->PLLSAICFGR = rcc_pllsaicfgr;
+
+    // Enable SAI PLL
+    RCC->CR |= RCC_CR_PLLSAION;
+
+    while ( (RCC->CR&RCC_CR_PLLSAIRDY) == 0 ) {}
+
+}
+
+/**
+ * @brief   SystemConfigSAIPLL
+ *
+ * @note    Configure SAI PLL unit
+ *
+ * @note    If core clock source (HCLK) is PLL, it is changed to HSI
+ */
+
+void
+SystemConfigI2SPLL(PLL_Configuration *pllconfig) {
+uint32_t freq,src;
+uint32_t rcc_plli2scfgr;
+uint32_t clocksource;
+
+    // Some parameter are shared with the Main PLL.
+    // It must be configured first
+    if( !MainPLLConfigured )
+        return;
+
+    // Disable SAI PLL
+    RCC->CR &= ~RCC_CR_PLLI2SON;
+    
+    // Get PLLI2SCFGR and clear fields to be set
+    rcc_plli2scfgr = RCC->PLLI2SCFGR
+                    &~(
+                        RCC_PLLI2SCFGR_PLLI2SN
+                       |RCC_PLLI2SCFGR_PLLI2SP
+                       |RCC_PLLI2SCFGR_PLLI2SQ
+                       |RCC_PLLI2SCFGR_PLLI2SR
+                      );
+
+    rcc_plli2scfgr |= (
+                        ((pllconfig->N<<RCC_PLLI2SCFGR_PLLI2SN_Pos)&RCC_PLLI2SCFGR_PLLI2SN)
+                       |((pllconfig->P<<RCC_PLLI2SCFGR_PLLI2SP_Pos)&RCC_PLLI2SCFGR_PLLI2SP)
+                       |((pllconfig->Q<<RCC_PLLI2SCFGR_PLLI2SQ_Pos)&RCC_PLLI2SCFGR_PLLI2SQ)
+                       |((pllconfig->R<<RCC_PLLI2SCFGR_PLLI2SR_Pos)&RCC_PLLI2SCFGR_PLLI2SR)
+                      );
+
+    RCC->PLLI2SCFGR = rcc_plli2scfgr;
+
+    // Enable SAI PLL
+    RCC->CR |= RCC_CR_PLLI2SON;
+
+    while ( (RCC->CR&RCC_CR_PLLI2SRDY) == 0 ) {}
+
+}
 
 /**
  * @brief   SystemSetCoreClock
@@ -964,6 +1056,7 @@ SystemInit(void) {
     /* Additional initialization here */
 
 }
+
 
 
 

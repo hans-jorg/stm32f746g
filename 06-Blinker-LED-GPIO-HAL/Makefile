@@ -48,16 +48,6 @@ PARTCLASS=STM32F7xx
 PARTCLASSCMSIS=STM32F7xx
 
 #
-# Bus used for flash access
-#
-# ITCM: Flash at 0x200000   ART
-# AXIM: Flash at 0x800000   Cache
-#
-FLASHBUS=itcm
-#FLASHBUS=axim
-
-
-#
 # Suppress warnings
 # Comment out to have verbose output
 #MAKEFLAGS+= --silent
@@ -436,7 +426,7 @@ DEPFLAGS=-MT $@  -MMD -MP -MF ${OBJDIR}/$*.d
 # Linker script
 #
 #LINKERSCRIPT=$(PROGNAME).ld
-LINKERSCRIPT=$(shell echo $(PART)| tr A-Z a-z)-$(FLASHBUS)flash.ld
+LINKERSCRIPT=$(shell echo $(PART)| tr A-Z a-z).ld
 
 #
 # Entry Point
