@@ -14,6 +14,7 @@
 #include "stm32f746xx.h"
 #include "system_stm32f746.h"
 #include "led.h"
+#include "button.h"
 
 
 /**
@@ -22,12 +23,14 @@
  * @note    It is called every 1ms
  *
  */
+static volatile int blinkon = 1;
 
 static volatile uint32_t tick_ms = 0;
 void SysTick_Handler(void) {
 
     if( tick_ms >= 500 ) {
-       LED_Toggle();
+       if( blinkon )
+           LED_Toggle();
        tick_ms = 0;
     } else {
        tick_ms++;
@@ -67,15 +70,18 @@ int main(void) {
 
     //SystemSetCoreClock(CLOCKSRC_HSE,100);
 
-    #if 1
     /* configure clock to 200 MHz */
     SystemConfigMainPLL(&Clock200MHz);
     SystemSetCoreClock(CLOCKSRC_PLL,1);
-    #endif
+
     SysTick_Config(SystemCoreClock/1000);
 
     LED_Init();
+    Button_Init();
 
     /* Main */
-    for (;;) {}
+    for (;;) {
+        if( Button_Read() )          // No debounce (yet) !!!!!
+            blinkon = !blinkon;
+    }
 }
