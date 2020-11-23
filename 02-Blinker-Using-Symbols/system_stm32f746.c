@@ -321,7 +321,7 @@ uint32_t hpre;
  */
 
 uint32_t SystemGetAPB1Prescaler(void) {
-    return ppre_table[(RCC->CFGR&~RCC_CFGR_PPRE1_Msk)>>RCC_CFGR_PPRE1_Pos];
+    return ppre_table[(RCC->CFGR&RCC_CFGR_PPRE1_Msk)>>RCC_CFGR_PPRE1_Pos];
 }
 
 
@@ -366,7 +366,7 @@ uint32_t p2;
  */
 
 uint32_t SystemGetAPB2Prescaler(void) {
-    return ppre_table[(RCC->CFGR&~RCC_CFGR_PPRE2_Msk)>>RCC_CFGR_PPRE2_Pos];
+    return ppre_table[(RCC->CFGR&RCC_CFGR_PPRE2_Msk)>>RCC_CFGR_PPRE2_Pos];
 }
 
 
@@ -539,8 +539,8 @@ uint32_t freq;
 uint32_t ppre1;
 
     freq = SystemGetCoreClock();
-    ppre1 = (RCC->CFGR&RCC_CFGR_PPRE1_Msk)>>RCC_CFGR_PPRE1_Pos;
-    return freq/ppre_table[ppre1];
+    ppre1 = SystemGetAPB1Prescaler();
+    return freq/ppre1;
 }
 
 /**
@@ -555,8 +555,8 @@ uint32_t freq;
 uint32_t ppre2;
 
     freq = SystemGetCoreClock();
-    ppre2 = (RCC->CFGR&RCC_CFGR_PPRE2_Msk)>>RCC_CFGR_PPRE2_Pos;
-    return freq/ppre_table[ppre2];
+    ppre2 = SystemGetAPB2Prescaler();
+    return freq/ppre2;
 }
 
 /**
@@ -593,12 +593,17 @@ uint32_t SystemGetHCLKFrequency(void) {
 static uint32_t FindHPRE(uint32_t divisor) {
 uint32_t k;
 
-    if( divisor >= 512 )                    // Maximum
+
+    if( divisor <= 1 ) {                    // Minimal
+        return 0;
+    } else if( divisor >= 512 ) {           // Maximum
         return 15;
+    }
+
         
     k = SystemFindLargestPower2(divisor);   // 2 exponent of divisor
 #if 1
-    if( k == 0 )
+    if( k <= 1 )
         return 0;
     if( k < 5 ) {
         return 0x8+k-1;
@@ -634,20 +639,23 @@ uint32_t clocksource;
 
     clocksource = pllconfig->source;
 
-    // If core clock source is PLL change it to HSI and disable PLL
+    // If core clock source is PLL change it to HSI
     if( (RCC->CFGR&RCC_CFGR_SWS) == RCC_CFGR_SWS_PLL ) {
         EnableHSI();
         RCC->CFGR = (RCC->CFGR&RCC_CFGR_SW)|RCC_CFGR_SW_HSI;
-        DisableMainPLL();
     }
+    // Disable Main PLL
+    DisableMainPLL();
 
     // Configure it
     switch(clocksource) {
     case CLOCKSRC_HSI:
+        EnableHSI();
         freq = HSI_FREQ;
         src  = RCC_CFGR_SW_HSI;
         break;
     case CLOCKSRC_HSE:
+        EnableHSE();
         freq = HSE_FREQ;
         src  = RCC_CFGR_SW_HSE;
         break;
@@ -656,19 +664,22 @@ uint32_t clocksource;
     }
     // Get PLLCFGR and clear fields to be set
     rcc_pllcfgr = RCC->PLLCFGR
-             &  ~(  RCC_CFGR_SW
+             &  ~(
+                    RCC_PLLCFGR_PLLM
+                   |RCC_PLLCFGR_PLLN
+                   |RCC_PLLCFGR_PLLP
                    |RCC_PLLCFGR_PLLQ
                    |RCC_PLLCFGR_PLLSRC
-                   |RCC_PLLCFGR_PLLP
-                   |RCC_PLLCFGR_PLLN
-                   |RCC_PLLCFGR_PLLM
                  );
 
-    rcc_pllcfgr |= (pllconfig->P<<RCC_PLLCFGR_PLLP_Pos)
-                  |(pllconfig->N<<RCC_PLLCFGR_PLLN_Pos)
-                  |(pllconfig->M<<RCC_PLLCFGR_PLLM_Pos)
-                  |(pllconfig->Q<<RCC_PLLCFGR_PLLQ_Pos)
-                  |(src<<RCC_PLLCFGR_PLLSRC_Pos);
+    rcc_pllcfgr |=
+                 (
+                   ((pllconfig->M<<RCC_PLLCFGR_PLLM_Pos)&RCC_PLLCFGR_PLLM)
+                  |((pllconfig->N<<RCC_PLLCFGR_PLLN_Pos)&RCC_PLLCFGR_PLLN)
+                  |((pllconfig->P<<RCC_PLLCFGR_PLLP_Pos)&RCC_PLLCFGR_PLLP)
+                  |((pllconfig->Q<<RCC_PLLCFGR_PLLQ_Pos)&RCC_PLLCFGR_PLLQ)
+                  |((src<<RCC_PLLCFGR_PLLSRC_Pos)&RCC_PLLCFGR_PLLSRC)
+                 );
 
     RCC->PLLCFGR = rcc_pllcfgr;
 
@@ -676,8 +687,100 @@ uint32_t clocksource;
 
     MainPLLConfigured = 1;
 }
-///@}
 
+/**
+ * @brief   SystemConfigSAIPLL
+ *
+ * @note    Configure SAI PLL unit
+ *
+ * @note    If core clock source (HCLK) is PLL, it is changed to HSI
+ */
+
+void
+SystemConfigSAIPLL(PLL_Configuration *pllconfig) {
+uint32_t freq,src;
+uint32_t rcc_pllsaicfgr;
+uint32_t clocksource;
+
+    // Some parameter are shared with the Main PLL.
+    // It must be configured first
+    if( !MainPLLConfigured )
+        return;
+
+    // Disable SAI PLL
+    RCC->CR &= ~RCC_CR_PLLSAION;
+    
+    // Get PLLSAICFGR and clear fields to be set
+    rcc_pllsaicfgr = RCC->PLLSAICFGR
+                    &~(
+                        RCC_PLLSAICFGR_PLLSAIN
+                       |RCC_PLLSAICFGR_PLLSAIP
+                       |RCC_PLLSAICFGR_PLLSAIQ
+                       |RCC_PLLSAICFGR_PLLSAIR
+                      );
+
+    rcc_pllsaicfgr |= (
+                        ((pllconfig->N<<RCC_PLLSAICFGR_PLLSAIN_Pos)&RCC_PLLSAICFGR_PLLSAIN)
+                       |((pllconfig->P<<RCC_PLLSAICFGR_PLLSAIP_Pos)&RCC_PLLSAICFGR_PLLSAIP)
+                       |((pllconfig->Q<<RCC_PLLSAICFGR_PLLSAIQ_Pos)&RCC_PLLSAICFGR_PLLSAIQ)
+                       |((pllconfig->R<<RCC_PLLSAICFGR_PLLSAIR_Pos)&RCC_PLLSAICFGR_PLLSAIR)
+                      );
+
+    RCC->PLLSAICFGR = rcc_pllsaicfgr;
+
+    // Enable SAI PLL
+    RCC->CR |= RCC_CR_PLLSAION;
+
+    while ( (RCC->CR&RCC_CR_PLLSAIRDY) == 0 ) {}
+
+}
+
+/**
+ * @brief   SystemConfigSAIPLL
+ *
+ * @note    Configure SAI PLL unit
+ *
+ * @note    If core clock source (HCLK) is PLL, it is changed to HSI
+ */
+
+void
+SystemConfigI2SPLL(PLL_Configuration *pllconfig) {
+uint32_t freq,src;
+uint32_t rcc_plli2scfgr;
+uint32_t clocksource;
+
+    // Some parameter are shared with the Main PLL.
+    // It must be configured first
+    if( !MainPLLConfigured )
+        return;
+
+    // Disable SAI PLL
+    RCC->CR &= ~RCC_CR_PLLI2SON;
+    
+    // Get PLLI2SCFGR and clear fields to be set
+    rcc_plli2scfgr = RCC->PLLI2SCFGR
+                    &~(
+                        RCC_PLLI2SCFGR_PLLI2SN
+                       |RCC_PLLI2SCFGR_PLLI2SP
+                       |RCC_PLLI2SCFGR_PLLI2SQ
+                       |RCC_PLLI2SCFGR_PLLI2SR
+                      );
+
+    rcc_plli2scfgr |= (
+                        ((pllconfig->N<<RCC_PLLI2SCFGR_PLLI2SN_Pos)&RCC_PLLI2SCFGR_PLLI2SN)
+                       |((pllconfig->P<<RCC_PLLI2SCFGR_PLLI2SP_Pos)&RCC_PLLI2SCFGR_PLLI2SP)
+                       |((pllconfig->Q<<RCC_PLLI2SCFGR_PLLI2SQ_Pos)&RCC_PLLI2SCFGR_PLLI2SQ)
+                       |((pllconfig->R<<RCC_PLLI2SCFGR_PLLI2SR_Pos)&RCC_PLLI2SCFGR_PLLI2SR)
+                      );
+
+    RCC->PLLI2SCFGR = rcc_plli2scfgr;
+
+    // Enable SAI PLL
+    RCC->CR |= RCC_CR_PLLI2SON;
+
+    while ( (RCC->CR&RCC_CR_PLLI2SRDY) == 0 ) {}
+
+}
 
 /**
  * @brief   SystemSetCoreClock
@@ -739,6 +842,9 @@ uint32_t ppre2;
         }
         RCC->CFGR = (RCC->CFGR&~RCC_CFGR_HPRE)|(newhpre<<RCC_CFGR_HPRE_Pos);
     } else {                // There is a change of clock source
+        SetFlashWaitStates(MAXWAITSTATES);  // Worst case
+        SystemSetAPB1Prescaler(4);          // Safe
+        SystemSetAPB2Prescaler(2);          // Safe
         // Set HPRE Prescaler
         newhpre = FindHPRE(newdiv);
         RCC->CFGR = (RCC->CFGR&~RCC_CFGR_HPRE)|(newhpre<<RCC_CFGR_HPRE_Pos);
@@ -759,10 +865,13 @@ uint32_t ppre2;
                 SystemConfigMainPLL(&ClockConfiguration200MHz);
             }
             RCC->CFGR = (RCC->CFGR&~RCC_CFGR_SW)|RCC_CFGR_SW_PLL;
+            __DSB();
+            __ISB();
         }
     }
 
     // Set SystemCoreClock to the new frequency and adjust flash wait states
+    
     SystemCoreClockUpdate();
     ConfigureFlashWaitStates(SystemCoreClock,VSUPPLY);
     // Try to restore APBx prescalers
@@ -964,6 +1073,9 @@ SystemInit(void) {
     /* Additional initialization here */
 
 }
+
+
+
 
 
 

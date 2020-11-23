@@ -366,7 +366,7 @@ void _stop(void) {
  * @note Call _stop if main returns
  */
 
-void Reset_Handler(void) {
+void __attribute__((weak,naked)) Reset_Handler(void) {
 unsigned long *pSource;
 unsigned long *pDest;
 

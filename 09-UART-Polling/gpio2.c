@@ -76,7 +76,7 @@
 static GPIO_PinConfiguration defaultinput = {
     .gpio   = 0,    // not used
     .pin    = 0,    // not used
-    .mode   = 1,    // input
+    .mode   = 0,    // input
     .otype  = 0,    //
     .ospeed = 0,    //
     .pupd   = 0,    // pull-up or pull-down
@@ -86,7 +86,7 @@ static GPIO_PinConfiguration defaultinput = {
 static GPIO_PinConfiguration defaultoutput = {
     .gpio   = 0,    // not used
     .pin    = 0,    // not used
-    .mode   = 2,    // output
+    .mode   = 1,    // output
     .otype  = 0,    //
     .ospeed = 0,    //
     .pupd   = 0,    // pull-up or pull-down
@@ -131,6 +131,7 @@ uint32_t m;
     else if ( gpio == GPIOK ) m=RCC_AHB1ENR_GPIOKEN;
     else    m = 0;
     RCC->AHB1ENR |= m;
+    __DSB();
 
 }
 
