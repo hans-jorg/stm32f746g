@@ -160,10 +160,10 @@ int pos;
             pos4 -= 32;
             gpio->AFR[1] = (gpio->AFR[1]&~(0xF<<pos4))|(conf->af<<pos4);
         }
-        // Set remain configurations to default
-        gpio->MODER   = (gpio->MODER&~(3<<pos2));
-        gpio->OSPEEDR = (gpio->OSPEEDR&~(3<<pos2));
-        gpio->PUPDR   = (gpio->PUPDR&~(3<<pos2));
+        gpio->MODER   = (gpio->MODER&~(3<<pos2))|(2<<pos2);
+        // Set remaining configurations to default
+        gpio->OSPEEDR = (gpio->OSPEEDR&~(3<<pos2))|(0<<pos2);
+        gpio->PUPDR   = (gpio->PUPDR&~(3<<pos2))|(0<<pos2);
         gpio->OTYPER  = (gpio->OTYPER&~(BIT(pos)));
         gpio->ODR     = (gpio->ODR&~BIT(pos));
     } else {

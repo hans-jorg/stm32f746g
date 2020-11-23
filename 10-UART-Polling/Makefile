@@ -500,6 +500,7 @@ usage:
 	@echo " tui:        enter a debug session using gdb in text UI"
 	@echo "doxygen:     generate doc files (alias=docs)"
 	@echo "clean:       clean all generated files"
+	@echo "term:        open a terminal window connected to device"
 	@echo "help:        print options (default)"
 
 #
@@ -658,6 +659,13 @@ $(OPENOCDDEBUGSCRIPT):
 docs: doxygen
 doxygen:
 	$(DOXYGEN) *.c *.h
+
+#
+# Open a terminal windows
+#
+terminal: term
+term:
+	$(TTYPROG) $(TTYPARMS)
 
 #
 #

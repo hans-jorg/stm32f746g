@@ -37,20 +37,6 @@
 //@}
 
 /**
- ** @brief  Clock source for UARTx
- **
- ** @note   Used HSI because it remains constant
- **/
-///@{
-#define UART_CLK_APB        0
-#define UART_CLK_SYSCLK     1
-#define UART_CLK_HSI        2
-#define UART_CLK_LSE        3
-
-#define UART_CLK            UART_CLK_HSI
-///@}
-
-/**
  ** @brief Info and data area for UARTS
  **/
 typedef struct {
@@ -86,23 +72,14 @@ static const int uarttabsize = sizeof(uarttab)/sizeof(UART_Info)-1;
  */
 void UART_Enable(USART_TypeDef *uart) {
 
-    if ( uart == USART1 ) {
-        RCC->APB2ENR |= RCC_APB2ENR_USART1EN;
-    } else if ( uart == USART2 ) {
-        RCC->APB1ENR |= RCC_APB1ENR_USART2EN;
-    } else if ( uart == USART3 ) {
-        RCC->APB1ENR |= RCC_APB1ENR_USART3EN;
-    } else if ( uart == UART4 ) {
-        RCC->APB1ENR |= RCC_APB1ENR_UART4EN;
-    } else if ( uart == UART5 ) {
-        RCC->APB1ENR |= RCC_APB1ENR_UART5EN;
-    } else if ( uart == USART6 ) {
-        RCC->APB2ENR |= RCC_APB2ENR_USART6EN;
-    } else if ( uart == UART7 ) {
-        RCC->APB1ENR |= RCC_APB1ENR_UART5EN;
-    } else if ( uart == UART8 ) {
-        RCC->APB1ENR |= RCC_APB1ENR_UART5EN;
-    }
+    if ( uart == USART1 )       RCC->APB2ENR |= RCC_APB2ENR_USART1EN;
+    else if ( uart == USART2 )  RCC->APB1ENR |= RCC_APB1ENR_USART2EN;
+    else if ( uart == USART3 )  RCC->APB1ENR |= RCC_APB1ENR_USART3EN;
+    else if ( uart == UART4 )   RCC->APB1ENR |= RCC_APB1ENR_UART4EN;
+    else if ( uart == UART5 )   RCC->APB1ENR |= RCC_APB1ENR_UART5EN;
+    else if ( uart == USART6 )  RCC->APB2ENR |= RCC_APB2ENR_USART6EN;
+    else if ( uart == UART7 )   RCC->APB1ENR |= RCC_APB1ENR_UART7EN;
+    else if ( uart == UART8 )   RCC->APB1ENR |= RCC_APB1ENR_UART8EN;
 }
 
 
@@ -112,9 +89,10 @@ void UART_Enable(USART_TypeDef *uart) {
  ** @note  Use defines in uart.h to configure the uart, or'ing the parameters
  **/
 int
-UART_Init(int uartn, uint32_t info) {
+UART_Init(int uartn, uint32_t config) {
 uint32_t baudrate,div,t,over;
 USART_TypeDef * uart;
+uint32_t uartfreq;
 
     if( uartn >= uarttabsize ) return -1;
 
@@ -124,31 +102,56 @@ USART_TypeDef * uart;
     GPIO_ConfigureSinglePin(&uarttab[uartn].txpinconf);
     GPIO_ConfigureSinglePin(&uarttab[uartn].rxpinconf);
 
+    // Configure RCC DCKCFGR2
+    t = RCC->DCKCFGR2;
+
     // Select clock source
-    t = RCC->DCKCFGR2&~BITVALUE(3,uartn*2-2);
-    t |= BITVALUE(UART_CLK,uartn*2); // Clock Source as define by UART_CLK
+
+    uartfreq = 0;
+    t &= ~BITVALUE(3,uartn*2);
+    switch(config&UART_CLOCK_M) {
+    case UART_CLOCK_APB:
+        t |= BITVALUE(0,uartn*2);
+        uartfreq = SystemGetAPB1Frequency();
+        break;
+    case UART_CLOCK_SYSCLK:
+        t |= BITVALUE(1,uartn*2);
+        uartfreq = SystemCoreClock;
+        break;
+    case UART_CLOCK_HSI:
+        t |= BITVALUE(2,uartn*2);
+        uartfreq = HSI_FREQ;
+        break;
+    case UART_CLOCK_LSE:
+        t |= BITVALUE(3,uartn*2);
+        uartfreq = LSE_FREQ;
+        break;
+    }
     RCC->DCKCFGR2 = t;
 
     // Enable Clock
     UART_Enable(uart);
 
-    // Configure UART
+    // Configure UART CR1
     t = uart->CR1;
+
+    // data length
     t &= ~(USART_CR1_M|USART_CR1_OVER8|USART_CR1_PCE|USART_CR1_PS|USART_CR1_UE);
-    switch( info&UART_SIZE ) {
+    switch( config&UART_SIZE_M ) {
     case UART_8BITS:                  ; break;
     case UART_7BITS: t |= USART_CR1_M0; break;
     case UART_9BITS: t |= USART_CR1_M1; break;
     default:
         return 2;
     }
+    // parity
     t |= USART_CR1_TE|USART_CR1_RE;
-    switch( info&UART_PARITY ) {
+    switch( config&UART_PARITY_M ) {
     case UART_NOPARITY:                                  ; break;
     case UART_ODDPARITY:  t |= USART_CR1_PCE|USART_CR1_PS; break;
     case UART_EVENPARITY: t |= USART_CR1_PCE;              break;
     }
-    if( info&UART_OVER8 ) {
+    if( config&UART_OVER8 ) {
         t |= USART_CR1_OVER8;
         over = 8;
     } else {
@@ -157,22 +160,41 @@ USART_TypeDef * uart;
     }
     uart->CR1 = t;
 
-    t = uart->CR2&~UART_STOP;
-    switch( info&UART_STOP ) {
-    case UART_1_STOP:                ; break;
-    case UART_0_5_STOP:  t |= 1;     ; break;
-    case UART_2_STOP:    t |= 2;     ; break;
-    case UART_1_5_STOP:  t |= 3;     ; break;
+    // Configure UART CR1
+    t = uart->CR2;
+
+    // parity
+    t &= ~USART_CR2_STOP;
+
+    switch( config&UART_STOP_M ) {
+    case UART_STOP_1:
+        t |= 0;
+        break;
+    case UART_STOP_0_5:
+        t |= USART_CR2_STOP_0;
+        break;
+    case UART_STOP_2:
+        t |= USART_CR2_STOP_1;
+        break;
+    case UART_STOP_1_5:
+        t |= USART_CR2_STOP_0|USART_CR2_STOP_1;
+        break;
     default:
         return 3;
     }
     uart->CR2 = t;
 
     // Configure Baudrate
-    baudrate = ((info&UART_BAUD)>>8);
-    div      = SystemCoreClock/baudrate/over; // round it?
+    baudrate = ((config&UART_BAUD_M)>>UART_BAUD_P);
 
-    uart->BRR = (div&~0xF)|((div&0xF)>>1);
+    if( over == 16 ) {
+        div = uartfreq/baudrate;
+        uart->BRR = div;
+    } else {
+        div = 2*uartfreq/baudrate;
+        uart->BRR = (div&~0xF)|((div&0xF)>>1);
+    }
+
 
     // Enable UART
     uart->CR1 |= USART_CR1_UE;
@@ -191,7 +213,7 @@ USART_TypeDef *uart;
 
     uart = uarttab[uartn].device;
 
-    while( (uart->ISR&USART_ISR_TEACK)==0 ) {}
+    while( (uart->ISR&USART_ISR_TXE)==0 ) {}
     uart->TDR = c;
 
     return 0;
@@ -223,12 +245,19 @@ UART_WriteString(int uartn, char s[]) {
 int
 UART_ReadChar(int uartn) {
 USART_TypeDef *uart;
+uint32_t status;
 
     if( uartn >= uarttabsize ) return -1;
 
     uart = uarttab[uartn].device;
 
+    status = uart->ISR;
+    if( status & USART_ISR_ORE )  {  // overun error
+        uart->ICR |= USART_ICR_ORECF;
+    }
+
     while( (uart->ISR & USART_ISR_RXNE) == 0 ) {}
+
     return uart->RDR;
 }
 
@@ -266,12 +295,15 @@ int i;
 int
 UART_GetStatus(int uartn) {
 USART_TypeDef *uart;
+uint32_t status;
 
     if( uartn >= uarttabsize ) return -1;
 
     uart = uarttab[uartn].device;
 
-    return uart->ISR;
+    status = uart->ISR;
+
+    return status;
 
 }
 

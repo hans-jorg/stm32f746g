@@ -25,6 +25,8 @@
  */
 
 static volatile uint32_t tick_ms = 0;
+static volatile uint32_t delay_ms = 0;
+
 #define INTERVAL 500
 void SysTick_Handler(void) {
 
@@ -34,6 +36,16 @@ void SysTick_Handler(void) {
     } else {
        tick_ms++;
     }
+
+    if( delay_ms > 0 ) delay_ms--;
+
+}
+
+void Delay(uint32_t delay) {
+
+    delay_ms = delay;
+    while( delay_ms ) {}
+
 }
 
 static PLL_Configuration Clock200MHz = {
@@ -46,8 +58,8 @@ static PLL_Configuration Clock200MHz = {
 };
 
 
-static const uint32_t uartconfig =  UART_NOPARITY | UART_8BITS | UART_2_STOP |
-                                    UART_BAUD_115200;
+static const uint32_t uartconfig =  UART_NOPARITY | UART_8BITS | UART_STOP_2 |
+                                    UART_BAUD_9600;
 /**
  * @brief   main
  *
@@ -71,14 +83,35 @@ int c;
     LED_Init();
 
     UART_Init(UART_1,uartconfig);
+//    ITM_Init();
+
 //   __enable_irq();
     /* Main */
+    c = 'A';
     for(;;) {
 #if 0
-          if( UART_GetStatus(UART_2)&UART_RXNOTEMPTY ) {
-            c = UART_ReadChar(UART_2);
+        // Output test
+        UART_WriteChar(UART_1,c);
+//        ITM_SendChar('a'+(c-'A'));
+        if( c == 'Z' ) {
+            UART_WriteChar(UART_1,'\n');
+            UART_WriteChar(UART_1,'\r');
+            c = 'A';
+        } else {
+            c++;
+        }
+        Delay(1);
+#endif
+#if 1
+        // Echo
+          if( UART_GetStatus(UART_1)&UART_RXNOTEMPTY ) {
+              c = UART_ReadChar(UART_1);
+              if( c == '\r' ) {
+                  UART_WriteChar(UART_1,'\n');
+              }
+              UART_WriteChar(UART_1,c);
           }
-          UART_WriteChar(UART_2,c);
+          Delay(100);   // Simulate load
 #endif
     }
 }

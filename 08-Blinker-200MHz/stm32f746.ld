@@ -50,7 +50,13 @@ MEMORY
     ITCMRAM (rwx)    : ORIGIN = 0x00000000, LENGTH = 16K
     BACKUPRAM (rwx)  : ORIGIN = 0x40024000, LENGTH = 4K
 
-}
+};
+
+
+_ram_start   = ORIGIN(SRAM);
+_ram_end     = ORIGIN(SRAM) + LENGTH(SRAM)-1;
+_flash_start = ORIGIN(FLASH);
+_flash_end   = ORIGIN(FLASH) + LENGTH(FLASH)-1;
 
 STACK_SIZE   = 4K;
 STACK_BASE   = ORIGIN(SRAM) + LENGTH(SRAM) - STACK_SIZE;
@@ -76,8 +82,8 @@ _stack_init  = STACK_END;
 
 SECTIONS
 {
-  _text       = .;
-  _text_start = .;                  /* remember start of text (instructions) */
+  _text       = ORIGIN(FLASH);
+  _text_start = ORIGIN(FLASH);      /* remember start of text (instructions) */
     .text :
     {
 
@@ -137,6 +143,7 @@ SECTIONS
     {
 
     } > SRAM
+
 
 }
 
