@@ -13,6 +13,8 @@
  *
  ******************************************************************************/
 
+#include "buffer.h"
+
 #ifndef UART_BIT
 #define UART_BIT(N) (1U<<(N))
 #define UART_BITFIELD(V,P)   ((V)<<(P))
@@ -144,6 +146,7 @@
 ///@}
 
 int UART_Init(int uartn, unsigned config);
+int UART_InitExt(int uartn, unsigned config, Buffer in, Buffer out);
 int UART_WriteChar(int uartn, unsigned c);
 int UART_WriteString(int uartn, char s[]);
 

@@ -1,7 +1,7 @@
 /**
  * @file    buffer.c
  *
- * @note    FIFO buffer for chars
+ * @note    FIFO Buffer for chars
  * @note    Uses a global data defined by DECLARE_BUFFER_AREA macro
  * @note    It does not use malloc
  * @note    Size must be defined in DECLARE_BUFFER_AREA and in buffer_init (Ugly)
@@ -15,9 +15,9 @@
  * @brief   initializes a fifo area
  */
 
-buffer
+Buffer
 buffer_init(void *b, int n) {
-buffer f = (buffer) b;
+Buffer f = (Buffer) b;
 
     f->front = f->rear = f->data;
     f->size = 0;
@@ -33,7 +33,7 @@ buffer f = (buffer) b;
  */
 
 void
-buffer_deinit(buffer f) {
+buffer_deinit(Buffer f) {
 
     f->size = 0;
     f->front = f->rear = f->data;
@@ -46,7 +46,7 @@ buffer_deinit(buffer f) {
  * @note    Does not free area. For now identical to deinit
  */
  void
- buffer_clear(buffer f) {
+ buffer_clear(Buffer f) {
 
     f->size = 0;
     f->front = f->rear = f->data;
@@ -60,7 +60,7 @@ buffer_deinit(buffer f) {
  */
 
 int
-buffer_insert(buffer f, char x) {
+buffer_insert(Buffer f, char x) {
 
     if( buffer_full(f) )
         return -1;
@@ -79,7 +79,7 @@ buffer_insert(buffer f, char x) {
  */
 
 int
-buffer_remove(buffer f) {
+buffer_remove(Buffer f) {
 char ch;
 
     if( buffer_empty(f) )

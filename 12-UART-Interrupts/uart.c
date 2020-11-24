@@ -25,6 +25,7 @@
 #include "system_stm32f746.h"
 #include "gpio.h"
 #include "uart.h"
+#include "buffer.h"
 
 /**
  ** @brief Bit manipulation macros
@@ -43,10 +44,17 @@ typedef struct {
     USART_TypeDef           *device;
     GPIO_PinConfiguration   txpinconf;
     GPIO_PinConfiguration   rxpinconf;
-    int                     irqlevel;
-    int                     irqn;
-    char                    inbuffer;
-    char                    outbuffer;
+        struct {
+        unsigned            irqlevel :5;
+        unsigned            irqn     :10;
+        unsigned            useinbuffer:1;
+        unsigned            useoutbuffer:1;
+        } conf;
+    // Could be unions
+    Buffer                  inbuffer;
+    Buffer                  outbuffer;
+    char                    singleinbuffer;
+    char                    singleoutbuffer;
 } UART_Info;
 
 /**
@@ -90,6 +98,51 @@ void UART_Enable(USART_TypeDef *uart) {
     else if ( uart == UART8 )   RCC->APB1ENR |= RCC_APB1ENR_UART8EN;
 }
 
+
+/**
+ * @brief   Interrupt processing
+ *
+ * @note    Identical to all uarts/usarts
+ */
+static void ProcessInterrupt(int un) {
+USART_TypeDef  *uart;
+
+    uart = uarttab[un].device;
+
+    /* Receiving  */
+    if( uart->ISR & USART_ISR_RXNE  ) { // RX not empty
+        if( uarttab[un].conf.useinbuffer ) {
+            /* Multibyte buffer */
+            buffer_insert(uarttab[un].inbuffer,uart->RDR);
+        } else {
+            /* Single byte buffer */
+            uarttab[un].singleinbuffer = uart->RDR;
+        }
+    }
+    /* Transmitting */
+    if( uart->ISR & USART_ISR_TXE  ) { // TX not empty
+        if( uarttab[un].conf.useoutbuffer ) {
+            /* Multibyte buffer */
+            if( !buffer_empty(uarttab[un].outbuffer) ) {
+                uart->TDR = buffer_remove(uarttab[un].outbuffer);
+            } else {
+                uart->RQR = USART_RQR_TXFRQ;
+                uart->CR1 &= ~USART_CR1_TXEIE;
+            }
+        } else {
+            /* Single byte buffer */
+            if ( uarttab[un].singleoutbuffer ) {
+                uart->TDR = uarttab[un].singleoutbuffer;
+                uarttab[un].singleoutbuffer = 0;
+            } else {
+                uart->RQR = USART_RQR_TXFRQ;    // Repeated code!!! Arghh!!!
+                uart->CR1 &= ~USART_CR1_TXEIE;
+            }
+        }
+    }
+    uart->ICR = 0x00021B5F;     // Clear all pending interrupts
+
+}
 /**
  ** @brief  Interrupt routines for USART and UART
  **/
@@ -97,166 +150,75 @@ void UART_Enable(USART_TypeDef *uart) {
 
 /// IRQ Handler for USART1
 void USART1_IRQHandler(void) {
-USART_TypeDef  *uart = USART1;
 
-    if( uart->ISR & USART_ISR_RXNE  ) { // RX not empty
-        uarttab[0].inbuffer = uart->RDR;
-    }
-    if( uart->ISR & USART_ISR_TXE  ) { // TX not empty
-        if ( uarttab[0].outbuffer ) {
-            uart->TDR = uarttab[0].outbuffer;
-            uarttab[0].outbuffer = 0;
-        } else {
-            uart->RQR = USART_RQR_TXFRQ;
-            uart->CR1 &= ~USART_CR1_TXEIE;
-        }
-    }
-    uart->ICR = 0x00021B5F;     // Clear all pending interrupts
+    ProcessInterrupt(UART_1);
 }
 
 /// IRQ Handler for USART2
 void USART2_IRQHandler(void) {
-USART_TypeDef  *uart = USART2;
 
-    if( uart->ISR & USART_ISR_RXNE  ) { // RX not empty
-        uarttab[0].inbuffer = uart->RDR;
-    }
-    if( uart->ISR & USART_ISR_TXE  ) { // TX not empty
-        if ( uarttab[0].outbuffer ) {
-            uart->TDR = uarttab[0].outbuffer;
-            uarttab[0].outbuffer = 0;
-        } else {
-            uart->RQR = USART_RQR_TXFRQ;
-            uart->CR1 &= ~USART_CR1_TXEIE;
-        }
-    }
-    uart->ICR = 0x00021B5F;     // Clear all pending interrupts
+    ProcessInterrupt(UART_2);
 }
 
 /// IRQ Handler for USART3
 void USART3_IRQHandler(void) {
-USART_TypeDef  *uart = USART3;
 
-    if( uart->ISR & USART_ISR_RXNE  ) { // RX not empty
-        uarttab[0].inbuffer = uart->RDR;
-    }
-    if( uart->ISR & USART_ISR_TXE  ) { // TX not empty
-        if ( uarttab[0].outbuffer ) {
-            uart->TDR = uarttab[0].outbuffer;
-            uarttab[0].outbuffer = 0;
-        } else {
-            uart->RQR = USART_RQR_TXFRQ;
-            uart->CR1 &= ~USART_CR1_TXEIE;
-        }
-    }
-    uart->ICR = 0x00021B5F;     // Clear all pending interrupts
+    ProcessInterrupt(UART_3);
 }
 
 /// IRQ Handler for UART4
 void UART4_IRQHandler(void) {
-USART_TypeDef  *uart = UART4;
 
-    if( uart->ISR & USART_ISR_RXNE  ) { // RX not empty
-        uarttab[0].inbuffer = uart->RDR;
-    }
-    if( uart->ISR & USART_ISR_TXE  ) { // TX not empty
-        if ( uarttab[0].outbuffer ) {
-            uart->TDR = uarttab[0].outbuffer;
-            uarttab[0].outbuffer = 0;
-        } else {
-            uart->RQR = USART_RQR_TXFRQ;
-            uart->CR1 &= ~USART_CR1_TXEIE;
-        }
-    }
-    uart->ICR = 0x00021B5F;     // Clear all pending interrupts
+    ProcessInterrupt(UART_4);
 }
 
 /// IRQ Handler for UART5
 void UART5_IRQHandler(void) {
-USART_TypeDef  *uart = UART5;
 
-    if( uart->ISR & USART_ISR_RXNE  ) { // RX not empty
-        uarttab[0].inbuffer = uart->RDR;
-    }
-    if( uart->ISR & USART_ISR_TXE  ) { // TX not empty
-        if ( uarttab[0].outbuffer ) {
-            uart->TDR = uarttab[0].outbuffer;
-            uarttab[0].outbuffer = 0;
-        } else {
-            uart->RQR = USART_RQR_TXFRQ;
-            uart->CR1 &= ~USART_CR1_TXEIE;
-        }
-    }
-    uart->ICR = 0x00021B5F;     // Clear all pending interrupts
+    ProcessInterrupt(UART_5);
 }
 
 
 /// IRQ Handler for USART6
 void USART6_IRQHandler(void) {
-USART_TypeDef  *uart = USART6;
 
-    if( uart->ISR & USART_ISR_RXNE  ) { // RX not empty
-        uarttab[0].inbuffer = uart->RDR;
-    }
-    if( uart->ISR & USART_ISR_TXE  ) { // TX not empty
-        if ( uarttab[0].outbuffer ) {
-            uart->TDR = uarttab[0].outbuffer;
-            uarttab[0].outbuffer = 0;
-        } else {
-            uart->RQR = USART_RQR_TXFRQ;
-            uart->CR1 &= ~USART_CR1_TXEIE;
-        }
-    }
-    uart->ICR = 0x00021B5F;     // Clear all pending interrupts
+    ProcessInterrupt(UART_6);
 }
 
 
 /// IRQ Handler for UART7
 void UART7_IRQHandler(void) {
-USART_TypeDef  *uart = UART7;
 
-    if( uart->ISR & USART_ISR_RXNE  ) { // RX not empty
-        uarttab[0].inbuffer = uart->RDR;
-    }
-    if( uart->ISR & USART_ISR_TXE  ) { // TX not empty
-        if ( uarttab[0].outbuffer ) {
-            uart->TDR = uarttab[0].outbuffer;
-            uarttab[0].outbuffer = 0;
-        } else {
-            uart->RQR = USART_RQR_TXFRQ;
-            uart->CR1 &= ~USART_CR1_TXEIE;
-        }
-    }
-    uart->ICR = 0x00021B5F;     // Clear all pending interrupts
+    ProcessInterrupt(UART_7);
 }
 
-/// IRQ Handler for UART7
+/// IRQ Handler for UART8
 void UART8_IRQHandler(void) {
-USART_TypeDef  *uart = UART8;
 
-    if( uart->ISR & USART_ISR_RXNE  ) { // RX not empty
-        uarttab[0].inbuffer = uart->RDR;
-    }
-    if( uart->ISR & USART_ISR_TXE  ) { // TX not empty
-        if ( uarttab[0].outbuffer ) {
-            uart->TDR = uarttab[0].outbuffer;
-            uarttab[0].outbuffer = 0;
-        } else {
-            uart->RQR = USART_RQR_TXFRQ;
-            uart->CR1 &= ~USART_CR1_TXEIE;
-        }
-    }
-    uart->ICR = 0x00021B5F;     // Clear all pending interrupts
+    ProcessInterrupt(UART_8);
 }
 ///@}
 
 /**
- ** @brief UART Initialization
+ ** @brief UART Initialization Simplified
  **
  ** @note  Use defines in uart.h to configure the uart, or'ing the parameters
  **/
 int
 UART_Init(int uartn, unsigned config) {
+
+    return UART_InitExt(uartn,config,0,0);
+}
+
+
+/**
+ ** @brief UART Initialization Extended
+ **
+ ** @note  Use defines in uart.h to configure the uart, or'ing the parameters
+ **/
+int
+UART_InitExt(int uartn, unsigned config, Buffer in, Buffer out) {
+
 uint32_t baudrate,div,t,over;
 USART_TypeDef * uart;
 uint32_t uartfreq;
@@ -362,18 +324,33 @@ uint32_t uartfreq;
         uart->BRR = (div&~0xF)|((div&0xF)>>1);
     }
 
-    // Clear buffers
-    uarttab[uartn].inbuffer = 0;
-    uarttab[uartn].outbuffer = 0;
+    // Set buffers
+    if ( in ) {
+        uarttab[uartn].inbuffer = in;
+        uarttab[uartn].conf.useinbuffer = 1;
+        buffer_clear(in);
+    } else {
+        uarttab[uartn].conf.useinbuffer = 0;
+        uarttab[uartn].singleinbuffer = 0;
+    }
+    if ( out ) {
+        uarttab[uartn].outbuffer = out;
+        uarttab[uartn].conf.useoutbuffer = 1;
+        buffer_clear(out);
+    } else {
+        uarttab[uartn].conf.useoutbuffer = 0;
+        uarttab[uartn].singleoutbuffer = 0;
+    }
+
 
     // Enable interrupts (only TCIE and RX)
     uart->CR1 |= USART_CR1_RXNEIE;      // Enable interrupt when RX not empty
  //   uart->CR1 |= USART_CR1_TXEIE;       // Enable interrupt when TX is empty
 
     // Enable interrupts on NVIC
-    NVIC_SetPriority(uarttab[uartn].irqn,uarttab[uartn].irqlevel);
-    NVIC_ClearPendingIRQ(uarttab[uartn].irqn);
-    NVIC_EnableIRQ(uarttab[uartn].irqn);
+    NVIC_SetPriority(uarttab[uartn].conf.irqn,uarttab[uartn].conf.irqlevel);
+    NVIC_ClearPendingIRQ(uarttab[uartn].conf.irqn);
+    NVIC_EnableIRQ(uarttab[uartn].conf.irqn);
 
 
     // Enable UART
@@ -393,11 +370,18 @@ USART_TypeDef *uart;
 
     uart = uarttab[uartn].device;
 #if 1
-    while ( uarttab[uartn].outbuffer != 0 ) {}
-    uarttab[uartn].outbuffer = c;
-    uart->CR1 |= USART_CR1_TXEIE;
+    if( uarttab[uartn].conf.useoutbuffer ) {
+        /* Multibyte buffer */
+        while ( buffer_full(uarttab[uartn].outbuffer) ) {}
+        buffer_insert(uarttab[uartn].outbuffer,c);
+    } else {
+        /* Singlebyte buffer */
+        while ( uarttab[uartn].singleoutbuffer != 0 ) {}
+        uarttab[uartn].singleoutbuffer = c;
+        uart->CR1 |= USART_CR1_TXEIE;
+    }
 #else
-    // Polling
+    /* Polling */
     while( (uart->ISR&USART_ISR_TXE)==0 ) {}
     uart->TDR = c;
 #endif
@@ -436,16 +420,22 @@ uint32_t c;
 
     uart = uarttab[uartn].device;
 
-    if( uarttab[uartn].inbuffer ) {
-        c = uarttab[uartn].inbuffer;
-        uarttab[uartn].inbuffer = 0;
+    if( uarttab[uartn].conf.useinbuffer ) {
+        if( ! buffer_empty(uarttab[uartn].inbuffer)) {
+            c = buffer_remove(uarttab[uartn].inbuffer);
+        }
+    } else {
+        if( uarttab[uartn].singleinbuffer ) {
+            c = uarttab[uartn].singleinbuffer;
+            uarttab[uartn].singleinbuffer = 0;
+        }
     }
 
     if( uart->ISR & USART_ISR_ORE )  {  // overun error
         uart->ICR |= USART_ICR_ORECF;
     }
 
-    return uart->RDR;
+    return c;
 }
 
 
@@ -489,11 +479,24 @@ uint32_t status;
     uart = uarttab[uartn].device;
 
     status = uart->ISR;
-    if ( uarttab[uartn].inbuffer )
-        status |= UART_RXNOTEMPTY;
-    if ( uarttab[uartn].outbuffer == 0 )
-        status |= UART_TXEMPTY;
 
+    /* Verify input buffer */
+    if ( uarttab[uartn].conf.useinbuffer ) {
+        if ( !buffer_empty(uarttab[uartn].inbuffer) )
+            status |= UART_RXNOTEMPTY;
+    } else {
+        if ( uarttab[uartn].singleinbuffer )
+            status |= UART_RXNOTEMPTY;
+    }
+
+    /* Verify output buffer */
+    if( uarttab[uartn].conf.useoutbuffer ) {
+        if ( buffer_empty(uarttab[uartn].outbuffer) )
+            status |= UART_RXNOTEMPTY;
+    } else {
+        if ( uarttab[uartn].singleoutbuffer == 0 )
+            status |= UART_TXEMPTY;
+    }
     return status;
 
 }

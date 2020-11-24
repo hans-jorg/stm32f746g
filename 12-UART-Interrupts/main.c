@@ -105,7 +105,7 @@ int c;
               }
               UART_WriteChar(UART_1,c);
           }
-          Delay(100);   // Simulate load
+          //Delay(100);   // Simulate load
 #endif
     }
 }
