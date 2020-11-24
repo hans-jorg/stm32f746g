@@ -106,7 +106,6 @@ uint32_t uartfreq;
     t = RCC->DCKCFGR2;
 
     // Select clock source
-
     uartfreq = 0;
     t &= ~BITVALUE(3,uartn*2);
     switch(config&UART_CLOCK_M) {
