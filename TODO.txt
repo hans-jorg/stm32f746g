@@ -9,6 +9,13 @@ NOR-Flash
 ExtRAM
 LCD
 
+
+OpenOCD
+=======
+
+To test ITM-SendChar
+
+
 Adjust parameters for compilation
 =================================
 
@@ -25,5 +32,31 @@ For compilation
     -ffunction-sections
     -fdata-sections
     -fno-builtin
+
+Semihosting
+===========
+
+>monitor arm semihosting enable
+
+-specs=nosys.specs -specs=nano.specs -specs=rdimon.specs -lc -lrdimon
+
+#include <stdio.h>
+#include <stdlib.h>
+# ….
+
+extern void initialise_monitor_handles(void);
+
+int main(void) {
+  initialise_monitor_handles();
+
+  printf("Hello !\n");
+
+  HAL_Init();
+  SystemClock_Config();
+
+  puts("Check your openocd console.\n");
+  printf("This works too\n");
+  //……………
+}
 
 

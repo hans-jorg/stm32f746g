@@ -160,7 +160,7 @@ uint32_t uartfreq;
     }
     uart->CR1 = t;
 
-    // Configure UART CR1
+    // Configure UART CR2
     t = uart->CR2;
 
     // parity

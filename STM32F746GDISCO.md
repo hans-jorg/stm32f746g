@@ -211,7 +211,7 @@ ST_LINK_RX |  VCP_TX            | SB12      |      PA9        | UART1_TX (AF7)
 The other is the semihosting, which uses the debug lines to communicate. To output a character, a BKPT is used (new generations, above Cortex M1 and M3) or a SWI instruction.
 
 
-There is another technology called ITM serial, which uses the debug lines to transfer information. It works only when using SWD interface.
+There is another technology called ITM serial, which uses the debug lines to transfer information. It works only when using SWD interface. It uses the PB3 pin.
 
 To use it, one must call the following routines:
 
