@@ -1,0 +1,29 @@
+
+Not completed Projects
+======================
+
+UART-Interrupt
+UART-Ministdio
+Newlib
+NOR-Flash
+ExtRAM
+LCD
+
+Adjust parameters for compilation
+=================================
+
+Use minimal newlib
+    --specs=nano.specs
+
+For linker
+    -nostartfiles
+    -nodefaultlibs
+    -nostdlib
+    -gc-sections
+
+For compilation
+    -ffunction-sections
+    -fdata-sections
+    -fno-builtin
+
+
