@@ -6,6 +6,7 @@
 
 #include "ttyemul.h"
 #include "uart.h"
+#include "buffer.h"
 
 /// Backspace used in line buffered mode
 #define TTY_BS          '\b'
@@ -16,17 +17,21 @@ static unsigned ttyconfig = TTY_IECHO|TTY_OCRLF|TTY_ICRLF|TTY_LINEBUFFERED;
 /**
  *  #brief  UART unit to be used for all I/O
  */
-#define UART_N  UART_2
+#define UART_N  UART_1
 
+
+/**
+ * @brief   Communication parameters
+ */
+static const unsigned uartconfig =  UART_NOPARITY | UART_8BITS | UART_STOP_2 |
+                                    UART_BAUD_9600;
 
 /**
  *  @brief  tty_init
  */
 int tty_init(int chn) {
 
-    UART_Init(  UART_N,
-                UART_NOPARITY|UART_8BITS|UART_2_STOP
-               |UART_BAUD_9600|UART_OVER8);
+    UART_Init(  UART_N,uartconfig );
 
     return 0;
 }

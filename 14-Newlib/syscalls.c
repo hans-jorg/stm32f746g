@@ -250,12 +250,12 @@ int _read(int file, char *ptr, int len) {
  */
 
 caddr_t _sbrk(int incr) {
-extern char _end;		/* Defined in the linker script */
-static char *heap_end;
+extern char _bss_end;		/* Defined in the linker script */
+static char *heap_end = 0;
 char *prev_heap_end;
 
     if (heap_end == 0) {
-        heap_end = &_end;
+        heap_end = &_bss_end;
     }
     prev_heap_end = heap_end;
     if( (heap_end + incr) > GetStackPointer() ) {

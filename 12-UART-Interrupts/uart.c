@@ -501,3 +501,31 @@ uint32_t status;
 
 }
 
+/**
+ ** @brief UART Get Status
+ **
+ ** @note  Clear input buffer and wait until output buffer is empty
+ **
+ **/
+
+ int
+ UART_Flush(int uartn) {
+
+     if( uartn >= uarttabsize ) return -1;
+
+    // Flush input buffer
+    if( uarttab[uartn].conf.useinbuffer ) {
+        buffer_clear(uarttab[uartn].inbuffer);
+    } else {
+        uarttab[uartn].singleinbuffer = 0;
+    }
+
+    // Flush out buffer
+    if( uarttab[uartn].conf.useoutbuffer ) {
+        while (!buffer_empty(uarttab[uartn].outbuffer) ) {}
+    } else {
+        while ( uarttab[uartn].singleoutbuffer ) {}
+    }
+
+    return 0;
+ }
