@@ -15,7 +15,7 @@
 #include "system_stm32f746.h"
 #include "led.h"
 #include "uart.h"
-#include "conversions.h"
+#include "ministdio.h"
 
 
 /**
@@ -58,12 +58,33 @@ static PLL_Configuration Clock200MHz = {
     .R = 2                                  // not used
 };
 
-
+/**
+ * @brief   Communication parameters
+ */
 static const uint32_t uartconfig =  UART_NOPARITY | UART_8BITS | UART_STOP_2 |
                                     UART_BAUD_9600;
 
+/**
+ * @brief   Linker information
+ */
+///@{
+extern unsigned long _text_start;
+extern unsigned long _text_end;
+extern unsigned long _data_start;
+extern unsigned long _data_end;
+extern unsigned long _bss_start;
+extern unsigned long _bss_end;
+extern unsigned long _stack_start;
+extern unsigned long _ram_start;
+extern unsigned long _ram_end;
+extern unsigned long _flash_start;
+extern unsigned long _flash_end;
+///@}
 
-
+/*
+ * @brief Get CPU Info
+ */
+///@{
 uint32_t GetFlashSize(void) {
 uint32_t size;
 
@@ -95,53 +116,22 @@ uint32_t v;
     v = *(uint32_t *) 0xE0042000;       // DBGMCU_IDCODE
     return v;
 }
-
-
-
-
-/**
- * @brief   WriteValue
- *
- */
-void WriteValue(int uart, char *label, unsigned value) {
-char s[30];
-
-    IntToString(value,s);
-    UART_WriteString(uart,label);
-    UART_WriteString(uart,s);
-    UART_WriteString(uart,"\n\r");
-}
-
-void WriteHexValue(int uart, char *label, unsigned value) {
-char s[30];
-
-    IntToHexString(value,s);
-    UART_WriteString(uart,label);
-    UART_WriteString(uart,s);
-    UART_WriteString(uart,"\n\r");
-}
-
-/**
- * @brief   Linker information
- */
-///@{
-extern unsigned long _text_start;
-extern unsigned long _text_end;
-extern unsigned long _data_start;
-extern unsigned long _data_end;
-extern unsigned long _bss_start;
-extern unsigned long _bss_end;
-extern unsigned long _stack_start;
-extern unsigned long _ram_start;
-extern unsigned long _ram_end;
-extern unsigned long _flash_start;
-extern unsigned long _flash_end;
 ///@}
+
+/**
+ * @brief   Interface to ministdio
+ *
+ * @note    All input/output go thru getchar/putchar functions
+ */
+
+int getchar(void) { return UART_ReadChar(UART_1); }
+void putchar(char c) { UART_WriteChar(UART_1,c); }
 
 /**
  * @brief   main
  *
  * @note    Initializes GPIO and blinks LED
+ *
  *
  */
 
@@ -150,13 +140,9 @@ uint32_t v;
 Uid u;
 uint32_t ramused,flashused;
 
-#if 1
     /* configure clock to 200 MHz */
     SystemSetCoreClock(CLOCKSRC_PLL,1);
-#else
-    SystemConfigMainPLL(&Clock200MHz);
-    SystemSetCoreClock(CLOCKSRC_PLL,1);
-#endif
+
     SysTick_Config(SystemCoreClock/1000);
 
     LED_Init();
@@ -164,59 +150,59 @@ uint32_t ramused,flashused;
     UART_Init(UART_1,uartconfig);
 
 
-    UART_WriteString(UART_1,"\n\r\n\r******************************************\n\r");
-    UART_WriteString(UART_1,"Information\n\r");
+    printf("\n\r\n\r******************************************\n\r");
+    printf("Information\n\r");
 
     v = GetModel();
-    WriteHexValue(UART_1,"Model:        ",v);
+    printf("Model:       %X\n",v);
 
     v = GetFlashSize();
-    WriteValue(UART_1,"Flash size:   ",v);
+    printf("Flash size:   %d\n",v);
 
     v = (char *) &_ram_end - (char *) &_ram_start;
-    WriteValue(UART_1,"RAM size:     ",v);
+    printf("RAM size:     %d\n",v);
 
     u = GetCPUId();
-    WriteHexValue(UART_1,"XY Position:  ",u.xy);
-    WriteHexValue(UART_1,"Lot #:        ",u.lot);
-    WriteHexValue(UART_1,"Wafer #:      ",u.waf);
+    printf("XY Position:  %x\n",u.xy);
+    printf("Lot #:        %x\n",u.lot);
+    printf("Wafer #:      %x\n",u.waf);
 
-    WriteValue(UART_1,"Core Clock Frequency (Hz):   ",SystemCoreClock);
-    WriteValue(UART_1,"SYSCLK Clock Frequency (Hz): ",SystemGetSYSCLKFrequency());
-    WriteValue(UART_1,"AHB Clock Frequency (Hz):    ",SystemGetAHBFrequency());
-    WriteValue(UART_1,"APB1 Clock Frequency (Hz):   ",SystemGetAPB1Frequency());
-    WriteValue(UART_1,"APB2 Clock Frequency (Hz):   ",SystemGetAPB2Frequency());
+    printf("Core Clock Frequency (Hz):   %d\n",SystemCoreClock);
+    printf("SYSCLK Clock Frequency (Hz): %d\n",SystemGetSYSCLKFrequency());
+    printf("AHB Clock Frequency (Hz):    %d\n",SystemGetAHBFrequency());
+    printf("APB1 Clock Frequency (Hz):   %d\n",SystemGetAPB1Frequency());
+    printf("APB2 Clock Frequency (Hz):   %d\n",SystemGetAPB2Frequency());
 
     v = (uint32_t) ((char *) &_flash_start);
-    WriteHexValue(UART_1,"Flash start:  ",v);
+    printf("Flash start:  %x\n",v);
     v = (uint32_t) ((char *) &_flash_end);
-    WriteHexValue(UART_1,"Flash end:    ",v);
+    printf("Flash end:    %x\n",v);
 
     v = (uint32_t) ((char *) &_ram_start);
-    WriteHexValue(UART_1,"RAM start:    ",v);
+    printf("RAM start:    %x\n",v);
     v = (uint32_t) ((char *) &_ram_end);
-    WriteHexValue(UART_1,"RAM end:      ",v);
+    printf("RAM end:      %x\n",v);
 
     ramused = (char *) &_bss_end - (char *) &_data_start;
-    WriteValue(UART_1,"RAM used:     ",ramused);
+    printf("RAM used:     %d\n",ramused);
     flashused = (char *) &_text_end - (char *) &_text_start;
-    WriteValue(UART_1,"Flash used:   ",flashused);
+    printf("Flash used:   %d\n",flashused);
 
 
     v = (uint32_t) ((char *) &_text_start);
-    WriteHexValue(UART_1,"Code start:   ",v);
+    printf("Code start:   %x\n",v);
     v = (uint32_t) ((char *) &_text_end);
-    WriteHexValue(UART_1,"Code end:     ",v);
+    printf("Code end:     %x\n",v);
 
     v = (uint32_t) ((char *) &_data_start);
-    WriteHexValue(UART_1,"Data start:   ",v);
+    printf("Data start:   %x\n",v);
     v = (uint32_t) ((char *) &_data_end);
-    WriteHexValue(UART_1,"Data end:     ",v);
+    printf("Data end:     %x\n",v);
 
     v = (uint32_t) ((char *) &_bss_start);
-    WriteHexValue(UART_1,"BSS start:    ",v);
+    printf("BSS start:    %x\n",v);
     v = (uint32_t) ((char *) &_bss_end);
-    WriteHexValue(UART_1,"BSS end:      ",v);
+    printf("BSS end:      %x\n",v);
 
 
 

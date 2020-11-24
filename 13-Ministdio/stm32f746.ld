@@ -82,8 +82,9 @@ _stack_init  = STACK_END;
 
 SECTIONS
 {
-  _text       = ORIGIN(FLASH);
-  _text_start = ORIGIN(FLASH);      /* remember start of text (instructions) */
+    .         = ORIGIN(FLASH);
+  _text       = .;
+  _text_start = .;   /* remember start of text (instructions) */
     .text :
     {
 

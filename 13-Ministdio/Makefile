@@ -390,12 +390,14 @@ AFLAGS=-mthumb \
 # The flags passed to the compiler.
 #
 CFLAGS=-mthumb             \
+        -O3 \
        ${CPUFLAGS}              \
        ${FPUFLAGS}              \
        $(addprefix -I ,${INCLUDEPATH})           \
        -D${PARTCLASS}            \
        -ffunction-sections \
        -fdata-sections     \
+       -fno-builtin \
        -std=c99            \
        -pedantic           \
        -DPART_${PART}
@@ -404,7 +406,7 @@ CFLAGS=-mthumb             \
 #
 # The flags passed to the linker.
 #
-LDFLAGS=--gc-sections
+LDFLAGS=--gc-sections 
 
 
 #
@@ -500,7 +502,6 @@ usage:
 	@echo " tui:        enter a debug session using gdb in text UI"
 	@echo "doxygen:     generate doc files (alias=docs)"
 	@echo "clean:       clean all generated files"
-	@echo "term:        open a terminal window connected to device"
 	@echo "help:        print options (default)"
 
 #
@@ -659,13 +660,6 @@ $(OPENOCDDEBUGSCRIPT):
 docs: doxygen
 doxygen:
 	$(DOXYGEN) *.c *.h
-
-#
-# Open a terminal windows
-#
-terminal: term
-term:
-	$(TTYPROG) $(TTYPARMS)
 
 #
 #
