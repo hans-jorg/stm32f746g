@@ -1,0 +1,6 @@
+*.log
+Docs/
+gcc/
+tmp/
+copyfilestoprojects
+updatefilesinprojects
