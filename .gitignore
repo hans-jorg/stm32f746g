@@ -1,4 +1,7 @@
 *.log
+*.d
+*.i
+*.s
 Docs/
 gcc/
 tmp/
