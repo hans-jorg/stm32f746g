@@ -388,7 +388,57 @@ LCD Signal    |        |  Pin   |  Description
  LCD_INT      | GPIO   | I13    |  LCD Interrupt
  LCD_BL_CTRL  | GPIO   | K3     |  Backlight PWM
 
+#### Serial flash memory
 
+The boad has a MT25QL128ABA serial flash memory. It is a 128 Mb (64 MB) memory with a 
+four lane QSPI interface.
+
+It has a 6 signal interface:
+
+Signal  |   Description
+--------|------------------
+DQ0     |   Data lane (LSB)
+DQ1     |   Data lane
+DQ2     |   Data lane (Used as W#: Write Protect# signal)
+DQ3     |   Data lane (MSB) (Used as a Hold# signal)
+C       |   Clock
+S#      |   Chip Select (Active low)
+
+The clock frequency can be:
+
+* 133 MHz for single transfer rate
+* 90 MHz for double transfer rate
+
+It supports in STR and DTR:
+* Extended I/O Protocol
+* Dual I/O Protocol
+* Quad I/O Protocol
+
+It has 256 sectores (numbered 0 to 255), each sector has two 32 KB subsectors (numbered 0 to 511).
+Each sector can be regarded as having eight 4B subsectors.
+
+All memory is addreass in the range 0 to 0x00FF_FFFF. 
+
+The microcontroller has a QUADSPI interface for flash memories. In the memory mapped mode, the flash memory ]
+occupies a region in the address space of microcontroller.
+
+
+#### Micro SD Card interface
+
+The board has micro SD connector.
+
+Signal |   Description
+-------|------------------
+D0     |   Data lane (LSB)
+D1     |   Data lane
+D2     |   Data lane
+D3     |   Data lane (MSB)
+CMD    |   Command
+CLK    |   Clock
+3V3    |   VDD
+GND    |   VSS
+
+The microcontroller has a SDMMC1 port controlled by the SDMMC host interface. 
 
 #### I2C
 
