@@ -36,7 +36,7 @@
 #
 # Program name
 #
-PROGNAME=blink
+PROGNAME=blink-ucos2
 
 #
 # Defines the part type that this project uses.
@@ -54,6 +54,13 @@ PARTCLASSCMSIS=STM32F7xx
 .SILENT:
 
 #
+# Source files
+#
+SRCFILES=$(wildcard *.c)
+#SRCFILES= main.c
+
+
+#
 # Include path for CMSIS headers
 #
 
@@ -64,12 +71,57 @@ CMSISDEVINCDIR=${CMSISDIR}/Device/ST/$(PARTCLASSCMSIS)/Include
 CMSISINCDIR=${CMSISDIR}/Include
 INCLUDEPATH=${CMSISDEVINCDIR} ${CMSISINCDIR}
 
-#
-# Source files
-#
-SRCFILES=$(wildcard *.c)
-#SRCFILES= main.c
 
+#
+# UCOS Configuration
+#
+
+# UCOS Dir
+UCOS_DIR=../../../Micrium/Software/uC-OS2
+#UCOS_DIR=uCOS-II
+UCOS_SRCDIR=$(UCOS_DIR)/Source
+# Ports Dir for uCOS-II
+UCOS_PORTDIRGNU=$(UCOS_DIR)/Ports/ARM-Cortex-M/ARMv7-M/GNU
+#UCOS_PORTDIR=uCOS-II/Ports/ARM-Cortex-M/GNU
+# Another directory. This contains os_cpu_c.c
+UCOS_PORTDIR=$(UCOS_DIR)/Ports/ARM-Cortex-M/ARMv7-M
+
+
+# Virtual path
+VPATH=$(UCOS_SRCDIR):$(UCOS_PORTDIR):$(UCOS_PORTDIRGNU)
+
+# UCOS Include Path
+UCOS_INCLUDEPATH=$(UCOS_SRCDIR)  $(UCOS_PORTDIRGNU)
+
+# UCOS Source Files
+UCOS_FILES=           os_mbox.c     os_mutex.c    os_sem.c    os_time.c    os_core.c     \
+                      os_flag.c     os_mem.c      os_q.c      os_task.c    os_tmr.c
+UCOS_PORTCFILES=      os_cpu_c.c
+UCOS_PORTCFILESGNU=   os_dbg.c
+UCOS_PORTASMFILESGNU= os_cpu_a.S
+
+UCOS_SRCFILES=  $(addprefix $(UCOS_SRCDIR)/,$(UCOS_FILES) )                             \
+                $(addprefix $(UCOS_PORTDIR)/,$(UCOS_PORTCFILES))                        \
+                $(addprefix $(UCOS_PORTDIRGNU)/,$(UCOS_PORTCFILESGNU))                 \
+                $(addprefix $(UCOS_PORTDIRGNU)/,$(UCOS_PORTASMFILESGNU))
+
+UCOS_OBJFILES=  $(addprefix ${OBJDIR}/, $(notdir $(UCOS_FILES:.c=.o)))                  \
+                $(addprefix ${OBJDIR}/, $(notdir $(UCOS_PORTCFILES:.c=.o)))             \
+                $(addprefix ${OBJDIR}/, $(notdir $(UCOS_PORTCFILESGNU:.c=.o)))          \
+                $(addprefix ${OBJDIR}/, $(notdir $(UCOS_PORTASMFILESGNU:.S=.o)))
+
+
+#
+# Object files
+#
+OBJFILES=   $(addprefix ${OBJDIR}/,$(notdir $(SRCFILES:.c=.o)))                         \
+            $(UCOS_OBJFILES)
+
+
+#
+# Include path
+#
+INCLUDEPATH+=$(UCOS_INCLUDEPATH)
 
 #
 # Include the common make definitions.
@@ -195,9 +247,9 @@ PREFIX:=arm-none-eabi
 # Set the compiler CPU/FPU options.
 #
 CPUFLAGS=-mcpu=cortex-m7
-FPUFLAGS=-mthumb -mcpu=cortex-m7 -mfloat-abi=hard
+#FPUFLAGS=-mthumb -mcpu=cortex-m7 -mfloat-abi=hard
 #FPUFLAGS=-mthumb -mcpu=cortex-m7 -mfloat-abi=softfp  -mfpu=fpv5-d16
-#FPUFLAGS=-mthumb -mcpu=cortex-m7 -mfloat-abi=softfp -mfpu=fpv5-sp-d16
+FPUFLAGS=-mthumb -mcpu=cortex-m7 -mfloat-abi=softfp -mfpu=fpv5-sp-d16
 
 #
 # Terminal application (used to open new windows in debug)
@@ -373,31 +425,27 @@ LIBC:=${shell ${CC} ${CFLAGS} ${FPUFLAGS} -print-file-name=libc.a}
 LIBM:=${shell ${CC} ${CFLAGS} ${FPUFLAGS} -print-file-name=libm.a}
 
 #
-# Object files
-#
-OBJFILES=$(addprefix ${OBJDIR}/,$(SRCFILES:.c=.o))
-
-#
 #
 # The flags passed to the assembler.
 #
 AFLAGS=-mthumb \
        ${CPUFLAGS}  \
        ${FPUFLAGS}  \
-       $(addprefix -I ,${INCLUDEPATH})           \
+       $(addprefix -I ,${INCLUDEPATH})          \
 
 #
 # The flags passed to the compiler.
 #
-CFLAGS=-mthumb             \
-       ${CPUFLAGS}              \
-       ${FPUFLAGS}              \
-       $(addprefix -I ,${INCLUDEPATH})           \
-       -D${PARTCLASS}            \
-       -ffunction-sections \
-       -fdata-sections     \
-       -std=c99            \
-       -pedantic           \
+CFLAGS=-mthumb                                  \
+       ${CPUFLAGS}                              \
+       ${FPUFLAGS}                              \
+       -I .  \
+       $(addprefix -I ,${INCLUDEPATH})          \
+       -D${PARTCLASS}                           \
+       -ffunction-sections                      \
+       -fdata-sections                          \
+       -std=c99                                 \
+       -pedantic                                \
        -DPART_${PART}
 
 
@@ -443,14 +491,14 @@ COMMA=,
 # The rule for building the object file from each C source file.
 #
 ${OBJDIR}/%.o: %.c
-	@echo "  Compiling           ${<}";
+	@echo "  Compiling           $(notdir ${<})";
 	${CC} -c ${CFLAGS} -D${OBJDIR} ${DEPFLAGS} -o ${@} ${<}
 
 #
 # The rule for building the object file from each assembly source file.
 #
 ${OBJDIR}/%.o: %.S
-	@echo "  Assembling          ${<}";
+	@echo "  Assembling          $(notdir ${<})";
 	${CC} -c ${AFLAGS} -D${OBJDIR} -o ${@} -c ${<}
 
 #

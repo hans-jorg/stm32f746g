@@ -467,6 +467,7 @@ ${OBJDIR}/%.axf:  $(OBJFILES)
 	@echo "  Linking             ${@} ";
 	${CC} -Wl,-T '${LINKERSCRIPT}' --entry '${ENTRY}' \
 	        ${CPUFLAGS} ${FPUFLAGS} \
+            -Wl,--print-memory-usage  \
 	        ${addprefix -Wl${COMMA},${LDFLAGS} } -o ${@} $(OBJFILES) \
 	        '${LIBM}' '${LIBC}' '${LIBGCC}' -nostartfiles
 
