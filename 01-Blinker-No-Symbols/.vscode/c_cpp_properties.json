@@ -8,7 +8,7 @@
                 "../../STM32CubeF7/Drivers/CMSIS/Include"
             ],
             "defines": [
-                "EFM32GG990F1024",
+                "STM32G746",
                 "DEBUG",
                 "_DEBUG"
             ],
