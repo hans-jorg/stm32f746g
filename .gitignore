@@ -1,6 +1,8 @@
 # Files
 TODO.md
 null.d
+copyfilestoprojects
+updatefilesinprojects
 
 # Work files
 *.BAK
@@ -12,6 +14,7 @@ utils/
 tmp/
 X*/
 build/
+Docs/
 
 # Prerequisites
 *.d
