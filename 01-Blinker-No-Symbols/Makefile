@@ -4,8 +4,8 @@
 #
 #  @file     Makefile
 #  @brief    General Makefile for Cortex-M Processors
-#  @version  V1.0
-#  @date     05/10/2020
+#  @version  V1.1
+#  @date     06/04/2021
 #
 #  @note     CMSIS library used
 #
@@ -36,7 +36,7 @@
 #
 # Program name
 #
-PROGNAME=blink
+PROGNAME=blink1
 
 #
 # Defines the part type that this project uses.
@@ -54,20 +54,40 @@ PARTCLASSCMSIS=STM32F7xx
 .SILENT:
 
 #
+# Main target
+#
+#default: help
+default: build
+
+#
+# Compatibility Windows/Linux
+#
+ifeq (${OS},Windows_NT)
+HOSTOS :=Windows
+else
+HOSTOS :=${shell uname -s}
+endif
+
+#
+# Include debug information
+#
+DEBUG=y
+
+#
 # Include path for CMSIS headers
 #
 
 # CMSIS Dir
 CMSISDIR=../../STM32CubeF7/Drivers/CMSIS
 
-CMSISDEVINCDIR=${CMSISDIR}/Device/ST/$(PARTCLASSCMSIS)/Include
+CMSISDEVINCDIR=${CMSISDIR}/Device/ST/${PARTCLASSCMSIS}/Include
 CMSISINCDIR=${CMSISDIR}/Include
 INCLUDEPATH=${CMSISDEVINCDIR} ${CMSISINCDIR}
 
 #
 # Source files
 #
-SRCFILES=$(wildcard *.c)
+SRCFILES=${wildcard *.c}
 #SRCFILES= main.c
 
 
@@ -194,27 +214,64 @@ PREFIX:=arm-none-eabi
 
 # Set the compiler CPU/FPU options.
 #
-CPUFLAGS=-mcpu=cortex-m7
-FPUFLAGS=-mthumb -mcpu=cortex-m7 -mfloat-abi=hard
-#FPUFLAGS=-mthumb -mcpu=cortex-m7 -mfloat-abi=softfp  -mfpu=fpv5-d16
-#FPUFLAGS=-mthumb -mcpu=cortex-m7 -mfloat-abi=softfp -mfpu=fpv5-sp-d16
+CPUFLAGS= -mthumb  -mcpu=cortex-m7
+FPUFLAGS= -mfloat-abi=hard -mfpu=fpv5-d16 
+#FPUFLAGS= -mfloat-abi=softfp  -mfpu=fpv5-d16
+#FPUFLAGS= -mfloat-abi=softfp -mfpu=fpv5-sp-d16
 
 #
-# Terminal application (used to open new windows in debug)
+# Specs script (modification of compiler and linker flags}
 #
-#TERMAPP=xterm
-TERMAPP=gnome-terminal
+# This parameter is only recognized by gcc.
+# Linking must be done by a gcc call instead of ld
+#
+# Alternatives are:
+#   nosys.specs:    no libc or libm
+#   nano.specs:     minimal libc (newlib-nano)
+#   rdimon.specs:   semihosting (serial interface thru debug lines)
+#   rdpmon.specs:   RDP
+#   redboot.specs:
+#   picolibc.specs:
+#
+SPECFLAGS= --specs=nano.specs
 
 #
 # Folder for object files
 #
 OBJDIR=gcc
 
+
 #
-# Main target
+# Use sections to optimize code generation.
+# Functions and data are put in separated sections.
+# The linker can drop a (function or data) section
+# if there is no reference to i
 #
-#default: help
-default: build
+
+ASECTIONS=  -ffunction-sections                     \
+            -fdata-sections                         \
+
+
+CSECTIONS=  -ffunction-sections                     \
+            -fdata-sections                         \
+
+LSECTIONS=  -gc-sections
+
+
+#
+# C Error and Warning Messages Flags
+#    -Wall -std=c11 -pedantic
+#
+CERRORFLAGS=                                        \
+            -std=c11                                \
+            -pedantic                               \
+
+
+#
+# Terminal application (used to open new windows in debug)
+#
+#TERMAPP=xterm
+TERMAPP=gnome-terminal
 
 #
 # Default debugger
@@ -226,37 +283,34 @@ debug: gdb
 #
 TTYTERM=/dev/ttyACM0
 TTYBAUD=9600
+TTYBAUD=115200
+
 #
 # Serial terminal emulator
 #
 # Use one of configuration below
 # cu
 #TTYPROG=cu
-#TTYPARMS=-l $(TTYTERM) -s $(TTYBAUD)
+#TTYPARMS=-l ${TTYTERM} -s ${TTYBAUD}
 # screen
 #TTYPROG=screen
-#TTYPARMS= $(TTYTERM) $(TTYBAUD)
+#TTYPARMS= ${TTYTERM} ${TTYBAUD}
 # minicom
-TTYPROG=minicom
-TTYPARMS=-D $(TTYTERM) -b $(TTYBAUD)
+#TTYPROG=minicom
+#TTYPARMS=-D ${TTYTERM} -b ${TTYBAUD}
 # putty
 #TTYPROG=putty
 # tip
 #TTYPROG=tip
-#TTYPARMS=-$(TTYBAUD) $(TTYTERM)
-
+#TTYPARMS=-${TTYBAUD} ${TTYTERM}
+# picocom
+TTYPROG=picocom
+TTYPARMS= -b ${TTYBAUD}  ${TTYTERM} 
 #
 # The command to flash the device
 #
 FLASHER=st-flash
 #FLASHER=openocd
-
-
-#
-# Terminal application (used to open new windows in debug)
-#
-#TERMAPP=xterm
-TERMAPP=gnome-terminal
 
 #
 # Editor to be used
@@ -264,18 +318,25 @@ TERMAPP=gnome-terminal
 EDITOR=gedit
 
 #
-# Path
+# Parameters for OpenOCD
 #
+OPENOCD=openocd
 OPENOCDDIR=/usr/share/openocd
+OPENOCDBOARD=${OPENOCDDIR}/scripts/board/stm32f476discovery.cfg
+OPENOCDFLASHSCRIPT=${OBJDIR}/flash.ocd
+
+#
+# Parameters for st-flash
+#
+STFLASH=st-flash
+STFLASHCMD=write
+STFLASHADDR=0x08000000
 
 #
 # Additional libraries
 #
 #
 
-###############################################################################
-# Generally it is not needed to modify the lines below                        #
-###############################################################################
 
 ###############################################################################
 # Commands                                                                    #
@@ -295,11 +356,6 @@ AR=${PREFIX}-ar
 # The command for calling the linker.
 #
 LD=${PREFIX}-ld
-
-#
-# Debugger
-#
-GDB=$(PREFIX)-gdb
 
 #
 # Tool to generate documentation
@@ -326,6 +382,29 @@ OBJSIZE=${PREFIX}-size
 #
 OBJNM=${PREFIX}-nm
 
+#
+# Debuggers
+#
+
+## GDB with and without TUI
+GDB=${PREFIX}-gdb
+
+## nemiver
+NEMIVER=nemiver
+NEMIVERFLAGS=
+
+## ddd
+DDD=ddd
+DDDFLAGS=
+
+## cdbg
+CDBG=cdbg
+CDBGFLAGS=
+
+## kdbg
+KDBG=kdbg
+KDBGFLAGS=
+
 
 ###############################################################################
 # Commands parameters                                                         #
@@ -334,24 +413,33 @@ OBJNM=${PREFIX}-nm
 #
 # The flags passed to the debugger
 #
-GDBFLAGS=-x $(GDBINIT) -n
-
-#
-# Parameters for OpenOCD
-#
-OPENOCD=openocd
-OPENOCDBOARD=$(OPENOCDDIR)/scripts/board/stm32f476discovery.cfg
-OPENOCDFLASHSCRIPT=$(OBJDIR)/flash.ocd
+GDBFLAGS=-x ${GDBINIT} -n
 
 #
 # Configuration file for GDB
 #
-GDBINIT=$(OBJDIR)/gdbinit
+GDBINIT=${OBJDIR}/gdbinit
 
 #
 # Flags for disassembler
 #
 ODFLAGS=-S -D
+
+
+#
+# Tell the compiler to include debugging information if the DEBUG environment
+# variable is set.
+#
+ifeq ($DEBUG,y)
+DEBUGFLAGS=-g -D DEBUG -O0
+else
+DEBUGFLAGS=-Os
+endif
+
+
+###############################################################################
+# Generally it is not needed to modify the lines below                        #
+###############################################################################
 
 ###############################################################################
 # Compilation parameters                                                      #
@@ -360,62 +448,69 @@ ODFLAGS=-S -D
 #
 # Get the location of libgcc.a from the GCC front-end.
 #
-LIBGCC:=${shell ${CC} ${CFLAGS} ${FPUFLAGS} -print-libgcc-file-name}
+LIBGCC:=${shell ${CC} ${CPUFLAGS} ${FPUFLAGS} -print-libgcc-file-name}
 
 #
 # Get the location of libc.a from the GCC front-end.
 #
-LIBC:=${shell ${CC} ${CFLAGS} ${FPUFLAGS} -print-file-name=libc.a}
+LIBC:=${shell ${CC} ${CPUFLAGS} ${FPUFLAGS} -print-file-name=libc.a}
 
 #
 # Get the location of libm.a from the GCC front-end.
 #
-LIBM:=${shell ${CC} ${CFLAGS} ${FPUFLAGS} -print-file-name=libm.a}
+LIBM:=${shell ${CC} ${CPUFLAGS} ${FPUFLAGS} -print-file-name=libm.a}
 
 #
 # Object files
 #
-OBJFILES=$(addprefix ${OBJDIR}/,$(SRCFILES:.c=.o))
+OBJFILES=${addprefix ${OBJDIR}/,${SRCFILES:.c=.o}}
 
 #
 #
 # The flags passed to the assembler.
 #
-AFLAGS=-mthumb \
-       ${CPUFLAGS}  \
-       ${FPUFLAGS}  \
-       $(addprefix -I ,${INCLUDEPATH})           \
+AFLAGS= ${CPUFLAGS}  							\
+	    ${FPUFLAGS}  							\
+	    ${addprefix -I ,${INCLUDEPATH}}         \
+        ${ASECTIONS}                            \
+
 
 #
 # The flags passed to the compiler.
 #
-CFLAGS=-mthumb             \
-       ${CPUFLAGS}              \
-       ${FPUFLAGS}              \
-       $(addprefix -I ,${INCLUDEPATH})           \
-       -D${PARTCLASS}            \
-       -ffunction-sections \
-       -fdata-sections     \
-       -std=c99            \
-       -pedantic           \
-       -DPART_${PART}
-
+CFLAGS= ${CPUFLAGS}              				\
+	    ${FPUFLAGS}              				\
+	    ${DEBUGFLAGS}                           \
+	    ${addprefix -I ,${INCLUDEPATH}}         \
+	    -D${PARTCLASS}            				\
+	    -DPART_${PART}							\
+        ${CSECTIONS}                            \
+        ${CERRORFLAGS}                          \
+	
 
 #
 # The flags passed to the linker.
 #
-LDFLAGS=--gc-sections
+LDFLAGS=                                        \
+            ${LSECTIONS}                        \
+            ${MAPFLAGS}                         \
+
+#
+# linker flags for libraries
+#     -nostdlib
+#     -nodefaultlibs
+LIBFLAGS= -nolibc -nodefaultlibs  -nostdlib
 
 
 #
-# Tell the compiler to include debugging information if the DEBUG environment
-# variable is set.
+# libraries linked
 #
-ifneq ($DEBUG,)
-CFLAGS+=-g -D DEBUG -O0
-else
-CFLAGS+=-Os
-endif
+# Thery are modified by the specs files
+
+#     -lm -lc -lgcc
+LIBS=
+#
+#
 
 #
 # Flags needed to generate dependency information
@@ -425,14 +520,18 @@ DEPFLAGS=-MT $@  -MMD -MP -MF ${OBJDIR}/$*.d
 #
 # Linker script
 #
-#LINKERSCRIPT=$(PROGNAME).ld
-LINKERSCRIPT=$(shell echo $(PART)| tr A-Z a-z).ld
+#LINKERSCRIPT=${PROGNAME}.ld
+LINKERSCRIPT=${shell echo ${PART}| tr A-Z a-z}.ld
 
 #
 # Entry Point
 #
 ENTRY=Reset_Handler
 
+#
+# Cflow parameters
+#
+CFLOWFLAGS=-l  -b --omit-arguments
 
 ###############################################################################
 # RULES                                                                       #
@@ -444,14 +543,14 @@ COMMA=,
 #
 ${OBJDIR}/%.o: %.c
 	@echo "  Compiling           ${<}";
-	${CC} -c ${CFLAGS} -D${OBJDIR} ${DEPFLAGS} -o ${@} ${<}
+	${CC} -c ${SPECFLAGS} ${CFLAGS} ${CPUFLAGS} ${FPUFLAGS} ${DEPFLAGS} -o ${@} ${<}
 
 #
 # The rule for building the object file from each assembly source file.
 #
 ${OBJDIR}/%.o: %.S
 	@echo "  Assembling          ${<}";
-	${CC} -c ${AFLAGS} -D${OBJDIR} -o ${@} -c ${<}
+	${CC} -c  ${SPECFLAGS} ${AFLAGS} ${CPUFLAGS} ${FPUFLAGS} -o ${@} -c ${<}
 
 #
 # The rule for creating an object library.
@@ -463,13 +562,16 @@ ${OBJDIR}/%.a:
 #
 # The rule for linking the application.
 #
-${OBJDIR}/%.axf:  $(OBJFILES)
+${OBJDIR}/%.axf:  ${OBJFILES}
 	@echo "  Linking             ${@} ";
-	${CC} -Wl,-T '${LINKERSCRIPT}' --entry '${ENTRY}' \
-	        ${CPUFLAGS} ${FPUFLAGS} \
-	        -Wl,--print-memory-usage  \
-	        ${addprefix -Wl${COMMA},${LDFLAGS} } -o ${@} $(OBJFILES) \
-	        '${LIBM}' '${LIBC}' '${LIBGCC}' -nostartfiles
+	${CC}   -Wl,-T '${LINKERSCRIPT}'                                    \
+            -nostartfiles                                               \
+            --entry '${ENTRY}'                                          \
+	         ${SPECFLAGS} ${CPUFLAGS} ${FPUFLAGS} ${LIBFLAGS}           \
+	        -Wl,--print-memory-usage                                    \
+	        ${addprefix -Wl${COMMA},${LDFLAGS} }                        \
+            -o ${@} ${OBJFILES}                                         \
+	        '${LIBM}' '${LIBC}' '${LIBGCC}' 
 
 ${OBJDIR}/%.bin: ${OBJDIR}/%.axf
 	@echo "  Generating binary   ${@} ";
@@ -504,9 +606,9 @@ usage:
 	@echo "help:        print options (default)"
 
 #
-# The default rule, which causes the $(PROGNAME) example to be built.
+# The default rule, which causes the ${PROGNAME} example to be built.
 #
-build: ${OBJDIR} ${OBJDIR}/$(PROGNAME).bin
+build: ${OBJDIR} ${OBJDIR}/${PROGNAME}.bin ${OBJDIR}/${PART}.svd
 	echo "Done."
 
 #
@@ -520,42 +622,44 @@ clean:
 #
 flash: deploy
 burn: deploy
-ifeq ($(FLASHER),st-flash)
-deploy: ${OBJDIR}/$(PROGNAME).bin
-	${FLASHER} write $^ 0x08000000
+ifeq (${FLASHER},st-flash)
+deploy: ${OBJDIR}/${PROGNAME}.bin
+	${STFLASH} ${STFLASHCMD} $^ ${STFLASHADDR} 
 else
-deploy: ${OBJDIR}/$(PROGNAME).bin $(OPENOCDFLASHSCRIPT)
-	${FLASHER} -f $(OPENOCDBOARD) -f $(OPENOCDFLASHSCRIPT)
+deploy: ${OBJDIR}/${PROGNAME}.bin ${OPENOCDFLASHSCRIPT}
+	${OPENOCD} -f ${OPENOCDBOARD} -f ${OPENOCDFLASHSCRIPT}
 endif
 
 #
 # Force write to flash memory. Useful in case of recurring write errors
 #
-force-flash: ${OBJDIR}/$(PROGNAME).bin
+ifeq (${FLASHER},st-flash)
+force-flash: ${OBJDIR}/${PROGNAME}.bin
 	echo "Press RESET during write"
 	sleep 3
 	sudo ${FLASHER} --reset write  $^ 0x8000000
+endif
 
 #
 # Disassembling
 #
-disassembly:$(OBJDIR)/$(PROGNAME).dump
+disassembly:${OBJDIR}/${PROGNAME}.dump
 dump: disassembly
-$(OBJDIR)/$(PROGNAME).dump: $(OBJDIR)/$(PROGNAME).axf
-	@echo "  Disassembling       ${^} and storing in $(OBJDIR)/$(PROGNAME).dump"
-	$(OBJDUMP) $(ODFLAGS) $^ > $(OBJDIR)/$(PROGNAME).dump
+${OBJDIR}/${PROGNAME}.dump: ${OBJDIR}/${PROGNAME}.axf
+	@echo "  Disassembling       ${^} and storing in ${OBJDIR}/${PROGNAME}.dump"
+	${OBJDUMP} ${ODFLAGS} $^ > ${OBJDIR}/${PROGNAME}.dump
 
 #
 # List size
 #
-size: $(OBJDIR)/$(PROGNAME).axf
-	$(OBJSIZE) $^
+size: ${OBJDIR}/${PROGNAME}.axf
+	${OBJSIZE} $^
 
 #
 # List symbols
 #
-nm: $(OBJDIR)/$(PROGNAME).axf
-	$(OBJNM) $^
+nm: ${OBJDIR}/${PROGNAME}.axf
+	${OBJNM} $^
 
 #
 # The rule to create the target directory.
@@ -564,114 +668,149 @@ ${OBJDIR}:
 	mkdir -p ${OBJDIR}
 
 #
-# Rules for building the $(PROGNAME) example.
+# SVDFIlE
 #
-${OBJDIR}/$(PROGNAME).bin: ${OBJDIR}/$(PROGNAME).axf
-${OBJDIR}/$(PROGNAME).axf: ${OBJFILES}
+${OBJDIR}/${PART}.svd: ${OBJDIR}
+	cp ../${PART}.svd ${OBJDIR}
+
+
+# Rules for building the ${PROGNAME} example.
+#
+${OBJDIR}/${PROGNAME}.bin: ${OBJDIR}/${PROGNAME}.axf
+${OBJDIR}/${PROGNAME}.axf: ${OBJFILES}
 
 #
 # Open files in editor windows
 #
 edit:
-	$(EDITOR) Makefile *.c *.h *.ld &
+	${EDITOR} Makefile *.c *.h *.ld &
 
 #
 # Debug command
 #
-gdb: $(OBJDIR)/$(PROGNAME).bin $(GDBINIT)
-	$(GDB) $(GDBFLAGS) $(OBJDIR)/$(PROGNAME).axf
+gdb: ${OBJDIR}/${PROGNAME}.bin ${GDBINIT}
+	${GDB} ${GDBFLAGS} ${OBJDIR}/${PROGNAME}.axf
 
 #
 # iDebug command with text UI
 #
-tui: $(OBJDIR)/$(PROGNAME).bin $(GDBINIT)
-	$(GDB) -tui $(GDBFLAGS) $(OBJDIR)/$(PROGNAME).axf
+tui: ${OBJDIR}/${PROGNAME}.bin ${GDBINIT}
+	${GDB} -tui ${GDBFLAGS} ${OBJDIR}/${PROGNAME}.axf
 
 #
 # iDebug command with text UI
 #
-cgdb: $(OBJDIR)/$(PROGNAME).bin $(GDBINIT)
-	cgdb -d `which $(GDB)`  -x $(OBJDIR)/gdbinit $(OBJDIR)/$(PROGNAME).axf
+cgdb: ${OBJDIR}/${PROGNAME}.bin ${GDBINIT}
+	cgdb -d `which ${GDB}`  -x ${OBJDIR}/gdbinit ${OBJDIR}/${PROGNAME}.axf
 
 
 #
 # Debug using GUI
 #
-ddd: $(OBJDIR)/$(PROGNAME).bin $(GDBINIT)
-	ddd --debugger "$(GDB) $(GDBFLAGS)" $(OBJDIR)/$(PROGNAME).axf
+ddd: ${OBJDIR}/${PROGNAME}.bin ${GDBINIT}
+	ddd --debugger "${GDB} ${GDBFLAGS}" ${OBJDIR}/${PROGNAME}.axf
 
 #
 # Debug using kdbg GUI
 #
-#kdbg: $(OBJDIR)/$(PROGNAME).bin $(GDBINIT)
-#	kdbg  -r localhost:4242 $(OBJDIR)/$(PROGNAME).axf
+#kdbg: ${OBJDIR}/${PROGNAME}.bin ${GDBINIT}
+#	kdbg  -r localhost:4242 ${OBJDIR}/${PROGNAME}.axf
 
 #
 # Debug using nemiver GUI
 #
-nemiver: $(OBJDIR)/$(PROGNAME).bin $(GDBINIT)
-	nemiver  --remote=localhost:4242  --gdb-binary=`which $(GDB)`     $(OBJDIR)/$(PROGNAME).axf
+nemiver: ${OBJDIR}/${PROGNAME}.bin ${GDBINIT}
+	nemiver  --remote=localhost:4242  --gdb-binary=`which ${GDB}`     ${OBJDIR}/${PROGNAME}.axf
 
 
 #
 # Start debug demon
 #
 gdbserver:
-ifeq ($(FLASHER),st-flash)
+ifeq (${FLASHER},st-flash)
 	if [ X"`pidof st-util`" != X ]; then kill `pidof st-util`; fi
-	$(TERMAPP) -e "st-util" &
+	${TERMAPP} -e "st-util" &
 else
-	$(TERMAPP) -e "openocd -x XXXXXXXXXXX" &
+	${TERMAPP} -e "openocd -x XXXXXXXXXXX" &
 endif
 
 #
 # Debugger initialization scripts
 #
-$(GDBINIT):
-ifeq ($(FLASHER),st-flash)
-	echo "# Run this script using gdb source command" > $(GDBINIT)
-	echo "target extended-remote localhost:4242" >> $(GDBINIT)
-	echo "break main" >> $(GDBINIT)
-	echo "continue" >> $(GDBINIT)
+${GDBINIT}:
+ifeq (${FLASHER},st-flash)
+	echo "# Run this script using gdb source command" > ${GDBINIT}
+	echo "target extended-remote localhost:4242" >> ${GDBINIT}
+	echo "break main" >> ${GDBINIT}
+	echo "continue" >> ${GDBINIT}
 else
-	echo "# Run this script using gdb source command" > $(GDBINIT)
-	echo "target remote localhost:3333" >> $(GDBINIT)
-	echo "break main" >> $(GDBINIT)
-	echo "continue" >> $(GDBINIT)
+	echo "# Run this script using gdb source command" > ${GDBINIT}
+	echo "target remote localhost:3333" >> ${GDBINIT}
+	echo "break main" >> ${GDBINIT}
+	echo "continue" >> ${GDBINIT}
 endif
 
-$(OPENOCDFLASHSCRIPT):
-	echo "reset halt" > $(OPENOCDFLASHSCRIPT)
-	echo "flash probe 0" >> $(OPENOCDFLASHSCRIPT)
-	echo "flash write_image erase ${OBJDIR}/$(PROGNAME).bin 0" >> $(OPENOCDFLASHSCRIPT)
-	echo "reset run" >> $(OPENOCDFLASHSCRIPT)
+${OPENOCDFLASHSCRIPT}:
+	echo "reset halt" > ${OPENOCDFLASHSCRIPT}
+	echo "flash probe 0" >> ${OPENOCDFLASHSCRIPT}
+	echo "flash write_image erase ${OBJDIR}/${PROGNAME}.bin 0" >> ${OPENOCDFLASHSCRIPT}
+	echo "reset run" >> ${OPENOCDFLASHSCRIPT}
 
-$(OPENOCDDEBUGSCRIPT):
-	echo "monitor reset halt" > $(OPENOCDFLASHSCRIPT)
-	echo "monitor flash probe 0" >> $(OPENOCDFLASHSCRIPT)
-	echo "monitor flash write_image erase ${OBJDIR}/$(PROGNAME).bin 0" >> $(OPENOCDFLASHSCRIPT)
-	echo "monitor reset run" >> $(OPENOCDFLASHSCRIPT)
+${OPENOCDDEBUGSCRIPT}:
+	echo "monitor reset halt" > ${OPENOCDFLASHSCRIPT}
+	echo "monitor flash probe 0" >> ${OPENOCDFLASHSCRIPT}
+	echo "monitor flash write_image erase ${OBJDIR}/${PROGNAME}.bin 0" >> ${OPENOCDFLASHSCRIPT}
+	echo "monitor reset run" >> ${OPENOCDFLASHSCRIPT}
 
 
 #
 # Generate documentation using doxygen
 #
 docs: doxygen
-doxygen:
-	$(DOXYGEN) *.c *.h
+doxygen: ${DOXYGENCFG}
+	${DOXYGEN} ${DOXYGENCFG}
+	echo Done.
+
+#
+# Generate Doxygen Config
+#
+SEDSCRIPT=dox.sed
+${DOXYGENCFG}:
+	${DOXYGEN} -g ${DOXYGENCFG}
+	echo /^PROJECT_NAME/cPROJECT_NAME           = \"${PROJNAME}\" > ${SEDSCRIPT}
+	echo /^FULL_PATH_NAMES/cFULL_PATH_NAMES     = NO >> ${SEDSCRIPT}
+	echo /^OPTIMIZE_OUTPUT_FOR_C/cOPTIMIZE_OUTPUT_FOR_C    = YES >> ${SEDSCRIPT}
+	echo /^DISTRIBUTE_GROUP_DOC/cDISTRIBUTE_GROUP_DOC    = YES >> ${SEDSCRIPT}
+	echo /^EXTRACT_STATIC/cEXTRACT_STATIC    = YES >> ${SEDSCRIPT}
+	sed -i -f ${SEDSCRIPT} ${DOXYGENCFG}
+	rm  -f  ${SEDSCRIPT}
+
+#
+# Clean the generated documentation
+#
+docs-clean:
+	rm -rf html latex && echo Done.
 
 #
 #
 #
 cproto:
-	cproto -c $(addprefix -I ,${INCLUDEPATH}) -D${PARTCLASS} $(SRCFILES)
+	cproto -c ${addprefix -I ,${INCLUDEPATH}} -D${PARTCLASS} ${SRCFILES}
+
+#
+# generates a call graph
+#
+cflow:
+	(cflow ${CFLOWFLAGS} -D${PART} ${addprefix -I ,${INCLUDEPATH}} ${SRCFILES} 2>&1} | egrep -v "^cflow"
+
+
 #
 # These labels are not files !!!
 #
-.PHONY: nm size dump disassembly deploy burn clean editor force-flash gdbserver
-.PHONY: help build nemiver ddd gdb tui doxygen docs flash cproto
+.PHONY: build burn cflow clean cproto ddd debug default deploy disassembly docs docs-clean
+.PHONY: doxygen dump edit flash force-flash gdb gdbserver help nemiver nm size tui usage 
 
 #
 # Dependencies
 #
--include $(OBJFILES:%.o=%.d)
+-include ${OBJFILES:%.o=%.d}

@@ -47,8 +47,8 @@ MEMORY
      */
     SRAM (rwx)         : ORIGIN = 0x20000000, LENGTH = 320K
     /* Extra RAM */
-    ITCMRAM (rwx)    : ORIGIN = 0x00000000, LENGTH = 16K
-    BACKUPRAM (rwx)  : ORIGIN = 0x40024000, LENGTH = 4K
+    ITCMRAM (rwx)      : ORIGIN = 0x00000000, LENGTH = 16K
+    BACKUPRAM (rwx)    : ORIGIN = 0x40024000, LENGTH = 4K
 
 };
 

@@ -13,8 +13,8 @@
             "cwd": "${workspaceFolder}",
 
             "serverpath":"",
-            "servertype":"jlink",
-            "device":"EFM32GG990F1024",
+            "servertype":"stutil",
+            "device":"STM32F746",
             "interface":"swd",
             "serialNumber":"",
           // There are two possibilites: using a JLink script as specified by the
@@ -28,8 +28,7 @@
                 "monitor reset"
             ],
             "runToEntryPoint": "main",
-            "svdFile": "${workspaceFolder}/gcc/EFM32GG990F1024.svd",
-
+            "svdFile": "${workspaceFolder}/gcc/STM32F746.svd",
             "preLaunchTask": "Make: make flash",
         }
     ]
