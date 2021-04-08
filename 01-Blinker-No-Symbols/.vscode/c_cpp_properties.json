@@ -4,8 +4,8 @@
             "name": "Embedded ARM",
             "includePath": [
                 "${workspaceFolder}/**",
-                "../../Gecko_SDK/platform/Device/SiliconLabs/EFM32GG/Include",
-                "../../Gecko_SDK//platform/CMSIS"
+                "../../STM32CubeF7/Drivers/CMSIS/Device/ST/STM32F7xx/Include/",
+                "../../STM32CubeF7/Drivers/CMSIS/Include"
             ],
             "defines": [
                 "EFM32GG990F1024",
