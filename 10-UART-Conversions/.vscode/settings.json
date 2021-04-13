@@ -9,8 +9,8 @@
             "color": "#4f0000"
         },
         120
-    ]
+    ],
     "editor.renderWhitespace": "all",
-    "workbench.colorCustomizations": { "editorWhitespace.foreground": "#7F7F7F" }
-
+    "workbench.colorCustomizations": { "editorWhitespace.foreground": "#7F7F7F" },
+    "cortex-debug.armToolchainPath": "/opt/gcc-arm-none-eabi/bin"
 }

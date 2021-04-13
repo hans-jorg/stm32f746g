@@ -11,21 +11,13 @@
             "request": "launch",
             "executable": "${workspaceFolder}/gcc/blink1.axf",
             "cwd": "${workspaceFolder}",
-            "servertype":"stutil",
+            "servertype":"openocd",
             "device":"STM32F746",
             "interface":"swd",
-            "serialNumber":"",
-            "preRestartCommands": [
-                "file ${workspaceFolder}/gcc/blink1.bin",
-                "load",
-                "add-symbol-file ${workspaceFolder}/gcc/blink1.axf 0x0",
-                "enable breakpoint",
-                "monitor reset"
+            "configFiles" : [
+                "board/stm32f7discovery.cfg"
             ],
-            "runToEntryPoint": "main",
-            "svdFile": "${workspaceFolder}/gcc/STM32F746.svd",
-
-            "preLaunchTask": "Make: make flash",
-        }
+            "svdFile": "${workspaceFolder}/gcc/STM32F746.svd"
+         }
     ]
 }
