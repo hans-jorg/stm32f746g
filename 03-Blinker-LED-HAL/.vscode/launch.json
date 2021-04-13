@@ -11,15 +11,10 @@
             "request": "launch",
             "executable": "${workspaceFolder}/gcc/blink1.axf",
             "cwd": "${workspaceFolder}",
-
-            "serverpath":"",
-            "servertype":"jlink",
-            "device":"EFM32GG990F1024",
+            "servertype":"stutil",
+            "device":"STM32F746",
             "interface":"swd",
             "serialNumber":"",
-          // There are two possibilites: using a JLink script as specified by the
-          // jlinkscript":"${workspaceFolder}/gcc/blink1.jlink",
-          // line, or embedded the script in a preRestartCommands parameter
             "preRestartCommands": [
                 "file ${workspaceFolder}/gcc/blink1.bin",
                 "load",
@@ -28,7 +23,7 @@
                 "monitor reset"
             ],
             "runToEntryPoint": "main",
-            "svdFile": "${workspaceFolder}/gcc/EFM32GG990F1024.svd",
+            "svdFile": "${workspaceFolder}/gcc/STM32F746.svd",
 
             "preLaunchTask": "Make: make flash",
         }

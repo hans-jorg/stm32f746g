@@ -14,7 +14,9 @@
             "servertype":"stutil",
             "device":"STM32F746",
             "interface":"swd",
-            "serialNumber":"",
+            "debuggerArgs": [],
+            "serverpath": "st-util",
+            "cpu": "cortex-m4",
             "preRestartCommands": [
                 "file ${workspaceFolder}/gcc/blink1.bin",
                 "load",
@@ -24,8 +26,7 @@
             ],
             "runToEntryPoint": "main",
             "svdFile": "${workspaceFolder}/gcc/STM32F746.svd",
-
-            "preLaunchTask": "Make: make flash",
-        }
+            "debugServer": 50000
+         }
     ]
 }

@@ -36,7 +36,7 @@
 #
 # Program name
 #
-PROGNAME=blink5
+PROGNAME=blink1
 
 #
 # Defines the part type that this project uses.
@@ -215,7 +215,7 @@ PREFIX:=arm-none-eabi
 # Set the compiler CPU/FPU options.
 #
 CPUFLAGS= -mthumb  -mcpu=cortex-m7
-FPUFLAGS= -mfloat-abi=hard -mfpu=fpv5-d16
+FPUFLAGS= -mfloat-abi=hard -mfpu=fpv5-d16 
 #FPUFLAGS= -mfloat-abi=softfp  -mfpu=fpv5-d16
 #FPUFLAGS= -mfloat-abi=softfp -mfpu=fpv5-sp-d16
 
@@ -300,7 +300,7 @@ TTYBAUD=115200
 #TTYPARMS=-${TTYBAUD} ${TTYTERM}
 # picocom
 TTYPROG=picocom
-TTYPARMS= -b ${TTYBAUD}  ${TTYTERM}
+TTYPARMS= -b ${TTYBAUD}  ${TTYTERM} 
 
 #
 # Editor to be used
@@ -315,12 +315,12 @@ EDITOR=gedit
 #               that can be found in https://github.com/stlink-org/stlink
 #               and in many linux repositories.
 #               NOTE: Upgrading the board firmware can break the st-flash.
-#               This can be solved by installing a new version of the
+#               This can be solved by installing a new version of the 
 #               utility.
-#    openocd:   The OpenOCD (Open On-Chip Debugging) project has a server
-#               that can work as a GDB Server and as a flasher. To write a
-#               binary file, a command sequence must be entered using a
-#               telnet connection to port 4444. It can be found on
+#    openocd:   The OpenOCD (Open On-Chip Debugging) project has a server 
+#               that can work as a GDB Server and as a flasher. To write a 
+#               binary file, a command sequence must be entered using a 
+#               telnet connection to port 4444. It can be found on 
 #               https://www.openocd.org.
 #    copy:      The board appears as a MSD (Mass Storage Device), i.e., a
 #               memory like a pen driver. What is moved to this device
@@ -356,20 +356,20 @@ endif
 debug: gdb
 
 
-#
+# 
 # GDB Server
 #
 # There are three ways to start a GDB server:
-#    stutil:    It uses the st-util utility, that is part of the Open Source
+#    stutil:    It uses the st-util utility, that is part of the Open Source 
 #               ST-LINK. The default port is 4242. It can be found at
 #               https://github.com/stlink-org/stlink
-#    openocd:   The OpenOCD (Open On-Chip Debugging) project has a server
+#    openocd:   The OpenOCD (Open On-Chip Debugging) project has a server 
 #               that can work as a GDB Server and as a flasher. To use it as
 #               a GDB server, GDB (or a GDB fronted) must connect to port 3333.
 #               It can be found at https://www.openocd.org.
 #    stlink:    There is a GDB Server embedded in the STM32CubeIDE. It can be
 #               used as a standalone apllication. The port used is 61234.
-#               STM32CubeIDE can be found at
+#               STM32CubeIDE can be found at 
 #               https://www.st.com/en/development-tools/stm32cubeide.html.
 #               In Ubuntu systems, the ST software only works correctly
 #               when started in its folder.
@@ -380,7 +380,7 @@ gdbserver:gdbserver-stutil
 #gdbserver=gdbserver-cube
 
 
-#
+# 
 # Parameters for Flash and GDB Server software
 #
 
@@ -402,7 +402,7 @@ STFLASHADDR=0x08000000
 STGDBPORT=4242
 
 #
-# Configuration for STM32CubeIDE GDB Server
+# Configuration for STM32CubeIDE GDB Server 
 # Note: STM32CubeProgrammer must be installed
 #
 # Status: Not tested
@@ -521,7 +521,7 @@ DOXYGENCFG=Doxyfile
 # variable is set.
 #
 ifeq (${DEBUG},y)
-DEBUGCFLAGS=-g -DDEBUG
+DEBUGCFLAGS=-g -DDEBUG 
 DEBUGLDFLAGS=-O0 -g
 else
 DEBUGCFLAGS=
@@ -578,7 +578,7 @@ CFLAGS= ${CPUFLAGS}                             \
 	    -DPART_${PART}                          \
 	    ${CSECTIONS}                            \
 	    ${CERRORFLAGS}                          \
-
+	
 
 #
 # The flags passed to the linker.
@@ -665,7 +665,7 @@ ${OBJDIR}/%.axf:  ${OBJFILES}
 	        -Wl,--print-memory-usage                                    \
 	        ${addprefix -Wl${COMMA},${LDFLAGS} }                        \
 	        -o ${@} ${OBJFILES}                                         \
-	        '${LIBM}' '${LIBC}' '${LIBGCC}'
+	        '${LIBM}' '${LIBC}' '${LIBGCC}' 
 
 
 ###############################################################################
@@ -732,7 +732,7 @@ flash-copy: ${OBJDIR}/${PROGNAME}.bin
 
 # Flash using st-flash
 flash-stflash: ${OBJDIR}/${PROGNAME}.bin
-	${STFLASH} ${STFLASHCMD} $^ ${STFLASHADDR}
+	${STFLASH} ${STFLASHCMD} $^ ${STFLASHADDR} 
 
 # Flash using OpenOCD
 flash-openocd: ${OBJDIR}/${PROGNAME}.bin ${OPENOCDFLASHSCRIPT}
@@ -926,7 +926,7 @@ cflow:
 # These labels are not files !!!
 #
 .PHONY: burn cflow clean cproto ddd debug default deploy disassembly docs docs-clean
-.PHONY: doxygen dump edit flash force-flash gdb gdbserver help nemiver nm size tui usage
+.PHONY: doxygen dump edit flash force-flash gdb gdbserver help nemiver nm size tui usage 
 .PHONY: FORCE
 
 # Force run
@@ -936,4 +936,6 @@ FORCE:
 # Dependencies
 #
 -include ${OBJFILES:%.o=%.d}
+
+
 

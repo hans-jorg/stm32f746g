@@ -1,3 +1,16 @@
 {
-    "makefile.extensionOutputFolder": "./.vscode"
+    "editor.rulers" : [
+        { 
+            "column": 80,
+            "color": "#4F4f00"
+        },
+        {
+            "column": 100,
+            "color": "#4f0000"
+        },
+        120
+    ]
+    "editor.renderWhitespace": "all",
+    "workbench.colorCustomizations": { "editorWhitespace.foreground": "#7F7F7F" }
+
 }
