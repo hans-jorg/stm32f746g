@@ -56,14 +56,14 @@ int main(void) {
      */
     for (;;) {
 #if 1
-       ms_delay(500);
-       LED_Toggle();
+        ms_delay(300);
+        LED_Toggle();
 #else
-        ms_delay(500);
+        ms_delay(300);
         LED_Set();
-        ms_delay(500);
+        ms_delay(300);
         LED_Clear();
-        ms_delay(500);
+        ms_delay(300);
 #endif
     }
 }

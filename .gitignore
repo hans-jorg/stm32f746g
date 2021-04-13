@@ -15,6 +15,7 @@ tmp/
 X*/
 build/
 Docs/
+Utils/
 
 # Prerequisites
 *.d

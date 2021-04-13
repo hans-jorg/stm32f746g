@@ -334,10 +334,10 @@ EDITOR=gedit
 #               https://www.st.com/en/development-tools/stsw-link004.html.
 #               Not tested yet.
 #
-#flash: flash-stflash
+flash: flash-stflash
 #flash: flash-openocd
 #flash: flash-cube
-flash: flash-copy
+#flash: flash-copy
 ifeq (${HOSTOS},Windows)
 #flash: flash-stlink
 endif
@@ -652,21 +652,6 @@ ${OBJDIR}/%.a:
 	@echo "  Archiving           ${@}";
 	${AR} -cr ${@} ${^}
 
-#
-# The rule for linking the application.
-#
-${OBJDIR}/%.axf:  ${OBJFILES}
-	@echo "  Linking             ${@} ";
-	${CC}   -Wl,-T '${LINKERSCRIPT}'                                    \
-	        ${DEBUGLDFLAGS}                                             \
-	        -nostartfiles                                               \
-	        --entry '${ENTRY}'                                          \
-	         ${SPECFLAGS} ${CPUFLAGS} ${FPUFLAGS} ${LIBFLAGS}           \
-	        -Wl,--print-memory-usage                                    \
-	        ${addprefix -Wl${COMMA},${LDFLAGS} }                        \
-	        -o ${@} ${OBJFILES}                                         \
-	        '${LIBM}' '${LIBC}' '${LIBGCC}'
-
 
 ###############################################################################
 # TARGETS                                                                     #
@@ -707,14 +692,27 @@ build: ${OBJDIR} ${OBJDIR}/${PROGNAME}.bin ${OBJDIR}/${PART}.svd
 clean:
 	rm -rf ${OBJDIR} ${wildcard *~} html latex docs  null.* && echo "Done."
 
-# Rules for building the ${PROGNAME} example.
+#
+# Rules for building binary file from the ${PROGNAME}.axf executable file.
 #
 ${OBJDIR}/${PROGNAME}.bin: ${OBJDIR} ${OBJDIR}/${PROGNAME}.axf
-	@echo "  Generating binary   ${@} ";
+	@echo "  Generating binary ${@}"
 	${OBJCOPY} -O binary  ${OBJDIR}/${PROGNAME}.axf ${@}
 
-
-${OBJDIR}/${PROGNAME}.axf: ${OBJDIR} ${OBJFILES}
+#
+# The rule for linking the application.
+#
+${OBJDIR}/${PROGNAME}.axf:  ${OBJFILES}
+	@echo "  Linking             ${@} ";
+	${CC}   -Wl,-T '${LINKERSCRIPT}'                                    \
+	        ${DEBUGLDFLAGS}                                             \
+	        -nostartfiles                                               \
+	        --entry '${ENTRY}'                                          \
+	         ${SPECFLAGS} ${CPUFLAGS} ${FPUFLAGS} ${LIBFLAGS}           \
+	        -Wl,--print-memory-usage                                    \
+	        ${addprefix -Wl${COMMA},${LDFLAGS} }                        \
+	        -o ${@} ${OBJFILES}                                         \
+	        '${LIBM}' '${LIBC}' '${LIBGCC}'
 
 #
 # Rules for the transfer binary to board
@@ -728,14 +726,17 @@ deploy: flash
 
 # Flash using copy
 flash-copy: ${OBJDIR}/${PROGNAME}.bin
+	@echo "  Flashing ${PROGNAME}.bin using copy"
 	${COPY}  $^   ${DEVICEMOUNTPOINT}/${DEVICENAME}
 
 # Flash using st-flash
 flash-stflash: ${OBJDIR}/${PROGNAME}.bin
+	@echo "  Flashing ${PROGNAME}.bin using st-flash"
 	${STFLASH} ${STFLASHCMD} $^ ${STFLASHADDR}
 
 # Flash using OpenOCD
 flash-openocd: ${OBJDIR}/${PROGNAME}.bin ${OPENOCDFLASHSCRIPT}
+	@echo "  Flashing ${PROGNAME}.bin using openocd"
 	${OPENOCD} -f ${OPENOCDBOARD}
 	sleep 15
 	telnet localhost 4444 < ${OPENOCDFLASHSCRIPT}
@@ -744,13 +745,13 @@ ${OPENOCDFLASHSCRIPT}:
 	echo "reset halt" > ${OPENOCDFLASHSCRIPT}
 	echo "flash probe 0" >> ${OPENOCDFLASHSCRIPT}
 	echo "flash write_image erase ${OBJDIR}/${PROGNAME}.bin 0x8000000" >> \
-		${OPENOCDFLASHSCRIPT}
+	    ${OPENOCDFLASHSCRIPT}
 	echo "reset run" >> ${OPENOCDFLASHSCRIPT}
 	echo "shutdown" >> ${OPENOCDFLASHSCRIPT}
 
 # Flash using st-link
 flash-stlink: ${OBJDIR}/${PROGNAME}.bin
-	echo "Not implemented"
+	echo "Not implemented yet"
 	false
 
 #
@@ -799,14 +800,13 @@ nemiver: ${OBJDIR}/${PROGNAME}.bin ${GDBINIT}
 	nemiver  --remote=localhost:${GDBPORT}  \
 	         --gdb-binary=`which ${GDB}`     ${OBJDIR}/${PROGNAME}.axf
 
-
 #
 # Start debug demon
 #
 
 # GDB Server using Open Source ST-LINK
 gdbserver-stutil: gdbinit-stutil
-	if [ X"`pidof ${STUTIL}`" != X ]; then kill `pidof ${STUTIL}`; fi
+	#if [ X"`pidof ${STUTIL}`" != X ]; then kill `pidof ${STUTIL}`; fi
 	${TERMAPP} -- ${STUTIL} -p ${STGDBPORT}
 
 # GDB Server using OpenOCD
@@ -870,6 +870,7 @@ ${OBJDIR}:
 # SVDFIlE
 #
 ${OBJDIR}/${PART}.svd: ${OBJDIR}
+	echo "  Copying ${PART}.svd file to build folder"
 	cp ../${PART}.svd ${OBJDIR}
 
 #
