@@ -50,22 +50,27 @@ Projects
 
 \# |  Project               |  Description                                     | Status
 ---|------------------------|--------------------------------------------------|-----------------
-01 | Blinker-Simple         | A very simple LED blinker                        | Run
-02 | Blinker-GPIO-HAL       | Simple blinker with a GPIO HAL                   | ? 
-03 | Blinker-LED-HAL        | Simple blinker with a LED HAL                    | ? 
-04 | Blinker-LED-HAL-V2     | Simple blinker with a better LED HAL             | ? 
-05 | Blinker-LED-GPIO-HAL   | Simple blinker with a LED/GPIO layered HAL       | ? 
-06 | Blinker-SysTick        | Simple blinker using SysTick                     | ? 
-07 | Blinker-200MHz         | Changing the CPU clock frequency                 | ?
-08 | Button                 | Reading button status                            | ?
-09 | UART-Polling           | UART interface with polling                      | ?
-10 | UART-Conversions       | ?                                                | ?
-11 | UART-Interrupts        | UART interface with interrupts                   | ?
+01 | Blinker-Simple         | A very simple LED blinker                        | OK
+02 | Blinker-GPIO-HAL       | Simple blinker with a GPIO HAL                   | OK 
+03 | Blinker-LED-HAL        | Simple blinker with a LED HAL                    | OK 
+04 | Blinker-LED-HAL-V2     | Simple blinker with a better LED HAL             | OK 
+05 | Blinker-LED-GPIO-HAL   | Simple blinker with a LED/GPIO layered HAL       | OK 
+06 | Blinker-SysTick        | Simple blinker using SysTick                     | OK 
+07 | Blinker-200MHz         | Changing the CPU clock frequency                 | OK
+08 | Button                 | Reading button status                            | OK
+09 | UART-Polling           | UART interface with polling                      | OK
+10 | UART-Interrupts        | UART interface with interrupts                   | OK
+11 | Infos                  | Show MCU Info                                    | OK
 12 | Ministdio              | A minimal stdio (printf)                         | ?
+13 | ----                   | -----                                            | -
 14 | Newlib                 | Using newlib (already in arm-none-eabi-gcc)      | ?
 15 | TimeTriggered-v1       | Pont's time triggered system (old)               | ? 
 16 | TimeTriggered-v2       | Pont's time triggered system (new)               | ?
 17 | ucos2                  | Using uC/OS-II                                   | ? 
+18 | ----                   | ----                                             | -
+19 | ----                   | ----                                             | -
+20 | ----                   | ----                                             | -
+21 | ----                   | ----                                             | -
 22 | ExternalRAM            | External RAM                                     | Not tested
 23 | Buddy                  | Using buddy allocator on external RAM            | Not tested
 24 | LCD                    | Using the on board LCD                           | ?
