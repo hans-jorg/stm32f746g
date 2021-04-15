@@ -113,15 +113,15 @@ void LED_Init(void) {
     LEDGPIO->ODR     &=  ~LEDMASK;
 }
 
-static inline void LED_Set() {
+static inline void LED_Set(void) {
         LEDGPIO->BSRR = LEDMASK;            // Turn on LED
 }
 
-static inline void LED_Clear() {
+static inline void LED_Clear(void) {
         LEDGPIO->BSRR = (LEDMASK<<16);      // Turn off LED
 }
 
-static inline void LED_Toggle() {
+static inline void LED_Toggle(void) {
        LEDGPIO->ODR ^= LEDMASK;             // Use XOR to toggle output
 }
 

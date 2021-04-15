@@ -84,28 +84,17 @@ int c;
     /* Main loop */
     c = 'a';
     for(;;) {
-#if 0
-        // Output test
-        UART_WriteChar(UART_1,c);
-//        ITM_SendChar('a'+(c-'A'));
-        if( c == 'z' ) {
-            UART_WriteChar(UART_1,'\n');
-            UART_WriteChar(UART_1,'\r');
-            c = 'a';
-        } else {
-            c++;
-        }
-        Delay(1);
-#else
         // Echo
-          if( UART_GetStatus(UART_1)&UART_RXNOTEMPTY ) {
-              c = UART_ReadChar(UART_1);
-              if( c == '\r' ) {
-                  UART_WriteChar(UART_1,'\n');
-              }
-              UART_WriteChar(UART_1,c);
-          }
-          //Delay(100);   // Simulate load
-#endif
+        while( UART_GetStatus(UART_1)&UART_RXNOTEMPTY ) {
+            c = UART_ReadChar(UART_1);
+            if( c == '\r' ) {
+                UART_WriteString(UART_1,"\n\r");
+            } else if ( c == '\x1B') {
+                UART_WriteString(UART_1,"0123456789");
+            } else {
+                UART_WriteChar(UART_1,c);
+            }
+        }
+        Delay(100);   // Simulate load
     }
 }

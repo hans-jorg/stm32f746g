@@ -83,35 +83,23 @@ int c;
     LED_Init();
 
     UART_Init(UART_1,uartconfig);
-//    ITM_Init();
 
-//   __enable_irq();
+    UART_WriteString(UART_1,"Hello\n\r");
+
     /* Main */
     c = 'A';
     for(;;) {
-#if 0
-        // Output test
-        UART_WriteChar(UART_1,c);
-//        ITM_SendChar('a'+(c-'A'));
-        if( c == 'Z' ) {
-            UART_WriteChar(UART_1,'\n');
-            UART_WriteChar(UART_1,'\r');
-            c = 'A';
-        } else {
-            c++;
-        }
-        Delay(1);
-#endif
-#if 1
         // Echo
-          if( UART_GetStatus(UART_1)&UART_RXNOTEMPTY ) {
-              c = UART_ReadChar(UART_1);
-              if( c == '\r' ) {
-                  UART_WriteChar(UART_1,'\n');
-              }
+        if( UART_GetStatus(UART_1)&UART_RXNOTEMPTY ) {
+            c = UART_ReadChar(UART_1);
+            if( c == '\r' ) {
+                UART_WriteString(UART_1,"\n\r");
+            } else if ( c == '\x1B' ) {
+                UART_WriteString(UART_1,"0123456789");
+            } else {
               UART_WriteChar(UART_1,c);
-          }
-          Delay(100);   // Simulate load
-#endif
+            }
+        }
+        Delay(100);   // Simulate load
     }
 }

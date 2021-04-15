@@ -81,7 +81,7 @@ int i,i2;
     for(i=0;i<16;i++) {
         m =  1<<i;               /* mask for bit for pin            */
         i2 = 2*i;
-        f =  3<<i2;           /* mask for 2 bit field for pin    */
+        f =  3<<i2;             /* mask for 2 bit field for pin    */
 
         if( imask&m ) {         /* pin is input */
             gpio->MODER    = (gpio->MODER&~f)|(INPUTMODE<<i2);

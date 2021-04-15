@@ -36,7 +36,7 @@
 #
 # Program name
 #
-PROGNAME=uart3
+PROGNAME=uart2
 
 #
 # Defines the part type that this project uses.

@@ -27,17 +27,17 @@
 
 void LED_Init(void);
 
-static inline void LED_Set() {
+static inline void LED_Set(void) {
         /* Writing a 1 to lower 16 bits of BSRR set the corresponding bit */
         LEDGPIO->BSRR = LEDMASK;            // Turn on LED
 }
 
-static inline void LED_Clear() {
+static inline void LED_Clear(void) {
         /* Writing a 1 to upper 16 bits of BSRR clear the correspoding bit */
         LEDGPIO->BSRR = (LEDMASK<<16);      // Turn off LED
 }
 
-static inline void LED_Toggle() {
+static inline void LED_Toggle(void) {
         /* This is a read/modify/write sequence */
        LEDGPIO->ODR ^= LEDMASK;             // Use XOR to toggle output
 }

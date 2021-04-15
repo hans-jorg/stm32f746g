@@ -13,7 +13,7 @@
  *
  ******************************************************************************/
 
-#include "buffer.h"
+#include "fifo.h"
 
 #ifndef UART_BIT
 #define UART_BIT(N) (1U<<(N))
@@ -146,11 +146,12 @@
 ///@}
 
 int UART_Init(int uartn, unsigned config);
-int UART_InitExt(int uartn, unsigned config, Buffer in, Buffer out);
+int UART_InitExt(int uartn, unsigned config, FIFO in, FIFO out);
 int UART_WriteChar(int uartn, unsigned c);
 int UART_WriteString(int uartn, char s[]);
 
 int UART_ReadChar(int uartn);
+int UART_ReadCharNoWait(int uartn);
 int UART_ReadString(int uartn, char *s, int n);
 int UART_GetStatus(int uartn);
 

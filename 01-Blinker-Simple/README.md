@@ -1,5 +1,5 @@
-Blink
-=====
+Blink1
+======
 
 Introduction
 ------------
@@ -7,14 +7,23 @@ Introduction
 This is a very simple LED blink. It shows how to compile a program, upload and 
 debug it.
 
-It uses a quick and dirty delay routine, and it should not to be used in 
-production code.
-
 The STM32F746G Discovery board has a LED connected to pin 1 of GPIO port I. 
 This is not documented but can be found in the schematics.
 
 Furthermore, pin 3 of GPIO port K controls the LCD. By setting it low, it is 
 possible to turn off the LCD.
+
+
+The structure of the application is very simple.
+
+    +----------------------------------------------------+
+    |                Application                         |
+    +----------------------------------------------------+
+    |                 Hardware                           |
+    +----------------------------------------------------+
+
+It uses a quick and dirty delay routine, and it should not to be used in 
+production code.
 
 GPIO
 ----

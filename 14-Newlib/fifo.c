@@ -1,23 +1,23 @@
 /**
- * @file    buffer.c
+ * @file    fifo.c
  *
- * @note    FIFO Buffer for chars
- * @note    Uses a global data defined by DECLARE_BUFFER_AREA macro
+ * @note    FIFO for chars
+ * @note    Uses a global data defined by DECLARE_fifo_AREA macro
  * @note    It does not use malloc
- * @note    Size must be defined in DECLARE_BUFFER_AREA and in buffer_init (Ugly)
+ * @note    Size must be defined in DECLARE_fifo_AREA and in fifo_init (Ugly)
  * @note    Uses as many dependencies as possible
  */
 
-#include "buffer.h"
+#include "fifo.h"
 
 
 /**
  * @brief   initializes a fifo area
  */
 
-Buffer
-buffer_init(void *b, int n) {
-Buffer f = (Buffer) b;
+FIFO
+fifo_init(void *b, int n) {
+FIFO f = (FIFO) b;
 
     f->front = f->rear = f->data;
     f->size = 0;
@@ -33,7 +33,7 @@ Buffer f = (Buffer) b;
  */
 
 void
-buffer_deinit(Buffer f) {
+fifo_deinit(FIFO f) {
 
     f->size = 0;
     f->front = f->rear = f->data;
@@ -46,7 +46,7 @@ buffer_deinit(Buffer f) {
  * @note    Does not free area. For now identical to deinit
  */
  void
- buffer_clear(Buffer f) {
+ fifo_clear(FIFO f) {
 
     f->size = 0;
     f->front = f->rear = f->data;
@@ -60,9 +60,9 @@ buffer_deinit(Buffer f) {
  */
 
 int
-buffer_insert(Buffer f, char x) {
+fifo_insert(FIFO f, char x) {
 
-    if( buffer_full(f) )
+    if( fifo_full(f) )
         return -1;
 
     *(f->rear++) = x;
@@ -79,10 +79,10 @@ buffer_insert(Buffer f, char x) {
  */
 
 int
-buffer_remove(Buffer f) {
+fifo_remove(FIFO f) {
 char ch;
 
-    if( buffer_empty(f) )
+    if( fifo_empty(f) )
         return -1;
 
     ch = *(f->front++);

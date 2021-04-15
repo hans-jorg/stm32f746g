@@ -31,15 +31,15 @@ static void LED_Init(void) {
     GPIO_Init(LEDGPIO,0,LEDMASK);
 }
 
-static inline void LED_Set() {
+static inline void LED_Set(void) {
     GPIO_Set(LEDGPIO,LEDMASK);
 }
 
-static inline void LED_Clear() {
+static inline void LED_Clear(void) {
     GPIO_Clear(LEDGPIO,LEDMASK);
 }
 
-static inline void LED_Toggle() {
+static inline void LED_Toggle(void) {
     GPIO_Toggle(LEDGPIO,LEDMASK);
 }
 #endif

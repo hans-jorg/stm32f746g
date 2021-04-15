@@ -15,6 +15,13 @@
 #include "system_stm32f746.h"
 #include "led.h"
 
+#define BIT(N) (1UL<<(N))
+
+/*
+ * Bit 3 of GPIOK controls the LCD
+ */
+#define LCDGPIO   GPIOK
+#define LCDPIN    BIT(3)
 
 /**
  * @brief   Quick and dirty delay routine
@@ -49,8 +56,16 @@ void ms_delay(volatile int ms) {
 
 int main(void) {
 
+    /*
+     * Initialize LEDs
+     */
     LED_Init();
 
+    /*
+     * Turn off LCD
+     */
+    GPIO_Init(LCDGPIO,0,LCDPIN);
+    GPIO_Clear(LCDGPIO,LCDPIN);
     /*
      * Blink LED
      */
