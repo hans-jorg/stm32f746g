@@ -18,14 +18,16 @@
 #include <stdarg.h>
 #include "ministdio.h"
 
-extern int      putchar(int c);
-extern int      getchar(void);
-
+/*
+ * Use division in conversion
+ */
 #define USE_DIV
-#define miniprintf printf
-#define miniputs   puts
-#define minifputs  fputs
-#define minifgets  fgets
+
+/*
+ * Low level input/output
+ */
+extern int      miniputchar(int c);
+extern int      minigetchar(void);
 
 #define BS  '\x08'
 #define DEL '\x7F'

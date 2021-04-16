@@ -1022,13 +1022,14 @@ void
 SystemInit(void) {
 
     /* Configure FPU */
+#if 1
     #if (__FPU_PRESENT == 1) && (__FPU_USED == 1)
         /* enable CP10 and CP11 coprocessors */
         SCB->CPACR |= (0x0FUL << 20);
         __DSB();
         __ISB();
     #endif
-
+#endif
     /* Reset HSEON, CSSON and PLLON bits */
     RCC->CR = 0x00000083;
 
@@ -1073,6 +1074,7 @@ SystemInit(void) {
     /* Additional initialization here */
 
 }
+
 
 
 

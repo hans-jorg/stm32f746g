@@ -10,8 +10,6 @@
 #include "stm32f746xx.h"
 #include "system_stm32f746.h"
 
-#include "gpio.h"
-
 /**
  * @brief LED Symbols
  *
@@ -27,20 +25,21 @@
 #define LEDMASK             (1U<<(LEDPIN))
 ///@}
 
-static void LED_Init(void) {
-    GPIO_Init(LEDGPIO,0,LEDMASK);
+void LED_Init(void);
+
+static inline void LED_Set(void) {
+        /* Writing a 1 to lower 16 bits of BSRR set the corresponding bit */
+        LEDGPIO->BSRR = LEDMASK;            // Turn on LED
 }
 
-static inline void LED_Set() {
-    GPIO_Set(LEDGPIO,LEDMASK);
+static inline void LED_Clear(void) {
+        /* Writing a 1 to upper 16 bits of BSRR clear the correspoding bit */
+        LEDGPIO->BSRR = (LEDMASK<<16);      // Turn off LED
 }
 
-static inline void LED_Clear() {
-    GPIO_Clear(LEDGPIO,LEDMASK);
-}
-
-static inline void LED_Toggle() {
-    GPIO_Toggle(LEDGPIO,LEDMASK);
+static inline void LED_Toggle(void) {
+        /* This is a read/modify/write sequence */
+       LEDGPIO->ODR ^= LEDMASK;             // Use XOR to toggle output
 }
 #endif
 

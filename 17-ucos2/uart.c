@@ -11,16 +11,6 @@
  **
  **/
 
-/**
- ** @brief UART Configuration
- **
- ** @note No interrupts are used
- ** Oversampling    : 8
- ** Clock source    : SystemCoreClock
- ** Handshaking     : No
- **/
-
-
 #include "stm32f746xx.h"
 #include "system_stm32f746.h"
 #include "gpio.h"
@@ -68,9 +58,9 @@ static const int uarttabsize = sizeof(uarttab)/sizeof(UART_Info)-1;
 //@}
 
 /**
- * @brief   Enable UART
+ * @brief   Enable clock for UART
  */
-void UART_Enable(USART_TypeDef *uart) {
+void UART_EnableClock(USART_TypeDef *uart) {
 
     if ( uart == USART1 )       RCC->APB2ENR |= RCC_APB2ENR_USART1EN;
     else if ( uart == USART2 )  RCC->APB1ENR |= RCC_APB1ENR_USART2EN;
@@ -93,6 +83,7 @@ UART_Init(int uartn, uint32_t config) {
 uint32_t baudrate,div,t,over;
 USART_TypeDef * uart;
 uint32_t uartfreq;
+uint32_t cr1,cr2,cr3,ckcfgr;
 
     if( uartn >= uarttabsize ) return -1;
 
@@ -102,89 +93,94 @@ uint32_t uartfreq;
     GPIO_ConfigureSinglePin(&uarttab[uartn].txpinconf);
     GPIO_ConfigureSinglePin(&uarttab[uartn].rxpinconf);
 
-    // Configure RCC DCKCFGR2
-    t = RCC->DCKCFGR2;
+    // Configure clock for UxARTy at RCC DCKCFGR2
+    ckcfgr = RCC->DCKCFGR2;
 
     // Select clock source
 
     uartfreq = 0;
-    t &= ~BITVALUE(3,uartn*2);
+    ckcfgr &= ~BITVALUE(3,uartn*2);
     switch(config&UART_CLOCK_M) {
     case UART_CLOCK_APB:
-        t |= BITVALUE(0,uartn*2);
+        ckcfgr |= BITVALUE(0,uartn*2);
         uartfreq = SystemGetAPB1Frequency();
         break;
     case UART_CLOCK_SYSCLK:
-        t |= BITVALUE(1,uartn*2);
+        ckcfgr |= BITVALUE(1,uartn*2);
         uartfreq = SystemCoreClock;
         break;
     case UART_CLOCK_HSI:
-        t |= BITVALUE(2,uartn*2);
+        ckcfgr |= BITVALUE(2,uartn*2);
         uartfreq = HSI_FREQ;
         break;
     case UART_CLOCK_LSE:
-        t |= BITVALUE(3,uartn*2);
+        ckcfgr |= BITVALUE(3,uartn*2);
         uartfreq = LSE_FREQ;
         break;
     }
-    RCC->DCKCFGR2 = t;
+    RCC->DCKCFGR2 = ckcfgr;
 
     // Enable Clock
-    UART_Enable(uart);
+    UART_EnableClock(uart);
+
+
+    // Configuration only with disabled UAR
+    uart->CR1 &= ~USART_CR1_UE;
+
 
     // Configure UART CR1
-    t = uart->CR1;
+    cr1 = uart->CR1;
+    cr1 &= ~(USART_CR1_M|USART_CR1_OVER8|USART_CR1_PCE|USART_CR1_PS|USART_CR1_UE);
 
     // data length
-    t &= ~(USART_CR1_M|USART_CR1_OVER8|USART_CR1_PCE|USART_CR1_PS|USART_CR1_UE);
     switch( config&UART_SIZE_M ) {
     case UART_8BITS:                  ; break;
-    case UART_7BITS: t |= USART_CR1_M0; break;
-    case UART_9BITS: t |= USART_CR1_M1; break;
+    case UART_7BITS: cr1 |= USART_CR1_M0; break;
+    case UART_9BITS: cr1 |= USART_CR1_M1; break;
     default:
         return 2;
     }
     // parity
-    t |= USART_CR1_TE|USART_CR1_RE;
     switch( config&UART_PARITY_M ) {
     case UART_NOPARITY:                                  ; break;
-    case UART_ODDPARITY:  t |= USART_CR1_PCE|USART_CR1_PS; break;
-    case UART_EVENPARITY: t |= USART_CR1_PCE;              break;
+    case UART_ODDPARITY:  cr1 |= USART_CR1_PCE|USART_CR1_PS; break;
+    case UART_EVENPARITY: cr1 |= USART_CR1_PCE;              break;
     }
     if( config&UART_OVER8 ) {
-        t |= USART_CR1_OVER8;
+        cr1 |= USART_CR1_OVER8;
         over = 8;
     } else {
-        t &= ~USART_CR1_OVER8;
+        cr1 &= ~USART_CR1_OVER8;
         over = 16;
     }
-    uart->CR1 = t;
 
-    // Configure UART CR2
-    t = uart->CR2;
+    // Configure UART CR2 register
+    cr2 = uart->CR2;
+    cr2 &= ~USART_CR2_STOP;
 
-    // parity
-    t &= ~USART_CR2_STOP;
-
+    // stop bits
     switch( config&UART_STOP_M ) {
     case UART_STOP_1:
-        t |= 0;
+        cr2 |= 0;
         break;
     case UART_STOP_0_5:
-        t |= USART_CR2_STOP_0;
+        cr2 |= USART_CR2_STOP_0;
         break;
     case UART_STOP_2:
-        t |= USART_CR2_STOP_1;
+        cr2 |= USART_CR2_STOP_1;
         break;
     case UART_STOP_1_5:
-        t |= USART_CR2_STOP_0|USART_CR2_STOP_1;
+        cr2 |= USART_CR2_STOP_0|USART_CR2_STOP_1;
         break;
     default:
         return 3;
     }
-    uart->CR2 = t;
 
-    // Configure Baudrate
+    // Configure UART CR3 register
+    cr3 = uart->CR3;
+    cr3 = 0;
+
+    // Configure UART BRR register (baudrate)
     baudrate = ((config&UART_BAUD_M)>>UART_BAUD_P);
 
     if( over == 16 ) {
@@ -196,7 +192,16 @@ uint32_t uartfreq;
     }
 
 
+
+
+
+    // Set configuration
+    uart->CR1 = cr1;
+    uart->CR2 = cr2;
+    uart->CR3 = cr3;
+
     // Enable UART
+    uart->CR1 |= USART_CR1_TE|USART_CR1_RE;
     uart->CR1 |= USART_CR1_UE;
     return 0;
 }
@@ -259,6 +264,33 @@ uint32_t status;
     while( (uart->ISR & USART_ISR_RXNE) == 0 ) {}
 
     return uart->RDR;
+}
+
+/**
+ ** @brief Read a character from UART
+ **
+ ** @note  It does not block. It return 0 when there is no received character
+ **
+ **/
+int
+UART_ReadCharNoWait(int uartn) {
+USART_TypeDef *uart;
+uint32_t status;
+
+    if( uartn >= uarttabsize ) return -1;
+
+    uart = uarttab[uartn].device;
+
+    status = uart->ISR;
+    if( status & USART_ISR_ORE )  {  // overun error
+        uart->ICR |= USART_ICR_ORECF;
+    }
+
+    if ( uart->ISR & USART_ISR_RXNE ) {
+        return uart->RDR;
+    } else {
+        return 0;
+    }
 }
 
 

@@ -93,7 +93,7 @@ void TaskStart(void *param) {
 
 
 #if (OS_TASK_STAT_EN > 0)
-    OSStatInit();                               // Determine CPU capacity
+    OSStatInit();                                               // Determine CPU capacity
 #endif
 
     // Create a task to blink LED 0
@@ -103,10 +103,10 @@ void TaskStart(void *param) {
                     TASKLED_PRIO);                              // Task Priority/ID
 
     // Create a task to blink LED 1
-    OSTaskCreate(   TaskUART,                                   // Pointer to task
-                    (void *) 0,                                 // Parameter
-                    (void *) &TaskUARTStack[TASKUART_STK_SIZE-1],// Initial value of SP
-                    TASKUART_PRIO);                             // Task Priority/ID
+/*    OSTaskCreate(   TaskUART,                                   // Pointer to task*/
+/*                    (void *) 0,                                 // Parameter*/
+/*                    (void *) &TaskUARTStack[TASKUART_STK_SIZE-1],// Initial value of SP*/
+/*                    TASKUART_PRIO);                             // Task Priority/ID*/
 
 
 

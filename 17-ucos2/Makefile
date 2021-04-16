@@ -51,7 +51,7 @@ PARTCLASSCMSIS=STM32F7xx
 # Suppress warnings
 # Comment out to have verbose output
 #MAKEFLAGS+= --silent
-.SILENT:
+#.SILENT:
 
 #
 # Main target
@@ -215,8 +215,8 @@ PREFIX:=arm-none-eabi
 # Set the compiler CPU/FPU options.
 #
 CPUFLAGS= -mthumb  -mcpu=cortex-m7
-FPUFLAGS= -mfloat-abi=hard -mfpu=fpv5-d16
-#FPUFLAGS= -mfloat-abi=softfp  -mfpu=fpv5-d16
+#FPUFLAGS= -mfloat-abi=hard -mfpu=fpv5-d16
+FPUFLAGS= -mfloat-abi=softfp  -mfpu=fpv5-d16
 #FPUFLAGS= -mfloat-abi=softfp -mfpu=fpv5-sp-d16
 
 #
@@ -426,6 +426,47 @@ OPENOCDFLASHSCRIPT=${OBJDIR}/flash.ocd
 #
 #
 
+# UCOS Dir
+UCOS_DIR=../../../Micrium/Software/uC-OS2/
+#UCOS_DIR=uCOS-II
+UCOS_SRCDIR=${UCOS_DIR}/Source
+# Ports Dir for uCOS-II
+UCOS_PORTDIRGNU=${UCOS_DIR}/Ports/ARM-Cortex-M/ARMv7-M/GNU
+# Another directory. This contains os_cpu_c.c
+UCOS_PORTDIR=${UCOS_DIR}/Ports/ARM-Cortex-M/ARMv7-M
+
+
+# Virtual path
+VPATH=${UCOS_SRCDIR}:${UCOS_PORTDIR}:${UCOS_PORTDIRGNU}
+
+# UCOS Include Path
+UCOS_INCLUDEPATH=${UCOS_SRCDIR}  ${UCOS_PORTDIRGNU}
+
+# UCOS Source Files
+UCOS_FILES=           os_mbox.c     os_mutex.c  os_sem.c    os_time.c   os_core.c \
+                      os_flag.c     os_mem.c    os_q.c      os_task.c   os_tmr.c
+UCOS_PORTCFILES=      os_cpu_c.c
+UCOS_PORTCFILESGNU=   os_dbg.c
+UCOS_PORTASMFILESGNU= os_cpu_a.S
+
+UCOS_SRCFILES=  ${addprefix ${UCOS_SRCDIR)/,${UCOS_FILES}}                  \
+                ${addprefix ${UCOS_PORTDIR}/,${UCOS_PORTCFILES}}            \
+                ${addprefix ${UCOS_PORTCDIRGNU}/,${UCOS_PORTCFILESGNU}}     \
+                ${addprefix ${UCOS_PORTDIRGNU}/,${UCOS_PORTASMFILESGNU}}
+
+UCOS_OBJFILES=  ${addprefix ${OBJDIR}/, ${notdir ${UCOS_FILES:.c=.o}        \
+                                        ${UCOS_PORTCFILES:.c=.o}            \
+                                        ${UCOS_PORTCFILESGNU:.c=.o}         \
+                                        ${UCOS_PORTASMFILESGNU:.S=.o}}}
+
+
+#
+# Include them in the building process
+#
+
+EXTSRCFILES=${UCOS_SRCFILES}
+EXTOBJFILES=${UCOS_OBJFILES}
+EXTINCLUDEPATH=${UCOS_INCLUDEPATH}  .
 
 ###############################################################################
 # Commands                                                                    #
@@ -561,9 +602,10 @@ OBJFILES=${addprefix ${OBJDIR}/,${SRCFILES:.c=.o}}
 #
 # The flags passed to the assembler.
 #
-AFLAGS= ${CPUFLAGS}  							\
-	    ${FPUFLAGS}  							\
+AFLAGS= ${CPUFLAGS}                             \
+	    ${FPUFLAGS}                             \
 	    ${addprefix -I ,${INCLUDEPATH}}         \
+	    ${addprefix -I ,${EXTINCLUDEPATH}}      \
 	    ${ASECTIONS}                            \
 
 
@@ -574,6 +616,7 @@ CFLAGS= ${CPUFLAGS}                             \
 	    ${FPUFLAGS}                             \
 	    ${DEBUGCFLAGS}                          \
 	    ${addprefix -I ,${INCLUDEPATH}}         \
+	    ${addprefix -I ,${EXTINCLUDEPATH}}      \
 	    -D${PARTCLASS}                          \
 	    -DPART_${PART}                          \
 	    ${CSECTIONS}                            \
@@ -635,14 +678,14 @@ COMMA=,
 # The rule for building the object file from each C source file.
 #
 ${OBJDIR}/%.o: %.c
-	@echo "  Compiling           ${<}";
+	@echo "  Compiling           ${notdir ${<}}";
 	${CC} -c ${SPECFLAGS} ${CFLAGS} ${CPUFLAGS} ${FPUFLAGS} ${DEPFLAGS} -o ${@} ${<}
 
 #
 # The rule for building the object file from each assembly source file.
 #
 ${OBJDIR}/%.o: %.S
-	@echo "  Assembling          ${<}";
+	@echo "  Assembling          ${notdir ${<}}";
 	${CC} -c  ${SPECFLAGS} ${AFLAGS} ${CPUFLAGS} ${FPUFLAGS} -o ${@} -c ${<}
 
 #
@@ -702,7 +745,7 @@ ${OBJDIR}/${PROGNAME}.bin: ${OBJDIR} ${OBJDIR}/${PROGNAME}.axf
 #
 # The rule for linking the application.
 #
-${OBJDIR}/${PROGNAME}.axf:  ${OBJFILES}
+${OBJDIR}/${PROGNAME}.axf:  ${OBJFILES} ${EXTOBJFILES}
 	@echo "  Linking             ${@} ";
 	${CC}   -Wl,-T '${LINKERSCRIPT}'                                    \
 	        ${DEBUGLDFLAGS}                                             \
@@ -711,7 +754,7 @@ ${OBJDIR}/${PROGNAME}.axf:  ${OBJFILES}
 	         ${SPECFLAGS} ${CPUFLAGS} ${FPUFLAGS} ${LIBFLAGS}           \
 	        -Wl,--print-memory-usage                                    \
 	        ${addprefix -Wl${COMMA},${LDFLAGS} }                        \
-	        -o ${@} ${OBJFILES}                                         \
+	        -o ${@} ${OBJFILES}  ${EXTOBJFILES}                         \
 	        '${LIBM}' '${LIBC}' '${LIBGCC}'
 
 #

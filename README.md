@@ -84,25 +84,25 @@ Notes
 
 1. OpenOCD under development
 
-* Makefile configuration ?
-* Test ITM-SendChar
+Makefile configuration   
+Flash programming (telnet 4444)  
 
-2. Parameters for compilation
+
+2. UART with interrupt
+
+Single byte buffer not tested.
+
+2. TODO: Teste parameters for compilation
 
 Effects and use of -specs=nosys.specs -specs=nano.specs -specs=rdimon.specs (-lrdimon)
 
-Use minimal newlib
-    --specs=nano.specs
-
-3. Test linker parameters
-
-    -nostartfiles
-    -nodefaultlibs
-    -nostdlib
+Use minimal newlib: --specs=nano.specs
 
 3. Test semihosting
 
-monitor arm semihosting enable
+Test ITM-SendChar  
+
+monitor arm semihosting enable  
 
 
     #include <stdio.h>
