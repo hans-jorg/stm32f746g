@@ -1022,7 +1022,7 @@ void
 SystemInit(void) {
 
     /* Configure FPU */
-#if 1
+#if 0
     #if (__FPU_PRESENT == 1) && (__FPU_USED == 1)
         /* enable CP10 and CP11 coprocessors */
         SCB->CPACR |= (0x0FUL << 20);

@@ -48,9 +48,13 @@ void MemManage_Handler(void)              WEAK_DEFAULT_ATTRIBUTE;   /* M3/M4/M7 
 void BusFault_Handler(void)               WEAK_DEFAULT_ATTRIBUTE;   /* M3/M4/M7 */
 void UsageFault_Handler(void)             WEAK_DEFAULT_ATTRIBUTE;   /* M3/M4/M7 */
 void DebugMon_Handler(void)               WEAK_DEFAULT_ATTRIBUTE;   /* M3/M4/M7 */
+
+void PendSV_Handler(void)                 WEAK_DEFAULT_ATTRIBUTE;   /* M0/M0+/M3/M4/M7 */
+void SysTick_Handler(void)                WEAK_DEFAULT_ATTRIBUTE;   /* M0/M0+/M3/M4/M7 */
+
 /* Modified to point to interrupt routines inside uc/os */
-void OS_CPU_PendSV_Handler(void)          WEAK_DEFAULT_ATTRIBUTE;   /* M0/M0+/M3/M4/M7 */
-void OS_CPU_SysTick_Handler(void)         WEAK_DEFAULT_ATTRIBUTE;   /* M0/M0+/M3/M4/M7 */
+extern void OS_CPU_PendSVHandler(void);
+extern void OS_CPU_SysTickHandler(void);
 
 /*
  * Implementation dependent interrupt routines
@@ -201,8 +205,8 @@ void(*nvictable[])(void) = {
     DebugMon_Handler,               /*12 : Debug Monitor              */
     0,                              /*13 : reserved                   */
 /* Modified to point to interrupt routines inside uc/os */
-    OS_CPU_PendSV_Handler,          /*14 : PendSV                     */
-    OS_CPU_SysTick_Handler,         /*15 : SysTick                    */
+    OS_CPU_PendSVHandler,           /*14 : PendSV                     */
+    OS_CPU_SysTickHandler,          /*15 : SysTick                    */
     
    /* Implementation dependent interrupt routines                     */
     WWDG_IRQHandler,                /* IRQ =  0 : Window Watchdog interrupt */
@@ -315,8 +319,10 @@ static uint32_t InterruptNumber = 0;
  * @note The interrupt source is stored in InterruptNumber variable
  */
 
+uint32_t cause = 0;
 void Default_Handler(void) {
 
+    cause = SCB->ICSR&0x3F;
     while(1) {} /* Loop */
     /* NEVER */
 }
