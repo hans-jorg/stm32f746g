@@ -1021,8 +1021,8 @@ SystemCoreClockUpdate(void) {
 void
 SystemInit(void) {
 
-    /* Configure FPU */
-#if 0
+    /* Configure FPU when FPU_USED=1 as defined in core_cm7.h */
+#if __FPU_USED == 1U
     #if (__FPU_PRESENT == 1) && (__FPU_USED == 1)
         /* enable CP10 and CP11 coprocessors */
         SCB->CPACR |= (0x0FUL << 20);
@@ -1074,6 +1074,7 @@ SystemInit(void) {
     /* Additional initialization here */
 
 }
+
 
 
 
