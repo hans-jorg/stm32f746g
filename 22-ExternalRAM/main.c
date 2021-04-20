@@ -43,6 +43,12 @@ void SysTick_Handler(void) {
 
 }
 
+/**
+ *  @brief  Delay
+ *
+ * @note    Delays *delay* milliseconds
+ */
+
 void Delay(uint32_t delay) {
 
     delay_ms = delay;
@@ -199,14 +205,17 @@ volatile char ch;
 
 int main(void) {
 
+    printf("Starting.at %ld KHz...\n",SystemCoreClock/1000);
+
     /* Set Clock to 200 MHz */
     SystemConfigMainPLL(&Clock200MHz);
     SystemSetCoreClock(CLOCKSRC_PLL,1);
 
+    printf("Now running at %ld KHz...\n",SystemCoreClock/1000);
 
     SysTick_Config(SystemCoreClock/1000);
 
-    printf("Starting....\n");
+
 
     /* WTF */
     //RCC->DCKCFGR1 = (RCC->DCKCFGR1&~RCC_DCKCFGR1_PLLSAIDIVR)|(8<<RCC_DCKCFGR1_PLLSAIDIVR_Pos);
@@ -215,10 +224,10 @@ int main(void) {
 
 
     /*
-     * Blink LED
+     * Get input
      */
     for (;;) {
-        putchar('+');
+        printf("Press ENTER");
         Delay(100);
     }
 }

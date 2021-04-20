@@ -11,21 +11,11 @@
  **
  **/
 
-/**
- ** @brief UART Configuration
- **
- ** @note No interrupts are used
- ** Oversampling    : 8
- ** Clock source    : SystemCoreClock
- ** Handshaking     : No
- **/
-
-
 #include "stm32f746xx.h"
 #include "system_stm32f746.h"
 #include "gpio.h"
 #include "uart.h"
-#include "buffer.h"
+#include "fifo.h"
 
 /**
  ** @brief Bit manipulation macros
@@ -44,18 +34,27 @@ typedef struct {
     USART_TypeDef           *device;
     GPIO_PinConfiguration   txpinconf;
     GPIO_PinConfiguration   rxpinconf;
-        struct {
-        unsigned            irqlevel :5;
-        unsigned            irqn     :10;
-        unsigned            useinbuffer:1;
-        unsigned            useoutbuffer:1;
-        } conf;
+    struct {
+    unsigned            irqlevel :5;
+    unsigned            irqn     :10;
+    unsigned            useinputfifo:1;
+    unsigned            useoutputfifo:1;
+    } conf;
     // Could be unions
-    Buffer                  inbuffer;
-    Buffer                  outbuffer;
-    char                    singleinbuffer;
-    char                    singleoutbuffer;
+    FIFO                    inputfifo;
+    FIFO                    outputfifo;
+    char                    inputbuffer;
+    char                    outputbuffer;
 } UART_Info;
+
+/*
+ * Default FIFO area
+ */
+#define INPUTAREASIZE    (16)
+#define OUTPUTAREASIZE   (16)
+
+DECLARE_FIFO_AREA(inputarea,INPUTAREASIZE);
+DECLARE_FIFO_AREA(outputarea,OUTPUTAREASIZE);
 
 /**
  * @brief   Interrupt level for UARTs
@@ -84,9 +83,9 @@ static const int uarttabsize = sizeof(uarttab)/sizeof(UART_Info)-1;
 //@}
 
 /**
- * @brief   Enable UART
+ * @brief   Enable clock for UART
  */
-void UART_Enable(USART_TypeDef *uart) {
+void UART_EnableClock(USART_TypeDef *uart) {
 
     if ( uart == USART1 )       RCC->APB2ENR |= RCC_APB2ENR_USART1EN;
     else if ( uart == USART2 )  RCC->APB1ENR |= RCC_APB1ENR_USART2EN;
@@ -111,32 +110,32 @@ USART_TypeDef  *uart;
 
     /* Receiving  */
     if( uart->ISR & USART_ISR_RXNE  ) { // RX not empty
-        if( uarttab[un].conf.useinbuffer ) {
+        if( uarttab[un].conf.useinputfifo ) {
             /* Multibyte buffer */
-            buffer_insert(uarttab[un].inbuffer,uart->RDR);
+            fifo_insert(uarttab[un].inputfifo,uart->RDR);
         } else {
             /* Single byte buffer */
-            uarttab[un].singleinbuffer = uart->RDR;
+            uarttab[un].inputbuffer = uart->RDR;
         }
     }
     /* Transmitting */
-    if( uart->ISR & USART_ISR_TXE  ) { // TX not empty
-        if( uarttab[un].conf.useoutbuffer ) {
+    if( uart->ISR & (USART_ISR_TC|USART_ISR_TXE)  ) { // TX completed or TX buffer empty
+        if( uarttab[un].conf.useoutputfifo ) {
             /* Multibyte buffer */
-            if( !buffer_empty(uarttab[un].outbuffer) ) {
-                uart->TDR = buffer_remove(uarttab[un].outbuffer);
+            if( fifo_empty(uarttab[un].outputfifo) ) {
+                uart->CR1 &= ~(USART_CR1_TXEIE|USART_CR1_TCIE);
             } else {
-                uart->RQR = USART_RQR_TXFRQ;
-                uart->CR1 &= ~USART_CR1_TXEIE;
+                uart->CR1 |= (USART_CR1_TXEIE|USART_CR1_TCIE);
+                uart->TDR = fifo_remove(uarttab[un].outputfifo);
             }
         } else {
             /* Single byte buffer */
-            if ( uarttab[un].singleoutbuffer ) {
-                uart->TDR = uarttab[un].singleoutbuffer;
-                uarttab[un].singleoutbuffer = 0;
+            if ( uarttab[un].outputbuffer == 0 ) { // no more data
+                //uart->RQR = USART_RQR_TXFRQ;    // Repeated code!!! Arghh!!!
+                uart->CR1 &= ~(USART_CR1_TXEIE|USART_CR1_TCIE);
             } else {
-                uart->RQR = USART_RQR_TXFRQ;    // Repeated code!!! Arghh!!!
-                uart->CR1 &= ~USART_CR1_TXEIE;
+                uart->TDR = uarttab[un].outputbuffer;
+                uarttab[un].outputbuffer = 0;
             }
         }
     }
@@ -206,8 +205,13 @@ void UART8_IRQHandler(void) {
  **/
 int
 UART_Init(int uartn, unsigned config) {
+FIFO in;
+FIFO out;
 
-    return UART_InitExt(uartn,config,0,0);
+    in  = fifo_init(inputarea,INPUTAREASIZE);
+    out = fifo_init(outputarea,OUTPUTAREASIZE);
+
+    return UART_InitExt(uartn,config,in,out);
 }
 
 
@@ -217,103 +221,118 @@ UART_Init(int uartn, unsigned config) {
  ** @note  Use defines in uart.h to configure the uart, or'ing the parameters
  **/
 int
-UART_InitExt(int uartn, unsigned config, Buffer in, Buffer out) {
-
+UART_InitExt(int uartn, unsigned config, FIFO in, FIFO out) {
 uint32_t baudrate,div,t,over;
 USART_TypeDef * uart;
 uint32_t uartfreq;
+uint32_t cr1,cr2,cr3,ckcfgr;
 
     if( uartn >= uarttabsize ) return -1;
 
-    uart = uarttab[uartn].device;
+    // Configure FIFO and buffer
+    uarttab[uartn].inputfifo    = in;
+    uarttab[uartn].outputfifo   = out;
+    uarttab[uartn].inputbuffer  = 0;
+    uarttab[uartn].outputbuffer = 0;
+    if( in )
+        uarttab[uartn].conf.useinputfifo = 1;
+    if( out )
+        uarttab[uartn].conf.useoutputfifo = 1;
 
     // Configure pins
     GPIO_ConfigureSinglePin(&uarttab[uartn].txpinconf);
     GPIO_ConfigureSinglePin(&uarttab[uartn].rxpinconf);
 
-    // Configure RCC DCKCFGR2
-    t = RCC->DCKCFGR2;
+    // Configure clock for UxARTy at RCC DCKCFGR2
+    ckcfgr = RCC->DCKCFGR2;
+
+    // Get pointer to UART registers
+    uart = uarttab[uartn].device;
 
     // Select clock source
-
     uartfreq = 0;
-    t &= ~BITVALUE(3,uartn*2);
+    ckcfgr &= ~BITVALUE(3,uartn*2);
     switch(config&UART_CLOCK_M) {
     case UART_CLOCK_APB:
-        t |= BITVALUE(0,uartn*2);
+        ckcfgr |= BITVALUE(0,uartn*2);
         uartfreq = SystemGetAPB1Frequency();
         break;
     case UART_CLOCK_SYSCLK:
-        t |= BITVALUE(1,uartn*2);
+        ckcfgr |= BITVALUE(1,uartn*2);
         uartfreq = SystemCoreClock;
         break;
     case UART_CLOCK_HSI:
-        t |= BITVALUE(2,uartn*2);
+        ckcfgr |= BITVALUE(2,uartn*2);
         uartfreq = HSI_FREQ;
         break;
     case UART_CLOCK_LSE:
-        t |= BITVALUE(3,uartn*2);
+        ckcfgr |= BITVALUE(3,uartn*2);
         uartfreq = LSE_FREQ;
         break;
     }
-    RCC->DCKCFGR2 = t;
+    RCC->DCKCFGR2 = ckcfgr;
 
     // Enable Clock
-    UART_Enable(uart);
+    UART_EnableClock(uart);
+
+
+    // Configuration only with disabled UAR
+    uart->CR1 &= ~USART_CR1_UE;
+
 
     // Configure UART CR1
-    t = uart->CR1;
+    cr1 = uart->CR1;
+    cr1 &= ~(USART_CR1_M|USART_CR1_OVER8|USART_CR1_PCE|USART_CR1_PS|USART_CR1_UE);
 
     // data length
-    t &= ~(USART_CR1_M|USART_CR1_OVER8|USART_CR1_PCE|USART_CR1_PS|USART_CR1_UE);
     switch( config&UART_SIZE_M ) {
     case UART_8BITS:                  ; break;
-    case UART_7BITS: t |= USART_CR1_M0; break;
-    case UART_9BITS: t |= USART_CR1_M1; break;
+    case UART_7BITS: cr1 |= USART_CR1_M0; break;
+    case UART_9BITS: cr1 |= USART_CR1_M1; break;
     default:
         return 2;
     }
     // parity
-    t |= USART_CR1_TE|USART_CR1_RE;
     switch( config&UART_PARITY_M ) {
-    case UART_NOPARITY:                                  ; break;
-    case UART_ODDPARITY:  t |= USART_CR1_PCE|USART_CR1_PS; break;
-    case UART_EVENPARITY: t |= USART_CR1_PCE;              break;
+    case UART_NOPARITY:                                    ; break;
+    case UART_ODDPARITY:  cr1 |= USART_CR1_PCE|USART_CR1_PS; break;
+    case UART_EVENPARITY: cr1 |= USART_CR1_PCE;              break;
     }
     if( config&UART_OVER8 ) {
-        t |= USART_CR1_OVER8;
+        cr1 |= USART_CR1_OVER8;
         over = 8;
     } else {
-        t &= ~USART_CR1_OVER8;
+        cr1 &= ~USART_CR1_OVER8;
         over = 16;
     }
-    uart->CR1 = t;
 
-    // Configure UART CR2
-    t = uart->CR2;
+    // Configure UART CR2 register
+    cr2 = uart->CR2;
+    cr2 &= ~USART_CR2_STOP;
 
-    // parity
-    t &= ~USART_CR2_STOP;
-
+    // stop bits
     switch( config&UART_STOP_M ) {
     case UART_STOP_1:
-        t |= 0;
+        cr2 |= 0;
         break;
     case UART_STOP_0_5:
-        t |= USART_CR2_STOP_0;
+        cr2 |= USART_CR2_STOP_0;
         break;
     case UART_STOP_2:
-        t |= USART_CR2_STOP_1;
+        cr2 |= USART_CR2_STOP_1;
         break;
     case UART_STOP_1_5:
-        t |= USART_CR2_STOP_0|USART_CR2_STOP_1;
+        cr2 |= USART_CR2_STOP_0|USART_CR2_STOP_1;
         break;
     default:
         return 3;
     }
-    uart->CR2 = t;
 
-    // Configure Baudrate
+    // Configure UART CR3 register
+    cr3 = uart->CR3;
+    cr3 = 0;
+
+    // Configure UART BRR register (baudrate)
     baudrate = ((config&UART_BAUD_M)>>UART_BAUD_P);
 
     if( over == 16 ) {
@@ -324,36 +343,22 @@ uint32_t uartfreq;
         uart->BRR = (div&~0xF)|((div&0xF)>>1);
     }
 
-    // Set buffers
-    if ( in ) {
-        uarttab[uartn].inbuffer = in;
-        uarttab[uartn].conf.useinbuffer = 1;
-        buffer_clear(in);
-    } else {
-        uarttab[uartn].conf.useinbuffer = 0;
-        uarttab[uartn].singleinbuffer = 0;
-    }
-    if ( out ) {
-        uarttab[uartn].outbuffer = out;
-        uarttab[uartn].conf.useoutbuffer = 1;
-        buffer_clear(out);
-    } else {
-        uarttab[uartn].conf.useoutbuffer = 0;
-        uarttab[uartn].singleoutbuffer = 0;
-    }
-
-
-    // Enable interrupts (only TCIE and RX)
-    uart->CR1 |= USART_CR1_RXNEIE;      // Enable interrupt when RX not empty
- //   uart->CR1 |= USART_CR1_TXEIE;       // Enable interrupt when TX is empty
+    // Set configuration
+    uart->CR1 = cr1;
+    uart->CR2 = cr2;
+    uart->CR3 = cr3;
 
     // Enable interrupts on NVIC
     NVIC_SetPriority(uarttab[uartn].conf.irqn,uarttab[uartn].conf.irqlevel);
     NVIC_ClearPendingIRQ(uarttab[uartn].conf.irqn);
     NVIC_EnableIRQ(uarttab[uartn].conf.irqn);
 
+    // Enable interrupts
+    uart->CR1 |= USART_CR1_RXNEIE;          // Enable interrupt when RX not empty
+    uart->CR1 |= USART_CR1_TXEIE;           // Enable interrupt when TX is empty
 
     // Enable UART
+    uart->CR1 |= USART_CR1_TE|USART_CR1_RE;
     uart->CR1 |= USART_CR1_UE;
     return 0;
 }
@@ -370,16 +375,25 @@ USART_TypeDef *uart;
 
     uart = uarttab[uartn].device;
 #if 1
-    if( uarttab[uartn].conf.useoutbuffer ) {
+    if( uarttab[uartn].conf.useoutputfifo ) {
         /* Multibyte buffer */
-        while ( buffer_full(uarttab[uartn].outbuffer) ) {}
-        buffer_insert(uarttab[uartn].outbuffer,c);
+        if ( fifo_empty(uarttab[uartn].outputfifo) ) {
+            while( (uart->ISR&USART_ISR_TXE)==0 ) {}
+            uart->TDR = c;
+        } else {
+            fifo_insert(uarttab[uartn].outputfifo,c);
+        }
     } else {
         /* Singlebyte buffer */
-        while ( uarttab[uartn].singleoutbuffer != 0 ) {}
-        uarttab[uartn].singleoutbuffer = c;
-        uart->CR1 |= USART_CR1_TXEIE;
+        while ( uarttab[uartn].outputbuffer != 0 ) {}
+        if ( (uart->ISR&USART_ISR_TXE)==0 ) {
+            uart->TDR = c;
+        } else {
+            uarttab[uartn].outputbuffer = c;
+        }
     }
+    // Enable interrupt when transmitting completed or TX buffer empty
+    uart->CR1 |= (USART_CR1_TCIE|USART_CR1_TXEIE);
 #else
     /* Polling */
     while( (uart->ISR&USART_ISR_TXE)==0 ) {}
@@ -420,15 +434,13 @@ uint32_t c;
 
     uart = uarttab[uartn].device;
 
-    if( uarttab[uartn].conf.useinbuffer ) {
-        if( ! buffer_empty(uarttab[uartn].inbuffer)) {
-            c = buffer_remove(uarttab[uartn].inbuffer);
-        }
+    if( uarttab[uartn].conf.useinputfifo ) {
+        while( fifo_empty(uarttab[uartn].inputfifo) ) {}
+        c = fifo_remove(uarttab[uartn].inputfifo);
     } else {
-        if( uarttab[uartn].singleinbuffer ) {
-            c = uarttab[uartn].singleinbuffer;
-            uarttab[uartn].singleinbuffer = 0;
-        }
+        while( uarttab[uartn].inputbuffer == 0 ) {}
+        c = uarttab[uartn].inputbuffer;
+        uarttab[uartn].inputbuffer = 0;
     }
 
     if( uart->ISR & USART_ISR_ORE )  {  // overun error
@@ -438,6 +450,42 @@ uint32_t c;
     return c;
 }
 
+/**
+ ** @brief Read a character from UART
+ **
+ ** @note  It doest not block. It return 0
+ **
+ **/
+int
+UART_ReadCharNoWait(int uartn) {
+USART_TypeDef *uart;
+uint32_t c;
+
+    if( uartn >= uarttabsize ) return -1;
+
+    uart = uarttab[uartn].device;
+
+    if( uarttab[uartn].conf.useinputfifo ) {
+        if( fifo_empty(uarttab[uartn].inputfifo)) {
+            c = 0;
+        } else {
+            c = fifo_remove(uarttab[uartn].inputfifo);
+        }
+    } else {
+        if( uarttab[uartn].inputbuffer ) {
+            c = uarttab[uartn].inputbuffer;
+            uarttab[uartn].inputbuffer = 0;
+        } else {
+            c = 0;
+        }
+    }
+
+    if( uart->ISR & USART_ISR_ORE )  {  // overun error
+        uart->ICR |= USART_ICR_ORECF;
+    }
+
+    return c;
+}
 
 /**
  ** @brief UART Send a string
@@ -481,20 +529,20 @@ uint32_t status;
     status = uart->ISR;
 
     /* Verify input buffer */
-    if ( uarttab[uartn].conf.useinbuffer ) {
-        if ( !buffer_empty(uarttab[uartn].inbuffer) )
+    if ( uarttab[uartn].conf.useinputfifo ) {
+        if ( !fifo_empty(uarttab[uartn].inputfifo) )
             status |= UART_RXNOTEMPTY;
     } else {
-        if ( uarttab[uartn].singleinbuffer )
+        if ( uarttab[uartn].inputbuffer )
             status |= UART_RXNOTEMPTY;
     }
 
     /* Verify output buffer */
-    if( uarttab[uartn].conf.useoutbuffer ) {
-        if ( buffer_empty(uarttab[uartn].outbuffer) )
+    if( uarttab[uartn].conf.useoutputfifo ) {
+        if ( fifo_empty(uarttab[uartn].outputfifo) )
             status |= UART_RXNOTEMPTY;
     } else {
-        if ( uarttab[uartn].singleoutbuffer == 0 )
+        if ( uarttab[uartn].outputbuffer == 0 )
             status |= UART_TXEMPTY;
     }
     return status;
@@ -514,17 +562,17 @@ uint32_t status;
      if( uartn >= uarttabsize ) return -1;
 
     // Flush input buffer
-    if( uarttab[uartn].conf.useinbuffer ) {
-        buffer_clear(uarttab[uartn].inbuffer);
+    if( uarttab[uartn].conf.useinputfifo ) {
+        fifo_clear(uarttab[uartn].inputfifo);
     } else {
-        uarttab[uartn].singleinbuffer = 0;
+        uarttab[uartn].inputbuffer = 0;
     }
 
     // Flush out buffer
-    if( uarttab[uartn].conf.useoutbuffer ) {
-        while (!buffer_empty(uarttab[uartn].outbuffer) ) {}
+    if( uarttab[uartn].conf.useoutputfifo ) {
+        while (!fifo_empty(uarttab[uartn].outputfifo) ) {}
     } else {
-        while ( uarttab[uartn].singleoutbuffer ) {}
+        while ( uarttab[uartn].outputbuffer ) {}
     }
 
     return 0;
