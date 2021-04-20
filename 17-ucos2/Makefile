@@ -113,7 +113,7 @@ PREFIX:=arm-none-eabi
 #
 # Option 1: No floating point (TESTED)
 #
-CPUFLAGS= -mthumb  -mcpu=cortex-m7+nofp
+#CPUFLAGS= -mthumb  -mcpu=cortex-m7+nofp
 #
 # Option 2: Floating point using hardware but using softfp ABI
 #           STM32F746 only has hardware support for single precision FP
@@ -125,8 +125,8 @@ CPUFLAGS= -mthumb  -mcpu=cortex-m7+nofp
 # Option 3: Floating point using hardware but using hard ABI
 #           STM32F746 only has hardware support for single precision FP
 #
-#CPUFLAGS= -mthumb  -mcpu=cortex-m7+nofp.dp
-#FPUFLAGS= -mfloat-abi=hard  -mfpu=fpv5-sp-d16
+CPUFLAGS= -mthumb  -mcpu=cortex-m7+nofp.dp
+FPUFLAGS= -mfloat-abi=hard  -mfpu=fpv5-sp-d16
 
 #
 # Specs script (modification of compiler and linker flags}
