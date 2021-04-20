@@ -6,7 +6,7 @@
 
 #include "ttyemul.h"
 #include "uart.h"
-#include "buffer.h"
+#include "fifo.h"
 
 /// Backspace used in line buffered mode
 #define TTY_BS          '\b'

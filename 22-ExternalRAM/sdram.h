@@ -7,7 +7,7 @@
  * @author  Hans
  */
 
-void SDRAM_Init(void);
+int SDRAM_Init(void);
 
 /**
  *  @brief  SystemCoreClock for correct working of the SDRAM

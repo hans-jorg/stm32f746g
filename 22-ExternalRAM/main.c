@@ -219,5 +219,6 @@ int main(void) {
      */
     for (;;) {
         putchar('+');
+        Delay(100);
     }
 }

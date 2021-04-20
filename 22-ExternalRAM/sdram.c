@@ -41,7 +41,7 @@
  *  Column addresssing | A7:0     (8 bits = 256)
  *  Bank addressing    | BA1:0    (2 bits = 4 )
  *                     |
- * Total addressing    | 2+8+12 = 22 bits = 4194304 addresses = 4 M
+ * Total addressing    | 2+8+12 = 22 bits = 4194304 addresses = 4 Mwords
  *                     | 32 bit words  = 128 Mbit
  *                     |  4 bytes      =  16 MBytes
  *                     |
@@ -954,7 +954,7 @@ SendCommand(uint32_t command, uint32_t parameters, uint32_t timeout) {
     parameters &= ~(FMC_SDCMR_MODE_Msk|FMC_SDCMR_CTB1|FMC_SDCMR_CTB2);
     FMC_Bank5_6->SDCMR=(command<<FMC_SDCMR_MODE_Pos)|FMC_SDCMR_CTB1|parameters;
 
-    while( (FMC_Bank5_6->SDSR&FMC_SDSR_BUSY) &&(timeout>0) ) {}
+    while( (FMC_Bank5_6->SDSR&FMC_SDSR_BUSY) &&(timeout-->0) ) {}
 
     if( FMC_Bank5_6->SDSR&FMC_SDSR_BUSY )
         return 0;
@@ -970,6 +970,7 @@ SendCommand(uint32_t command, uint32_t parameters, uint32_t timeout) {
  */
 static void
 SmallDelay(volatile uint32_t v) {
+
     while(v--) {}
 }
 
@@ -1025,23 +1026,23 @@ void
 ConfigureFMCSDRAM(void) {
 
     /* Configure and enable SDRAM bank1 */
-    FMC_Bank5_6->SDCR[0]  = (0<<FMC_SDCR1_RPIPE_Pos)      // No HCLK Clock delay after CL
-                           |(1<<FMC_SDCR1_RBURST_Pos)     // Burst read mode
-                           |(2<<FMC_SDCR1_SDCLK_Pos)      // f_SDCLK = f_HCLK/2
-                           |(0<<FMC_SDCR1_WP_Pos)         // No write protection
-                           |(0<<FMC_SDCR1_CAS_Pos)        // CL=2
-                           |(0<<FMC_SDCR1_NB_Pos)         // 4 banks
-                           |(1<<FMC_SDCR1_MWID_Pos)       // Mem width = 16 bits
-                           |(1<<FMC_SDCR1_NR_Pos)         // Rows bits = 12 bits
-                           |(0<<FMC_SDCR1_NC_Pos);        // Col bits = 8 bits
+    FMC_Bank5_6->SDCR[0]  = (0<<FMC_SDCR1_RPIPE_Pos)            // No HCLK Clock delay after CL
+                           |(1<<FMC_SDCR1_RBURST_Pos)           // Burst read mode
+                           |(2<<FMC_SDCR1_SDCLK_Pos)            // f_SDCLK = f_HCLK/2
+                           |(0<<FMC_SDCR1_WP_Pos)               // No write protection
+                           |(0<<FMC_SDCR1_CAS_Pos)              // CL=2
+                           |(0<<FMC_SDCR1_NB_Pos)               // 4 banks
+                           |(1<<FMC_SDCR1_MWID_Pos)             // Mem width = 16 bits
+                           |(1<<FMC_SDCR1_NR_Pos)               // Rows bits = 12 bits
+                           |(0<<FMC_SDCR1_NC_Pos);              // Col bits = 8 bits
 
-    FMC_Bank5_6->SDTR[0]  = (SDRAM_TRCD<<FMC_SDTR1_TRCD_Pos)       // Row to Column delay = 2 cycles
-                           |(SDRAM_TRP<<FMC_SDTR1_TRP_Pos)        // Row precharge delay = 2 cycles
-                           |(SDRAM_TWR<<FMC_SDTR1_TWR_Pos)        // Recovery delay = 2 cycles
-                           |(SDRAM_TRC<<FMC_SDTR1_TRC_Pos)        // Row cycle delay = 6 cycles
-                           |(SDRAM_TRAS<<FMC_SDTR1_TRAS_Pos)       // Self refresh timer = 4 cycles
-                           |(SDRAM_TXSR<<FMC_SDTR1_TXSR_Pos)       // Exit self refresh delay = 6 cycles
-                           |(SDRAM_TMRD<<FMC_SDTR1_TMRD_Pos);      // Load mode to active delay = 2 cycles
+    FMC_Bank5_6->SDTR[0]  = (SDRAM_TRCD<<FMC_SDTR1_TRCD_Pos)    // Row to Column delay = 2 cycles
+                           |(SDRAM_TRP<<FMC_SDTR1_TRP_Pos)      // Row precharge delay = 2 cycles
+                           |(SDRAM_TWR<<FMC_SDTR1_TWR_Pos)      // Recovery delay = 2 cycles
+                           |(SDRAM_TRC<<FMC_SDTR1_TRC_Pos)      // Row cycle delay = 6 cycles
+                           |(SDRAM_TRAS<<FMC_SDTR1_TRAS_Pos)    // Self refresh timer = 4 cycles
+                           |(SDRAM_TXSR<<FMC_SDTR1_TXSR_Pos)    // Exit self refresh delay = 6 cycles
+                           |(SDRAM_TMRD<<FMC_SDTR1_TMRD_Pos);   // Load mode to active delay = 2 cycles
 
     /*
      * SDRAM initialization sequence
@@ -1079,11 +1080,11 @@ ConfigureFMCSDRAM(void) {
  *
  * @note    HCLK must be 200 MHz!!!!
  */
-void
+int
 SDRAM_Init(void) {
 
     if( SystemCoreClock != SDRAMCLOCKFREQUENCY )
-        return;
+        return -1;
 
     // Enable clock for FMC
     RCC->AHB3ENR |= RCC_AHB3ENR_FMCEN;
@@ -1098,5 +1099,6 @@ SDRAM_Init(void) {
 
     ConfigureFMCSDRAM();
 
+    return 0;
 }
 
