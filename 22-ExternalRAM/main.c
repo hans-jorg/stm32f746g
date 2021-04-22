@@ -16,6 +16,7 @@
 
 #include "stm32f746xx.h"
 #include "system_stm32f746.h"
+#include "sdram.h"
 #include "led.h"
 
 
@@ -202,8 +203,10 @@ volatile char ch;
  *
  * @note    Initializes GPIO and blinks LED
  */
+#define LINEMAX 100
 
 int main(void) {
+char line[LINEMAX+1];
 
     printf("Starting.at %ld KHz...\n",SystemCoreClock/1000);
 
@@ -227,7 +230,12 @@ int main(void) {
      * Get input
      */
     for (;;) {
-        printf("Press ENTER");
+        printf("Press ENTER to initialized ExtRAM\n");
+        fgets(line,LINEMAX,stdin);
+        SDRAM_Init();
+        printf("Press ENTER to test ExtRAM\n");
+        fgets(line,LINEMAX,stdin);
+        SDRAM_Init();
         Delay(100);
     }
 }

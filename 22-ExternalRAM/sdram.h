@@ -3,7 +3,7 @@
 /**
  * @file    sdram.h
  *
- * @date    07/10/2020
+ * @date    04/21/2021
  * @author  Hans
  */
 
@@ -17,7 +17,7 @@ int SDRAM_Init(void);
  *  @note   Other frequencies are possible but the FMC and SDRAM must be reconfigured
  */
 
-#define SDRAMCLOCKFREQUENCY     200000000
+#define SDRAM_CLOCKFREQUENCY     200000000
 
 /**
  *  @brief  SDRAM address
@@ -25,7 +25,7 @@ int SDRAM_Init(void);
  *  @note   Address of SDRAM Bank 1. It is possible to remap it (not done).
  */
 
-#define SDRAMAREA               0xC0000000
+#define SDRAM_ADDRESS            0xC0000000
 
 /**
  *  @brief  SDRAM size
@@ -36,6 +36,6 @@ int SDRAM_Init(void);
  *          of the 32 bits are used.
  */
 
-#define SDRAMSIZE               0x0800000
+#define SDRAM_SIZE               0x0800000
 
 #endif
