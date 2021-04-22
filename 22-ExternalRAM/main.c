@@ -73,31 +73,6 @@ static PLL_Configuration Clock200MHz = {
     .R = 2                                  // not used
 };
 
-/*
- * @brief   Configuration for PLLSAI
- *
- * @note    Assumes PLL Main will use HSE (crystal) and have a 1 MHz input for PLL
- *
- * @note    LCD_CLK should be in range 5-12, with typical value 9 MHz.
- *
- * @note    There is an extra divisor in PLLSAIDIVR[1:0] of RCC_DCKCFGR, that can
- *          have value 2, 4, 8 or 16.
- *
- * @note    So the R output must be 18, 36, 72 or 144 MHz.
- *          But USB, RNG and SDMMC needs 48 MHz. The LCM of 48 and 9 is 144.
- *
- *          f_LCDCLK  = 9 MHz        PLLSAIRDIV=8
- *
- */
-
-PLL_Configuration  pllsaiconfig  = {
-    .source         = RCC_PLLCFGR_PLLSRC_HSI,
-    .M              = HSE_FREQ/1000,                        // f_IN = 1 MHz
-    .N              = 144,                                  // f_VCO = 144 MHz
-    .P              = 3,                                    // f_P = 48 MHz
-    .Q              = 3,                                    // f_Q = 48 MHz
-    .R              = 2                                     // f_R = 72 MHz
-};
 
 
 /**
@@ -197,11 +172,32 @@ volatile char ch;
     return status;
 }
 
+/* ------------------------------my_rand()-------------------------------------
+my_rand, implementation of random number generater described by S. Park
+and K. Miller, in Communications of the ACM, Oct 88, 31:10, p. 1192-1201.
+---------------------------------------------------------------------------- */
+
+long seed = 313;
+long int my_rand(void) {
+long int lo, hi, test;
+static long int a = 16807L, m = 2147483647L, q = 127773L, r = 2836L;
+
+    hi = seed / q;
+    lo = seed % q;
+    test = a * lo - r * hi;
+
+    if (test > 0) {
+        seed = test; /* test for overflow */
+    } else {
+        seed = test + m;
+    }
+    return seed;
+}
 
 /**
  * @brief   main
  *
- * @note    Initializes GPIO and blinks LED
+ * @note    Initializes GPIO and SDRAM, blinks LED and test SDRAM access
  */
 #define LINEMAX 100
 
@@ -218,24 +214,41 @@ char line[LINEMAX+1];
 
     SysTick_Config(SystemCoreClock/1000);
 
+    printf("Press ENTER to initialize ExtRAM\n");
+    fgets(line,LINEMAX,stdin);
+    SDRAM_Init(SDRAM_BANK1);
 
-
-    /* WTF */
-    //RCC->DCKCFGR1 = (RCC->DCKCFGR1&~RCC_DCKCFGR1_PLLSAIDIVR)|(8<<RCC_DCKCFGR1_PLLSAIDIVR_Pos);
-
-    //SystemConfigSAIPLL(&pllsaiconfig);
-
-
-    /*
-     * Get input
-     */
+#ifdef SIMPLE_TEST
+    uint16_t w = 0x1234;
+    uint16_t wr;
+    uint16_t *p = (uint16_t *) 0xC0000000;
     for (;;) {
-        printf("Press ENTER to initialized ExtRAM\n");
+        printf("Press ENTER to write to External RAM\n");
         fgets(line,LINEMAX,stdin);
-        SDRAM_Init();
-        printf("Press ENTER to test ExtRAM\n");
-        fgets(line,LINEMAX,stdin);
-        SDRAM_Init();
+        printf("Write %X to %p\n",w,p);
+        *p = w;
+
+        wr = *p++;
+        printf("Read %X from %p\n",wr,p);
         Delay(100);
+        w++;
     }
+#else
+    printf("Press ENTER to test to External RAM\n");
+    fgets(line,LINEMAX,stdin);
+    uint16_t w = 0x1234;
+    uint16_t wr;
+    uint16_t *p = (uint16_t *) 0xC0000000;
+    for(;;) {
+        w = my_rand();
+        printf("Wrote %X to %p  ",w,p);
+        *p = w;
+        wr = *p;
+        if ( w == wr )
+            printf("OK\n",wr);
+        else
+            printf("Read %x\n",wr);
+        p++;
+    }
+#endif
 }

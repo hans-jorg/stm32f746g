@@ -64,8 +64,7 @@
  * TRC  = 6      7
  *
  */
-#define SDRAM_BANK1             0
-#define SDRAM_BANK2             1
+
 
 // Configuration of SDCRx
 #define SDRAM_RPIPE             0
@@ -165,12 +164,29 @@
  * @note    Uncomment the define USE_FAST_INITIALIZATION  to initialize without GPIO routines and
  *          tables
  *
- * @note    In initializes the pins for 12-bit address and 16-bit data.
+ * @note    In initializes FMC for 12-bit column address and 16-bit data bus
  *
+ * @note    Pins must be configured as follows
+ *
+ *          | Parameter         |   Value   | Description              |
+ *          |-------------------|-----------|--------------------------|
+ *          | AF                |    12     | Alternate function FMC   |
+ *          | Mode              |     2     | Alternate function       |
+ *          | OType             |     0     | Push pull                |
+ *          | OSpeed            |     3     | Very High Speed          |
+ *          | Pull-up/Push down |     0     | No push-up nor pull down |
  */
 
 
 #if SDRAM_FAST_INITIALIZATION == 1
+
+
+#define SD_AF      (12)
+#define SD_MODE    (2)
+#define SD_OTYPE   (0)
+#define SD_OSPEED  (3)
+#define SD_PUPD    (0)
+
 
 static void
 ConfigureFMCSDRAMPins(int bank) {
@@ -183,8 +199,8 @@ uint32_t mAND,mOR; // Mask
 
     mAND =   GPIO_AFRL_AFRL0_Msk
             |GPIO_AFRL_AFRL1_Msk;
-    mOR  =   (12<<GPIO_AFRL_AFRL0_Pos)
-            |(12<<GPIO_AFRL_AFRL1_Pos);
+    mOR  =   (SD_AF<<GPIO_AFRL_AFRL0_Pos)
+            |(SD_AF<<GPIO_AFRL_AFRL1_Pos);
     GPIOD->AFR[0]  = (GPIOD->AFR[0]&~mAND)|mOR;
 
     mAND =   GPIO_AFRH_AFRH0_Msk
@@ -192,11 +208,11 @@ uint32_t mAND,mOR; // Mask
             |GPIO_AFRH_AFRH2_Msk
             |GPIO_AFRH_AFRH6_Msk
             |GPIO_AFRH_AFRH7_Msk;
-    mOR  =   (12<<GPIO_AFRH_AFRH0_Pos)
-            |(12<<GPIO_AFRH_AFRH1_Pos)
-            |(12<<GPIO_AFRH_AFRH2_Pos)
-            |(12<<GPIO_AFRH_AFRH6_Pos)
-            |(12<<GPIO_AFRH_AFRH7_Pos);
+    mOR  =   (SD_AF<<GPIO_AFRH_AFRH0_Pos)
+            |(SD_AF<<GPIO_AFRH_AFRH1_Pos)
+            |(SD_AF<<GPIO_AFRH_AFRH2_Pos)
+            |(SD_AF<<GPIO_AFRH_AFRH6_Pos)
+            |(SD_AF<<GPIO_AFRH_AFRH7_Pos);
     GPIOD->AFR[1]  = (GPIOD->AFR[1]&~mAND)|mOR;
 
     mAND =   GPIO_MODER_MODER0_Msk
@@ -206,13 +222,13 @@ uint32_t mAND,mOR; // Mask
             |GPIO_MODER_MODER10_Msk
             |GPIO_MODER_MODER14_Msk
             |GPIO_MODER_MODER15_Msk;
-    mOR  =   GPIO_MODER_MODER0
-            |GPIO_MODER_MODER1
-            |GPIO_MODER_MODER8
-            |GPIO_MODER_MODER9
-            |GPIO_MODER_MODER10
-            |GPIO_MODER_MODER14
-            |GPIO_MODER_MODER15;
+    mOR  =   (SD_MODE<<GPIO_MODER_MODER0_Pos)
+            |(SD_MODE<<GPIO_MODER_MODER1_Pos)
+            |(SD_MODE<<GPIO_MODER_MODER8_Pos)
+            |(SD_MODE<<GPIO_MODER_MODER9_Pos)
+            |(SD_MODE<<GPIO_MODER_MODER10_Pos)
+            |(SD_MODE<<GPIO_MODER_MODER14_Pos)
+            |(SD_MODE<<GPIO_MODER_MODER15_Pos);
     GPIOD->MODER   = (GPIOD->MODER&~mAND)|mOR;
 
     mAND =   GPIO_OSPEEDR_OSPEEDR0_Msk
@@ -222,13 +238,13 @@ uint32_t mAND,mOR; // Mask
             |GPIO_OSPEEDR_OSPEEDR10_Msk
             |GPIO_OSPEEDR_OSPEEDR14_Msk
             |GPIO_OSPEEDR_OSPEEDR15_Msk;
-    mOR  =   GPIO_OSPEEDR_OSPEEDR0
-            |GPIO_OSPEEDR_OSPEEDR1
-            |GPIO_OSPEEDR_OSPEEDR8
-            |GPIO_OSPEEDR_OSPEEDR9
-            |GPIO_OSPEEDR_OSPEEDR10
-            |GPIO_OSPEEDR_OSPEEDR14
-            |GPIO_OSPEEDR_OSPEEDR15;
+    mOR  =   (SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR0_Pos)
+            |(SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR1_Pos)
+            |(SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR8_Pos)
+            |(SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR9_Pos)
+            |(SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR10_Pos)
+            |(SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR14_Pos)
+            |(SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR15_Pos);
     GPIOD->OSPEEDR = (GPIOD->OSPEEDR&~mAND)|mOR;
 
     mAND =   GPIO_PUPDR_PUPDR0_Msk
@@ -238,13 +254,13 @@ uint32_t mAND,mOR; // Mask
             |GPIO_PUPDR_PUPDR10_Msk
             |GPIO_PUPDR_PUPDR14_Msk
             |GPIO_PUPDR_PUPDR15_Msk;
-    mOR  =   GPIO_PUPDR_PUPDR0
-            |GPIO_PUPDR_PUPDR1
-            |GPIO_PUPDR_PUPDR8
-            |GPIO_PUPDR_PUPDR9
-            |GPIO_PUPDR_PUPDR10
-            |GPIO_PUPDR_PUPDR14
-            |GPIO_PUPDR_PUPDR15;
+    mOR  =   (SD_PUPD<<GPIO_PUPDR_PUPDR0_Pos)
+            |(SD_PUPD<<GPIO_PUPDR_PUPDR1_Pos)
+            |(SD_PUPD<<GPIO_PUPDR_PUPDR8_Pos)
+            |(SD_PUPD<<GPIO_PUPDR_PUPDR9_Pos)
+            |(SD_PUPD<<GPIO_PUPDR_PUPDR10_Pos)
+            |(SD_PUPD<<GPIO_PUPDR_PUPDR14_Pos)
+            |(SD_PUPD<<GPIO_PUPDR_PUPDR15_Pos);
     GPIOD->PUPDR   = (GPIOD->PUPDR&~mAND)|mOR;
 
     mAND =   GPIO_OTYPER_OT0_Msk
@@ -254,26 +270,26 @@ uint32_t mAND,mOR; // Mask
             |GPIO_OTYPER_OT10_Msk
             |GPIO_OTYPER_OT14_Msk
             |GPIO_OTYPER_OT15_Msk;
-    mOR  =   GPIO_OTYPER_OT0
-            |GPIO_OTYPER_OT1
-            |GPIO_OTYPER_OT8
-            |GPIO_OTYPER_OT9
-            |GPIO_OTYPER_OT10
-            |GPIO_OTYPER_OT14
-            |GPIO_OTYPER_OT15;
+    mOR  =   (SD_OTYPE<<GPIO_OTYPER_OT0_Pos)
+            |(SD_OTYPE<<GPIO_OTYPER_OT1_Pos)
+            |(SD_OTYPE<<GPIO_OTYPER_OT8_Pos)
+            |(SD_OTYPE<<GPIO_OTYPER_OT9_Pos)
+            |(SD_OTYPE<<GPIO_OTYPER_OT10_Pos)
+            |(SD_OTYPE<<GPIO_OTYPER_OT14_Pos)
+            |(SD_OTYPE<<GPIO_OTYPER_OT15_Pos);
     GPIOD->OTYPER  = (GPIOD->OTYPER&~mAND)|mOR;
 
     // Configure pins in GPIOE
-    // 0/DQM0 1/DQM1 7/DQ4 8/DQ5 9/DQ6 10/DQ7 11/DQ8 12/DQ9 13/DQ10 14/DQ11 15/DQ12
+    // 0/DQM0 1/DQM1 7/DQ4 8/DQ5 9/DQ6 10/DQ7 11/DQ8 AF/DQ9 13/DQ10 14/DQ11 15/DQAF
 
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOEEN;
 
     mAND =   GPIO_AFRL_AFRL0_Msk
             |GPIO_AFRL_AFRL1_Msk
             |GPIO_AFRL_AFRL7_Msk;
-    mOR  =   (12<<GPIO_AFRL_AFRL0_Pos)
-            |(12<<GPIO_AFRL_AFRL1_Pos)
-            |(12<<GPIO_AFRL_AFRL7_Pos);
+    mOR  =   (SD_AF<<GPIO_AFRL_AFRL0_Pos)
+            |(SD_AF<<GPIO_AFRL_AFRL1_Pos)
+            |(SD_AF<<GPIO_AFRL_AFRL7_Pos);
     GPIOE->AFR[0]  = (GPIOE->AFR[0]&~mAND)|mOR;
 
     mAND =   GPIO_AFRH_AFRH0_Msk
@@ -284,14 +300,14 @@ uint32_t mAND,mOR; // Mask
             |GPIO_AFRH_AFRH5_Msk
             |GPIO_AFRH_AFRH6_Msk
             |GPIO_AFRH_AFRH7_Msk;
-    mOR  =   (12<<GPIO_AFRH_AFRH0_Pos)
-            |(12<<GPIO_AFRH_AFRH1_Pos)
-            |(12<<GPIO_AFRH_AFRH2_Pos)
-            |(12<<GPIO_AFRH_AFRH3_Pos)
-            |(12<<GPIO_AFRH_AFRH4_Pos)
-            |(12<<GPIO_AFRH_AFRH5_Pos)
-            |(12<<GPIO_AFRH_AFRH6_Pos)
-            |(12<<GPIO_AFRH_AFRH7_Pos);
+    mOR  =   (SD_AF<<GPIO_AFRH_AFRH0_Pos)
+            |(SD_AF<<GPIO_AFRH_AFRH1_Pos)
+            |(SD_AF<<GPIO_AFRH_AFRH2_Pos)
+            |(SD_AF<<GPIO_AFRH_AFRH3_Pos)
+            |(SD_AF<<GPIO_AFRH_AFRH4_Pos)
+            |(SD_AF<<GPIO_AFRH_AFRH5_Pos)
+            |(SD_AF<<GPIO_AFRH_AFRH6_Pos)
+            |(SD_AF<<GPIO_AFRH_AFRH7_Pos);
     GPIOE->AFR[1]  = (GPIOE->AFR[1]&~mAND)|mOR;
 
     mAND =   GPIO_MODER_MODER0_Msk
@@ -305,17 +321,17 @@ uint32_t mAND,mOR; // Mask
             |GPIO_MODER_MODER13_Msk
             |GPIO_MODER_MODER14_Msk
             |GPIO_MODER_MODER15_Msk;
-    mOR  =   GPIO_MODER_MODER0
-            |GPIO_MODER_MODER1
-            |GPIO_MODER_MODER7
-            |GPIO_MODER_MODER8
-            |GPIO_MODER_MODER9
-            |GPIO_MODER_MODER10
-            |GPIO_MODER_MODER11
-            |GPIO_MODER_MODER12
-            |GPIO_MODER_MODER13
-            |GPIO_MODER_MODER14
-            |GPIO_MODER_MODER15;
+    mOR  =   (SD_MODE<<GPIO_MODER_MODER0_Pos)
+            |(SD_MODE<<GPIO_MODER_MODER1_Pos)
+            |(SD_MODE<<GPIO_MODER_MODER7_Pos)
+            |(SD_MODE<<GPIO_MODER_MODER8_Pos)
+            |(SD_MODE<<GPIO_MODER_MODER9_Pos)
+            |(SD_MODE<<GPIO_MODER_MODER10_Pos)
+            |(SD_MODE<<GPIO_MODER_MODER11_Pos)
+            |(SD_MODE<<GPIO_MODER_MODER12_Pos)
+            |(SD_MODE<<GPIO_MODER_MODER13_Pos)
+            |(SD_MODE<<GPIO_MODER_MODER14_Pos)
+            |(SD_MODE<<GPIO_MODER_MODER15_Pos);
     GPIOE->MODER   = (GPIOE->MODER&~mAND)|mOR;
 
     mAND =   GPIO_OSPEEDR_OSPEEDR0_Msk
@@ -329,17 +345,17 @@ uint32_t mAND,mOR; // Mask
             |GPIO_OSPEEDR_OSPEEDR13_Msk
             |GPIO_OSPEEDR_OSPEEDR14_Msk
             |GPIO_OSPEEDR_OSPEEDR15_Msk;
-    mOR  =   GPIO_OSPEEDR_OSPEEDR0
-            |GPIO_OSPEEDR_OSPEEDR1
-            |GPIO_OSPEEDR_OSPEEDR7
-            |GPIO_OSPEEDR_OSPEEDR8
-            |GPIO_OSPEEDR_OSPEEDR9
-            |GPIO_OSPEEDR_OSPEEDR10
-            |GPIO_OSPEEDR_OSPEEDR11
-            |GPIO_OSPEEDR_OSPEEDR12
-            |GPIO_OSPEEDR_OSPEEDR13
-            |GPIO_OSPEEDR_OSPEEDR14
-            |GPIO_OSPEEDR_OSPEEDR15;
+    mOR  =   (SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR0_Pos)
+            |(SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR1_Pos)
+            |(SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR7_Pos)
+            |(SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR8_Pos)
+            |(SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR9_Pos)
+            |(SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR10_Pos)
+            |(SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR11_Pos)
+            |(SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR12_Pos)
+            |(SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR13_Pos)
+            |(SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR14_Pos)
+            |(SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR15_Pos);
     GPIOE->OSPEEDR = (GPIOE->OSPEEDR&~mAND)|mOR;
 
     mAND =   GPIO_PUPDR_PUPDR0_Msk
@@ -353,17 +369,17 @@ uint32_t mAND,mOR; // Mask
             |GPIO_PUPDR_PUPDR13_Msk
             |GPIO_PUPDR_PUPDR14_Msk
             |GPIO_PUPDR_PUPDR15_Msk;
-    mOR  =   GPIO_PUPDR_PUPDR0
-            |GPIO_PUPDR_PUPDR1
-            |GPIO_PUPDR_PUPDR7
-            |GPIO_PUPDR_PUPDR8
-            |GPIO_PUPDR_PUPDR9
-            |GPIO_PUPDR_PUPDR10
-            |GPIO_PUPDR_PUPDR11
-            |GPIO_PUPDR_PUPDR12
-            |GPIO_PUPDR_PUPDR13
-            |GPIO_PUPDR_PUPDR14
-            |GPIO_PUPDR_PUPDR15;
+    mOR  =   (SD_PUPD<<GPIO_PUPDR_PUPDR0_Pos)
+            |(SD_PUPD<<GPIO_PUPDR_PUPDR1_Pos)
+            |(SD_PUPD<<GPIO_PUPDR_PUPDR7_Pos)
+            |(SD_PUPD<<GPIO_PUPDR_PUPDR8_Pos)
+            |(SD_PUPD<<GPIO_PUPDR_PUPDR9_Pos)
+            |(SD_PUPD<<GPIO_PUPDR_PUPDR10_Pos)
+            |(SD_PUPD<<GPIO_PUPDR_PUPDR11_Pos)
+            |(SD_PUPD<<GPIO_PUPDR_PUPDR12_Pos)
+            |(SD_PUPD<<GPIO_PUPDR_PUPDR13_Pos)
+            |(SD_PUPD<<GPIO_PUPDR_PUPDR14_Pos)
+            |(SD_PUPD<<GPIO_PUPDR_PUPDR15_Pos);
     GPIOE->PUPDR   = (GPIOE->PUPDR&~mAND)|mOR;
 
     mAND =   GPIO_OTYPER_OT0_Msk
@@ -377,17 +393,17 @@ uint32_t mAND,mOR; // Mask
             |GPIO_OTYPER_OT13_Msk
             |GPIO_OTYPER_OT14_Msk
             |GPIO_OTYPER_OT15_Msk;
-    mOR  =   GPIO_OTYPER_OT0
-            |GPIO_OTYPER_OT1
-            |GPIO_OTYPER_OT7
-            |GPIO_OTYPER_OT8
-            |GPIO_OTYPER_OT9
-            |GPIO_OTYPER_OT10
-            |GPIO_OTYPER_OT11
-            |GPIO_OTYPER_OT12
-            |GPIO_OTYPER_OT13
-            |GPIO_OTYPER_OT14
-            |GPIO_OTYPER_OT15;
+    mOR  =   (SD_OTYPE<<GPIO_OTYPER_OT0_Pos)
+            |(SD_OTYPE<<GPIO_OTYPER_OT1_Pos)
+            |(SD_OTYPE<<GPIO_OTYPER_OT7_Pos)
+            |(SD_OTYPE<<GPIO_OTYPER_OT8_Pos)
+            |(SD_OTYPE<<GPIO_OTYPER_OT9_Pos)
+            |(SD_OTYPE<<GPIO_OTYPER_OT10_Pos)
+            |(SD_OTYPE<<GPIO_OTYPER_OT11_Pos)
+            |(SD_OTYPE<<GPIO_OTYPER_OT12_Pos)
+            |(SD_OTYPE<<GPIO_OTYPER_OT13_Pos)
+            |(SD_OTYPE<<GPIO_OTYPER_OT14_Pos)
+            |(SD_OTYPE<<GPIO_OTYPER_OT15_Pos);
     GPIOE->OTYPER  = (GPIOE->OTYPER&~mAND)|mOR;
 
     // Configure pins in GPIOF
@@ -401,12 +417,12 @@ uint32_t mAND,mOR; // Mask
             |GPIO_AFRL_AFRL3_Msk
             |GPIO_AFRL_AFRL4_Msk
             |GPIO_AFRL_AFRL5_Msk;
-    mOR  =   (12<<GPIO_AFRL_AFRL0_Pos)
-            |(12<<GPIO_AFRL_AFRL1_Pos)
-            |(12<<GPIO_AFRL_AFRL2_Pos)
-            |(12<<GPIO_AFRL_AFRL3_Pos)
-            |(12<<GPIO_AFRL_AFRL4_Pos)
-            |(12<<GPIO_AFRL_AFRL5_Pos);
+    mOR  =   (SD_AF<<GPIO_AFRL_AFRL0_Pos)
+            |(SD_AF<<GPIO_AFRL_AFRL1_Pos)
+            |(SD_AF<<GPIO_AFRL_AFRL2_Pos)
+            |(SD_AF<<GPIO_AFRL_AFRL3_Pos)
+            |(SD_AF<<GPIO_AFRL_AFRL4_Pos)
+            |(SD_AF<<GPIO_AFRL_AFRL5_Pos);
     GPIOF->AFR[0]  = (GPIOF->AFR[0]&~mAND)|mOR;
 
     mAND =   GPIO_AFRH_AFRH3_Msk
@@ -414,11 +430,11 @@ uint32_t mAND,mOR; // Mask
             |GPIO_AFRH_AFRH5_Msk
             |GPIO_AFRH_AFRH6_Msk
             |GPIO_AFRH_AFRH7_Msk;
-    mOR  =   (12<<GPIO_AFRH_AFRH3_Pos)
-            |(12<<GPIO_AFRH_AFRH4_Pos)
-            |(12<<GPIO_AFRH_AFRH5_Pos)
-            |(12<<GPIO_AFRH_AFRH6_Pos)
-            |(12<<GPIO_AFRH_AFRH7_Pos);
+    mOR  =   (SD_AF<<GPIO_AFRH_AFRH3_Pos)
+            |(SD_AF<<GPIO_AFRH_AFRH4_Pos)
+            |(SD_AF<<GPIO_AFRH_AFRH5_Pos)
+            |(SD_AF<<GPIO_AFRH_AFRH6_Pos)
+            |(SD_AF<<GPIO_AFRH_AFRH7_Pos);
     GPIOF->AFR[1]  = (GPIOF->AFR[1]&~mAND)|mOR;
 
     mAND =   GPIO_MODER_MODER0_Msk
@@ -432,17 +448,17 @@ uint32_t mAND,mOR; // Mask
             |GPIO_MODER_MODER13_Msk
             |GPIO_MODER_MODER14_Msk
             |GPIO_MODER_MODER15_Msk;
-    mOR  =   GPIO_MODER_MODER0
-            |GPIO_MODER_MODER1
-            |GPIO_MODER_MODER2
-            |GPIO_MODER_MODER3
-            |GPIO_MODER_MODER4
-            |GPIO_MODER_MODER5
-            |GPIO_MODER_MODER11
-            |GPIO_MODER_MODER12
-            |GPIO_MODER_MODER13
-            |GPIO_MODER_MODER14
-            |GPIO_MODER_MODER15;
+    mOR  =   (SD_MODE<<GPIO_MODER_MODER0_Pos)
+            |(SD_MODE<<GPIO_MODER_MODER1_Pos)
+            |(SD_MODE<<GPIO_MODER_MODER2_Pos)
+            |(SD_MODE<<GPIO_MODER_MODER3_Pos)
+            |(SD_MODE<<GPIO_MODER_MODER4_Pos)
+            |(SD_MODE<<GPIO_MODER_MODER5_Pos)
+            |(SD_MODE<<GPIO_MODER_MODER11_Pos)
+            |(SD_MODE<<GPIO_MODER_MODER12_Pos)
+            |(SD_MODE<<GPIO_MODER_MODER13_Pos)
+            |(SD_MODE<<GPIO_MODER_MODER14_Pos)
+            |(SD_MODE<<GPIO_MODER_MODER15_Pos);
     GPIOF->MODER   = (GPIOF->MODER&~mAND)|mOR;
 
     mAND =   GPIO_OSPEEDR_OSPEEDR0_Msk
@@ -456,17 +472,17 @@ uint32_t mAND,mOR; // Mask
             |GPIO_OSPEEDR_OSPEEDR13_Msk
             |GPIO_OSPEEDR_OSPEEDR14_Msk
             |GPIO_OSPEEDR_OSPEEDR15_Msk;
-    mOR  =   GPIO_OSPEEDR_OSPEEDR0
-            |GPIO_OSPEEDR_OSPEEDR1
-            |GPIO_OSPEEDR_OSPEEDR2
-            |GPIO_OSPEEDR_OSPEEDR3
-            |GPIO_OSPEEDR_OSPEEDR4
-            |GPIO_OSPEEDR_OSPEEDR5
-            |GPIO_OSPEEDR_OSPEEDR11
-            |GPIO_OSPEEDR_OSPEEDR12
-            |GPIO_OSPEEDR_OSPEEDR13
-            |GPIO_OSPEEDR_OSPEEDR14
-            |GPIO_OSPEEDR_OSPEEDR15;
+    mOR  =   (SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR0_Pos)
+            |(SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR1_Pos)
+            |(SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR2_Pos)
+            |(SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR3_Pos)
+            |(SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR4_Pos)
+            |(SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR5_Pos)
+            |(SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR11_Pos)
+            |(SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR12_Pos)
+            |(SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR13_Pos)
+            |(SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR14_Pos)
+            |(SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR15_Pos);
     GPIOF->OSPEEDR = (GPIOF->OSPEEDR&~mAND)|mOR;
 
     mAND =   GPIO_PUPDR_PUPDR0_Msk
@@ -480,17 +496,17 @@ uint32_t mAND,mOR; // Mask
             |GPIO_PUPDR_PUPDR13_Msk
             |GPIO_PUPDR_PUPDR14_Msk
             |GPIO_PUPDR_PUPDR15_Msk;
-    mOR  =   GPIO_PUPDR_PUPDR0
-            |GPIO_PUPDR_PUPDR1
-            |GPIO_PUPDR_PUPDR2
-            |GPIO_PUPDR_PUPDR3
-            |GPIO_PUPDR_PUPDR4
-            |GPIO_PUPDR_PUPDR5
-            |GPIO_PUPDR_PUPDR11
-            |GPIO_PUPDR_PUPDR12
-            |GPIO_PUPDR_PUPDR13
-            |GPIO_PUPDR_PUPDR14
-            |GPIO_PUPDR_PUPDR15;
+    mOR  =   (SD_PUPD<<GPIO_PUPDR_PUPDR0_Pos)
+            |(SD_PUPD<<GPIO_PUPDR_PUPDR1_Pos)
+            |(SD_PUPD<<GPIO_PUPDR_PUPDR2_Pos)
+            |(SD_PUPD<<GPIO_PUPDR_PUPDR3_Pos)
+            |(SD_PUPD<<GPIO_PUPDR_PUPDR4_Pos)
+            |(SD_PUPD<<GPIO_PUPDR_PUPDR5_Pos)
+            |(SD_PUPD<<GPIO_PUPDR_PUPDR11_Pos)
+            |(SD_PUPD<<GPIO_PUPDR_PUPDR12_Pos)
+            |(SD_PUPD<<GPIO_PUPDR_PUPDR13_Pos)
+            |(SD_PUPD<<GPIO_PUPDR_PUPDR14_Pos)
+            |(SD_PUPD<<GPIO_PUPDR_PUPDR15_Pos);
     GPIOF->PUPDR   = (GPIOF->PUPDR&~mAND)|mOR;
 
     mAND =   GPIO_OTYPER_OT0_Msk
@@ -504,17 +520,17 @@ uint32_t mAND,mOR; // Mask
             |GPIO_OTYPER_OT13_Msk
             |GPIO_OTYPER_OT14_Msk
             |GPIO_OTYPER_OT15_Msk;
-    mOR  =   GPIO_OTYPER_OT0
-            |GPIO_OTYPER_OT1
-            |GPIO_OTYPER_OT2
-            |GPIO_OTYPER_OT3
-            |GPIO_OTYPER_OT4
-            |GPIO_OTYPER_OT5
-            |GPIO_OTYPER_OT11
-            |GPIO_OTYPER_OT12
-            |GPIO_OTYPER_OT13
-            |GPIO_OTYPER_OT14
-            |GPIO_OTYPER_OT15;
+    mOR  =   (SD_OTYPE<<GPIO_OTYPER_OT0_Pos)
+            |(SD_OTYPE<<GPIO_OTYPER_OT1_Pos)
+            |(SD_OTYPE<<GPIO_OTYPER_OT2_Pos)
+            |(SD_OTYPE<<GPIO_OTYPER_OT3_Pos)
+            |(SD_OTYPE<<GPIO_OTYPER_OT4_Pos)
+            |(SD_OTYPE<<GPIO_OTYPER_OT5_Pos)
+            |(SD_OTYPE<<GPIO_OTYPER_OT11_Pos)
+            |(SD_OTYPE<<GPIO_OTYPER_OT12_Pos)
+            |(SD_OTYPE<<GPIO_OTYPER_OT13_Pos)
+            |(SD_OTYPE<<GPIO_OTYPER_OT14_Pos)
+            |(SD_OTYPE<<GPIO_OTYPER_OT15_Pos);
     GPIOF->OTYPER  = (GPIOF->OTYPER&~mAND)|mOR;
 
     // Configure pins in GPIOG
@@ -526,16 +542,16 @@ uint32_t mAND,mOR; // Mask
             |GPIO_AFRL_AFRL1_Msk
             |GPIO_AFRL_AFRL4_Msk
             |GPIO_AFRL_AFRL5_Msk;
-    mOR  =   (12<<GPIO_AFRL_AFRL0_Pos)
-            |(12<<GPIO_AFRL_AFRL1_Pos)
-            |(12<<GPIO_AFRL_AFRL4_Pos)
-            |(12<<GPIO_AFRL_AFRL5_Pos);
+    mOR  =   (SD_AF<<GPIO_AFRL_AFRL0_Pos)
+            |(SD_AF<<GPIO_AFRL_AFRL1_Pos)
+            |(SD_AF<<GPIO_AFRL_AFRL4_Pos)
+            |(SD_AF<<GPIO_AFRL_AFRL5_Pos);
     GPIOG->AFR[0]  = (GPIOG->AFR[0]&~mAND)|mOR;
 
     mAND =   GPIO_AFRH_AFRH0_Msk
             |GPIO_AFRH_AFRH7_Msk;
-    mOR  =   (12<<GPIO_AFRH_AFRH0_Pos)
-            |(12<<GPIO_AFRH_AFRH7_Pos);
+    mOR  =   (SD_AF<<GPIO_AFRH_AFRH0_Pos)
+            |(SD_AF<<GPIO_AFRH_AFRH7_Pos);
     GPIOG->AFR[1]  = (GPIOG->AFR[1]&~mAND)|mOR;
 
     mAND =   GPIO_MODER_MODER0_Msk
@@ -544,12 +560,12 @@ uint32_t mAND,mOR; // Mask
             |GPIO_MODER_MODER5_Msk
             |GPIO_MODER_MODER8_Msk
             |GPIO_MODER_MODER15_Msk;
-    mOR  =   GPIO_MODER_MODER0
-            |GPIO_MODER_MODER1
-            |GPIO_MODER_MODER4
-            |GPIO_MODER_MODER5
-            |GPIO_MODER_MODER8
-            |GPIO_MODER_MODER15;
+    mOR  =   (SD_MODE<<GPIO_MODER_MODER0_Pos)
+            |(SD_MODE<<GPIO_MODER_MODER1_Pos)
+            |(SD_MODE<<GPIO_MODER_MODER4_Pos)
+            |(SD_MODE<<GPIO_MODER_MODER5_Pos)
+            |(SD_MODE<<GPIO_MODER_MODER8_Pos)
+            |(SD_MODE<<GPIO_MODER_MODER15_Pos);
     GPIOG->MODER   = (GPIOG->MODER&~mAND)|mOR;
 
     mAND =   GPIO_OSPEEDR_OSPEEDR0_Msk
@@ -558,12 +574,12 @@ uint32_t mAND,mOR; // Mask
             |GPIO_OSPEEDR_OSPEEDR5_Msk
             |GPIO_OSPEEDR_OSPEEDR8_Msk
             |GPIO_OSPEEDR_OSPEEDR15_Msk;
-    mOR  =   GPIO_OSPEEDR_OSPEEDR0
-            |GPIO_OSPEEDR_OSPEEDR1
-            |GPIO_OSPEEDR_OSPEEDR4
-            |GPIO_OSPEEDR_OSPEEDR5
-            |GPIO_OSPEEDR_OSPEEDR8
-            |GPIO_OSPEEDR_OSPEEDR15;
+    mOR  =   (SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR0_Pos)
+            |(SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR1_Pos)
+            |(SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR4_Pos)
+            |(SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR5_Pos)
+            |(SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR8_Pos)
+            |(SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR15_Pos);
     GPIOG->OSPEEDR = (GPIOG->OSPEEDR&~mAND)|mOR;
 
     mAND =   GPIO_PUPDR_PUPDR0_Msk
@@ -572,12 +588,12 @@ uint32_t mAND,mOR; // Mask
             |GPIO_PUPDR_PUPDR5_Msk
             |GPIO_PUPDR_PUPDR8_Msk
             |GPIO_PUPDR_PUPDR15_Msk;
-    mOR  =   GPIO_PUPDR_PUPDR0
-            |GPIO_PUPDR_PUPDR1
-            |GPIO_PUPDR_PUPDR4
-            |GPIO_PUPDR_PUPDR5
-            |GPIO_PUPDR_PUPDR8
-            |GPIO_PUPDR_PUPDR15;
+    mOR  =   (SD_PUPD<<GPIO_PUPDR_PUPDR0_Pos)
+            |(SD_PUPD<<GPIO_PUPDR_PUPDR1_Pos)
+            |(SD_PUPD<<GPIO_PUPDR_PUPDR4_Pos)
+            |(SD_PUPD<<GPIO_PUPDR_PUPDR5_Pos)
+            |(SD_PUPD<<GPIO_PUPDR_PUPDR8_Pos)
+            |(SD_PUPD<<GPIO_PUPDR_PUPDR15_Pos);
     GPIOG->PUPDR   = (GPIOG->PUPDR&~mAND)|mOR;
 
     mAND =   GPIO_OTYPER_OT0_Msk
@@ -586,12 +602,12 @@ uint32_t mAND,mOR; // Mask
             |GPIO_OTYPER_OT5_Msk
             |GPIO_OTYPER_OT8_Msk
             |GPIO_OTYPER_OT15_Msk;
-    mOR  =   GPIO_OTYPER_OT0
-            |GPIO_OTYPER_OT1
-            |GPIO_OTYPER_OT4
-            |GPIO_OTYPER_OT5
-            |GPIO_OTYPER_OT8
-            |GPIO_OTYPER_OT15;
+    mOR  =   (SD_OTYPE<<GPIO_OTYPER_OT0_Pos)
+            |(SD_OTYPE<<GPIO_OTYPER_OT1_Pos)
+            |(SD_OTYPE<<GPIO_OTYPER_OT4_Pos)
+            |(SD_OTYPE<<GPIO_OTYPER_OT5_Pos)
+            |(SD_OTYPE<<GPIO_OTYPER_OT8_Pos)
+            |(SD_OTYPE<<GPIO_OTYPER_OT15_Pos);
     GPIOG->OTYPER  = (GPIOG->OTYPER&~mAND)|mOR;
 
     // Configure pins in GPIOH
@@ -600,7 +616,7 @@ uint32_t mAND,mOR; // Mask
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOHEN;
 
     mAND =   GPIO_AFRL_AFRL5_Msk;
-    mOR  =   (12<<GPIO_AFRL_AFRL5_Pos);
+    mOR  =   (SD_AF<<GPIO_AFRL_AFRL5_Pos);
     GPIOH->AFR[0]  = (GPIOH->AFR[0]&~mAND)|mOR;
 
     mAND =   0;
@@ -608,19 +624,19 @@ uint32_t mAND,mOR; // Mask
     GPIOH->AFR[1]  = (GPIOH->AFR[1]&~mAND)|mOR;
 
     mAND =   GPIO_MODER_MODER5_Msk;
-    mOR  =   GPIO_MODER_MODER5;
+    mOR  =   (SD_MODE<<GPIO_MODER_MODER5_Pos);
     GPIOH->MODER   = (GPIOH->MODER&~mAND)|mOR;
 
     mAND =   GPIO_OSPEEDR_OSPEEDR5_Msk;
-    mOR  =   GPIO_OSPEEDR_OSPEEDR5;
+    mOR  =   (SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR5_Pos);
     GPIOH->OSPEEDR = (GPIOH->OSPEEDR&~mAND)|mOR;
 
     mAND =   GPIO_PUPDR_PUPDR5_Msk;
-    mOR  =   GPIO_PUPDR_PUPDR5;
+    mOR  =   (SD_PUPD<<GPIO_PUPDR_PUPDR5_Pos);
     GPIOH->PUPDR   = (GPIOH->PUPDR&~mAND)|mOR;
 
     mAND =   GPIO_OTYPER_OT5_Msk;
-    mOR  =   GPIO_OTYPER_OT5;
+    mOR  =   (SD_OTYPE<<GPIO_OTYPER_OT5_Pos);
     GPIOH->OTYPER  = (GPIOH->OTYPER&~mAND)|mOR;
 
     /*
@@ -638,23 +654,23 @@ uint32_t mAND,mOR; // Mask
         RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN;
 
         mAND = GPIO_AFRL_AFRL3_Msk;
-        mOR  = (12<<GPIO_AFRL_AFRL3_Pos);
+        mOR  = (SD_AF<<GPIO_AFRL_AFRL3_Pos);
         GPIOC->AFR[0]  = (GPIOC->AFR[0]&~mAND)|mOR;
 
         mAND = GPIO_MODER_MODER3_Msk;
-        mOR  = GPIO_MODER_MODER3;
+        mOR  = (SD_MODE<<GPIO_MODER_MODER3_Pos);
         GPIOC->MODER   = (GPIOC->MODER&~mAND)|mOR;
 
         mAND = GPIO_OSPEEDR_OSPEEDR3_Msk;
-        mOR  = GPIO_OSPEEDR_OSPEEDR3;
+        mOR  = (SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR3_Pos);
         GPIOC->OSPEEDR = (GPIOC->OSPEEDR&~mAND)|mOR;
 
         mAND = GPIO_PUPDR_PUPDR3_Msk;
-        mOR  = GPIO_PUPDR_PUPDR3;
+        mOR  = (SD_PUPD<<GPIO_PUPDR_PUPDR3_Pos);
         GPIOC->PUPDR   = (GPIOC->PUPDR&~mAND)|mOR;
 
         mAND = GPIO_OTYPER_OT0_Msk;
-        mOR  = GPIO_OTYPER_OT3;
+        mOR  = (SD_OTYPE<<GPIO_OTYPER_OT3_Pos);
         GPIOC->OTYPER  = (GPIOC->OTYPER&~mAND)|mOR;
 
         // Configure pins in GPIOH
@@ -663,7 +679,7 @@ uint32_t mAND,mOR; // Mask
         RCC->AHB1ENR |= RCC_AHB1ENR_GPIOHEN;
 
         mAND =   GPIO_AFRL_AFRL3_Msk;
-        mOR  =   (12<<GPIO_AFRL_AFRL3_Pos);
+        mOR  =   (SD_AF<<GPIO_AFRL_AFRL3_Pos);
         GPIOH->AFR[0]  = (GPIOH->AFR[0]&~mAND)|mOR;
 
         mAND =   0;
@@ -671,19 +687,19 @@ uint32_t mAND,mOR; // Mask
         GPIOH->AFR[1]  = (GPIOH->AFR[1]&~mAND)|mOR;
 
         mAND =   GPIO_MODER_MODER3_Msk;
-        mOR  =   GPIO_MODER_MODER3;
+        mOR  =   (SD_MODE<<GPIO_MODER_MODER3_Pos);
         GPIOH->MODER   = (GPIOH->MODER&~mAND)|mOR;
 
         mAND =   GPIO_OSPEEDR_OSPEEDR3_Msk;
-        mOR  =   GPIO_OSPEEDR_OSPEEDR3;
+        mOR  =   (SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR3_Pos);
         GPIOH->OSPEEDR = (GPIOH->OSPEEDR&~mAND)|mOR;
 
         mAND =   GPIO_PUPDR_PUPDR3_Msk;
-        mOR  =   GPIO_PUPDR_PUPDR3;
+        mOR  =   (SD_PUPD<<GPIO_PUPDR_PUPDR3_Pos);
         GPIOH->PUPDR   = (GPIOH->PUPDR&~mAND)|mOR;
 
         mAND =   GPIO_OTYPER_OT3_Msk;
-        mOR  =   GPIO_OTYPER_OT3;
+        mOR  =   (SD_OTYPE<<GPIO_OTYPER_OT3_Pos);
         GPIOH->OTYPER  = (GPIOH->OTYPER&~mAND)|mOR;
 
     } else if ( bank == SDRAM_BANK2 ) {
@@ -694,38 +710,38 @@ uint32_t mAND,mOR; // Mask
 
         mAND =   GPIO_AFRL_AFRL6_Msk
                 |GPIO_AFRL_AFRL7_Msk;
-        mOR  =   (12<<GPIO_AFRL_AFRL0_Pos)
-                |(12<<GPIO_AFRL_AFRL5_Pos);
+        mOR  =   (SD_AF<<GPIO_AFRL_AFRL0_Pos)
+                |(SD_AF<<GPIO_AFRL_AFRL5_Pos);
         GPIOH->AFR[0]  = (GPIOG->AFR[0]&~mAND)|mOR;
 
         mAND =   GPIO_AFRH_AFRH6_Msk
                 |GPIO_AFRH_AFRH7_Msk;
-        mOR  =   (12<<GPIO_AFRH_AFRH6_Pos)
-                |(12<<GPIO_AFRH_AFRH7_Pos);
+        mOR  =   (SD_AF<<GPIO_AFRH_AFRH6_Pos)
+                |(SD_AF<<GPIO_AFRH_AFRH7_Pos);
         GPIOH->AFR[1]  = (GPIOH->AFR[1]&~mAND)|mOR;
 
         mAND =   GPIO_MODER_MODER6_Msk
                 |GPIO_MODER_MODER7_Msk;
-        mOR  =   GPIO_MODER_MODER6
-                |GPIO_MODER_MODER7;
+        mOR  =   (SD_MODE<<GPIO_MODER_MODER6_Pos)
+                |(SD_MODE<<GPIO_MODER_MODER7_Pos);
         GPIOH->MODER   = (GPIOH->MODER&~mAND)|mOR;
 
         mAND =   GPIO_OSPEEDR_OSPEEDR6_Msk
                 |GPIO_OSPEEDR_OSPEEDR7_Msk;
-        mOR  =   GPIO_OSPEEDR_OSPEEDR6
-                |GPIO_OSPEEDR_OSPEEDR7;
+        mOR  =   (SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR6_Pos)
+                |(SD_OSPEED<<GPIO_OSPEEDR_OSPEEDR7_Pos);
         GPIOH->OSPEEDR = (GPIOH->OSPEEDR&~mAND)|mOR;
 
         mAND =   GPIO_PUPDR_PUPDR6_Msk
                 |GPIO_PUPDR_PUPDR7_Msk;
-        mOR  =   GPIO_PUPDR_PUPDR6
-                |GPIO_PUPDR_PUPDR7;
+        mOR  =   (SD_PUPD<<GPIO_PUPDR_PUPDR6_Pos)
+                |(SD_PUPD<<GPIO_PUPDR_PUPDR7_Pos);
         GPIOH->PUPDR   = (GPIOH->PUPDR&~mAND)|mOR;
 
         mAND =   GPIO_OTYPER_OT6_Msk
                 |GPIO_OTYPER_OT7_Msk;
-        mOR  =   GPIO_OTYPER_OT6
-                |GPIO_OTYPER_OT7;
+        mOR  =   (SD_OTYPE<<GPIO_OTYPER_OT6_Pos)
+                |(SD_OTYPE<<GPIO_OTYPER_OT7_Pos);
         GPIOH->OTYPER  = (GPIOH->OTYPER&~mAND)|mOR;
 
     }
@@ -1031,7 +1047,11 @@ ConfigureSDRAM(int bank) {
  * @note    HCLK must be 200 MHz!!!!
  */
 int
-SDRAM_Init(void) {
+SDRAM_Init(int bank) {
+
+    /* The board has only one SDRAM, at Bank 1 */
+    if( bank != SDRAM_BANK1 )
+        return -1;
 
     if( SystemCoreClock != SDRAM_CLOCKFREQUENCY )
         return -1;

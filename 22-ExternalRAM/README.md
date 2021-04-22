@@ -239,12 +239,12 @@ These signals are shared by the two banks (chips)
 
 | Chip signal  | Board signal | MCU Signal  |  Function
 |--------------|--------------|-------------|---------
-|  CLKE        |  FMC_SDCKE0* | PC3/PH2     |  AF12
-|  CS          |  FMC_SDNE0*  | PH3         |  AF12
+|  CLKE        |  FMC_SDCKE0* | PC3+/PH2/PC5|  AF12
+|  CS          |  FMC_SDNE0*  | PH3+/PC4/PC2|  AF12
 |  CLK         |  FMC_SDCLK   | PG8         |  AF12
 |  RAS         |  FMC_SDNRAS  | PF11        |  AF12
 |  CAS         |  FMC_SDNCAS  | PG15        |  AF12
-|  WE          |  FMC_SNDWE   | PH5         |  AF12
+|  WE          |  FMC_SDNWE   | PH5+/PA7/PC0|  AF12
 |  BA0         |  FMC_BA0     | PG4         |  AF12
 |  BA1         |  FMC_BA1     | PG5         |  AF12
 |  DQM0        |  FMC_NBL0    | PE0         |  AF12
@@ -279,13 +279,14 @@ These signals are shared by the two banks (chips)
 |  A11         |  FMC_A11     | PG1         |  AF12
 
 \*: Bank 1 clock and chip enable
+\+: Used in the Discovery board
 
 These signals below are not connected (used) in this board.
 
 | Chip signal  | FMC signal   | MCU Signal  |  Function
 |--------------|--------------|-------------|---------
-|  CLKE        | FMC_SDCKE1*  | PH7         |  AF12
-|  CS          | FMC_SDNE1*   | PH6         |  AF12
+|  CLKE        | FMC_SDCKE1*  | PH7/PB5     |  AF12
+|  CS          | FMC_SDNE1*   | PH6/PB6     |  AF12
 |  DQM2        | FMC_NBL2     | PI4         |  AF12
 |  DQM3        | FMC_NBL3     | PI5         |  AF12
 |  CS          | FMC_SDNE1    | P           |  AF12
