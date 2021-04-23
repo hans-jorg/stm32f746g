@@ -54,21 +54,39 @@
 #include "buddy.h"
 
 /**
- *  @brief  Definition of map and tree size
-*/
-///@{
+ *  @brief  pool->mapsizeMAX
+ *
+ *  Define the bitmap size used to manage the allocation process
+ *
+ *  @note   It limits the ratio POLL_SIZE/POLL_MINSIZE
+ */
+#define  MAXRATIO   1024
 
-#define MAPSIZE        (BUDDYTOTALSIZE/BUDDYMINSIZE)    ///< Number of blocks
-#define TREESIZE       (MAPSIZE*2-1)                    ///< Number of elements in the tree
-///@}
+#define  MAPSIZEMAX   (MAXRATIO*2)
 
 /**
+ *  @brief  Buddy area pool
  *
+ *  @note   There is only one pool!!!
+ */
+typedef struct {
+    char        *baseaddress;                   /// base address of area to be managed
+    long        size;                           /// size of area to be managed (=power of 2)
+    long        minimalsize;                    /// minimal block size
+    long        mapsize;                        /// size/minimalsize
+    long        treesize;                       /// pool->mapsize*2-1
+    BV_TYPE     used[MAPSIZEMAX];               /// bit vector to store free(0) or used(1) block
+    BV_TYPE     split[MAPSIZEMAX];              /// bit vector to signal if a block was split
+} POOL_t;
+
+/**
+ *  @brief  Buddy area
  */
 ///@{
-BV_DECLARE(used,MAPSIZE*2);                  ///< used/free map
-BV_DECLARE(split,MAPSIZE*2);                 ///< already split
+static POOL_t   poolarea;
+static POOL_t   *pool = &poolarea;
 ///@}
+#define TREESIZE       (pool->mapsize*2-1)                    ///< Number of elements in the tree
 
 /**
  *  @brief  Structure used to navigate the allocation tree
@@ -85,40 +103,51 @@ typedef struct {
 /**
  *  @brief  buddy_init
  */
-void
-buddy_init(void) {
+int
+Buddy_Init(char *address, long size, long minsize) {
 
-    bv_clearall(used,MAPSIZE*2);
-    bv_clearall(split,MAPSIZE*2);
+    if( size/minsize > MAXRATIO )
+        return -1;
+
+    pool->baseaddress = address;                /// base address of area to be managed
+    pool->size        = size;                   /// size of area to be managed (=power of 2)
+    pool->minimalsize = minsize;                /// minimal block size
+    pool->mapsize     = size/minsize;           /// size/minimalsize
+    pool->treesize    = 2*pool->mapsize-1;      /// pool->mapsize*2-1
+
+    bv_clearall(pool->used,pool->mapsize*2);    /// Clear used block flags
+    bv_clearall(pool->split,pool->mapsize*2);   /// Clear split block flags
+
+    return 0;
 }
 
 /**
  *  @brief  buddy_alloc
  */
 void *
-buddy_alloc(unsigned size) {
+Buddy_Alloc(unsigned size) {
 int level;
 int s;
 int k;
 int l;
 uint32_t a;
 
-nodeinfo stack[MAPSIZE];
+nodeinfo stack[MAXRATIO];
 int sp;
 nodeinfo node;
 
     // Too big?
-    if( size > BUDDYTOTALSIZE )
+    if( size > pool->size )
         return 0;
 
     // Already full
-    if( bv_test(used,0) )
+    if( bv_test(pool->used,0) )
         return 0;
 
     sp = 0;
     stack[sp].level = 0;
     stack[sp].index = 0;
-    stack[sp].size = BUDDYTOTALSIZE;
+    stack[sp].size = pool->size;
     stack[sp].addr = 0;
     sp++;
 
@@ -131,15 +160,15 @@ nodeinfo node;
         l = node.level;
 
         // test if block already used
-        if( bv_test(used,k) )
+        if( bv_test(pool->used,k) )
             continue;
         // test if need full block
-        if( (size > s/2) || (s == BUDDYMINSIZE) ) {
+        if( (size > s/2) || (s == pool->minimalsize) ) {
             // if already split, try another block
-            if( bv_test(split,k) == 0 ) {
+            if( bv_test(pool->split,k) == 0 ) {
                 // reserve it
-                bv_set(used,k);
-                return (void *) ((char *) BUDDYBASE+a);
+                bv_set(pool->used,k);
+                return (void *) ((char *) pool->baseaddress+a);
             }
         }
         s /= 2;
@@ -147,7 +176,7 @@ nodeinfo node;
             continue;
 
         // Mark as split
-        bv_set(split,k);
+        bv_set(pool->split,k);
         // Try left and right leaves.
         l++;
         //Left must be on top of stack
@@ -171,22 +200,22 @@ static inline int iseven(int n) { return (n&1)^1; }
 /**
  *  @brief  buddy_free
  */
-void buddy_free(void *addr) {
-uint32_t disp = (char *) addr - (char *)BUDDYBASE;       // 4 GB limit
+void Buddy_Free(void *addr) {
+uint32_t disp = (char *) addr - (char *)pool->baseaddress;       // 4 GB limit
 int b,d,k,p;
 
-    d = disp/BUDDYMINSIZE;
+    d = disp/pool->minimalsize;
 
-    k = MAPSIZE+d-1;
+    k = pool->mapsize+d-1;
     // Free if it is not
-    bv_clear(used,k);
-    bv_clear(split,k);
+    bv_clear(pool->used,k);
+    bv_clear(pool->split,k);
     // Find block to be freed
     while( k > 0 ) {
             k /= 2;
-        if( bv_test(used,k) ) {
-            bv_clear(used,k);
-            bv_clear(split,k);
+        if( bv_test(pool->used,k) ) {
+            bv_clear(pool->used,k);
+            bv_clear(pool->split,k);
             break;
         }
     }
@@ -198,9 +227,12 @@ int b,d,k,p;
             b = k+1;
         else
             b = k-1;
-        if( (bv_test(used,k)==0)&&(bv_test(used,b)==0)&&(bv_test(split,k)==0)&&(bv_test(split,b))) {
+        if(  (bv_test(pool->used,k)==0)
+           &&(bv_test(pool->used,b)==0)
+           &&(bv_test(pool->split,k)==0)
+           &&(bv_test(pool->split,b))    ) {
             p = k/2;
-            bv_clear(split,p);
+            bv_clear(pool->split,p);
         }
         k /= 2;
     }
@@ -237,16 +269,16 @@ int s;
 int k;
 int l;
 uint32_t a;
-nodeinfo stack[MAPSIZE];
+nodeinfo stack[pool->mapsize];
 int sp;
 nodeinfo node;
 
-    fillmap(m,0,MAPSIZE,'-');
+    fillmap(m,0,pool->mapsize,'-');
 
     sp = 0;
     stack[sp].level = 0;
     stack[sp].index = 0;
-    stack[sp].size = BUDDYTOTALSIZE/BUDDYMINSIZE;
+    stack[sp].size = pool->size/pool->minimalsize;
     stack[sp].addr = 0;
     sp++;
 
@@ -258,7 +290,7 @@ nodeinfo node;
         a = node.addr;
         l = node.level;
         // test if block already used
-        if( bv_test(used,k) ) {
+        if( bv_test(pool->used,k) ) {
             fillmap(m,a,a+s,'U');
         }
 
@@ -282,22 +314,22 @@ nodeinfo node;
 
     }
 
-    m[MAPSIZE] = '\0';
+    m[pool->mapsize] = '\0';
 }
 
 
 /**
  *  @brief  print allocation map
  */
-void buddy_printmap(void) {
-char map[MAPSIZE+1];
+void Buddy_PrintMap(void) {
+char map[pool->mapsize+1];
     buildmap(map);
     printf("|%s|\n",map);
 }
 
 
 
-void buddy_printaddresses(void) {
+void Buddy_PrintAddresses(void) {
 int level;
 int k;
 int lim;
@@ -306,7 +338,7 @@ uint32_t size;
 int delta;
 
     level = 0;
-    size = BUDDYTOTALSIZE;
+    size = pool->size;
     lim = 0;
     addr = 0;
     delta = 1;

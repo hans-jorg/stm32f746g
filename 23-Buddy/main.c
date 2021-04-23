@@ -11,59 +11,106 @@
  *
  ******************************************************************************/
 
+#include <stdio.h>
+#include <string.h>
+
 #include "stm32f746xx.h"
 #include "system_stm32f746.h"
 #include "led.h"
+#include "sdram.h"
+#include "buddy.h"
+
+
 
 /*
- * @brief   Configuration for PLLSAI
+ * @brief   Configuration for Main PLL
  *
- * @note    Assumes PLL Main will use HSE (crystal) and have a 1 MHz input for PLL
- *
- * @note    LCD_CLK should be in range 5-12, with typical value 9 MHz.
- *
- * @note    There is an extra divisor in PLLSAIDIVR[1:0] of RCC_DCKCFGR, that can
- *          have value 2, 4, 8 or 16.
- *
- * @note    So the R output must be 18, 36, 72 or 144 MHz.
- *          But USB, RNG and SDMMC needs 48 MHz. The LCM of 48 and 9 is 144.
- *
- *          f_LCDCLK  = 9 MHz        PLLSAIRDIV=8
- *
+ * @note    PLL Main will use HSE (crystal) and uses a 1 MHz input for PLL
  */
 
-PLL_Configuration  pllsaiconfig  = {
-    .source         = RCC_PLLCFGR_PLLSRC_HSI,
-    .M              = HSE_FREQ/1000,                        // f_IN = 1 MHz
-    .N              = 144,                                  // f_VCO = 144 MHz
-    .P              = 3,                                    // f_P = 48 MHz
-    .Q              = 3,                                    // f_Q = 48 MHz
-    .R              = 2                                     // f_R = 72 MHz
+static PLL_Configuration Clock200MHz = {
+    .source = CLOCKSRC_HSE,
+    .M = HSE_OSCILLATOR_FREQ/1000000,       // f_INT = 1 MHz
+    .N = 400,                               // f_VCO = 400 MHz
+    .P = 2,                                 // f_OUT = 200 MHz
+    .Q = 2,                                 // not used
+    .R = 2                                  // not used
 };
 
 
-/**
- * @brief   Quick and dirty delay routine
- *
- * @note    It gives approximately 1ms delay at 16 MHz
- *
- * @note    The COUNTERFOR1MS must be adjusted by trial and error
- *
- * @note    Do not use this or similar in production code
- */
+static volatile uint32_t tick_ms = 0;
+static volatile uint32_t delay_ms = 0;
+static int led_initialized = 0;
 
-#define COUNTERFOR1MS 300000
+#define INTERVAL 500
+void SysTick_Handler(void) {
 
+    if( !led_initialized ) {
+        LED_Init();
+        led_initialized = 1;
+    }
+    if( tick_ms >= INTERVAL ) {
+       LED_Toggle();
+       tick_ms = 0;
+    } else {
+       tick_ms++;
+    }
 
-void ms_delay(volatile int ms) {
-   while (ms-- > 0) {
-      volatile int x=COUNTERFOR1MS;
-      while (x-- > 0)
-         __NOP();
-   }
+    if( delay_ms > 0 ) delay_ms--;
+
 }
 
+/**
+ *  @brief  Delay
+ *
+ * @note    Delays *delay* milliseconds
+ */
 
+void Delay(uint32_t delay) {
+
+    delay_ms = delay;
+    while( delay_ms ) {}
+
+}
+
+/**
+ *  @brief  my_rand
+ *
+ *  @note my_rand is an implementation of random number generater described by S. Park
+ *        and K. Miller, in Communications of the ACM, Oct 88, 31:10, p. 1192-1201.
+ */
+
+long seed = 313;
+long int my_rand(void) {
+long int lo, hi, test;
+static long int a = 16807L, m = 2147483647L, q = 127773L, r = 2836L;
+
+    hi = seed / q;
+    lo = seed % q;
+    test = a * lo - r * hi;
+
+    if (test > 0) {
+        seed = test; /* test for overflow */
+    } else {
+        seed = test + m;
+    }
+    return seed;
+}
+
+int round2(int x) {
+int p = 1;
+int pant = 1;
+
+    if( x < 0 )
+        return 0;
+
+    while( (p>pant) && (p < x) )  {
+        pant = p;
+        p<<=1;
+    }
+
+    return p;
+}
 
 /**
  * @brief   main
@@ -72,29 +119,73 @@ void ms_delay(volatile int ms) {
  *
  * @note    Really a bad idea to blink LED
  */
+#define LINEMAX 100
+#define TRIES  1000
+
 
 int main(void) {
+char line[LINEMAX+1];
+const long MINSIZE = 8192;
+typedef struct {
+    char    *address;
+    long    size;
+    long    size2;
+    long    pattern;
+} info_t;
+info_t info[TRIES];
+int ninfo = 0;
 
-    ///??
-    RCC->DCKCFGR1 = (RCC->DCKCFGR1&~RCC_DCKCFGR1_PLLSAIDIVR)|(8<<RCC_DCKCFGR1_PLLSAIDIVR_Pos);
-
-    SystemConfigSAIPLL(&pllsaiconfig);
 
     LED_Init();
+
+    printf("Starting.at %ld KHz...\n",SystemCoreClock/1000);
+
+    /* Set Clock to 200 MHz */
+    SystemConfigMainPLL(&Clock200MHz);
+    SystemSetCoreClock(CLOCKSRC_PLL,1);
+
+    printf("Now running at %ld KHz...\n",SystemCoreClock/1000);
+
+    SysTick_Config(SystemCoreClock/1000);
+
+    printf("Press ENTER to initialize ExtRAM\n");
+    fgets(line,LINEMAX,stdin);
+    SDRAM_Init(SDRAM_BANK1);
+
+    printf("Initializing buddy allocator\n");
+    Buddy_Init((char *) SDRAM_ADDRESS,SDRAM_SIZE,MINSIZE);
 
     /*
      * Blink LED
      */
-    for (;;) {
-#if 1
-       ms_delay(500);
-       LED_Toggle();
-#else
-        ms_delay(500);
-        LED_Set();
-        ms_delay(500);
-        LED_Clear();
-        ms_delay(500);
-#endif
+    while ( ninfo<TRIES ) {
+        LED_Toggle();
+        unsigned s = my_rand();
+        s %= (SDRAM_SIZE/4);
+        char *p = Buddy_Alloc(s);
+        printf("Allocated block #%1d with size %6d at address %p\n",ninfo,s,p);
+        if( p ) {
+            int pat = my_rand();
+            info[ninfo].address = p;
+            info[ninfo].size    = s;
+            info[ninfo].size2   = round2(s);
+            info[ninfo].pattern = pat;
+            memset(p,pat,s);
+            ninfo++;
+        }
+        int x;
+        if( ((x=my_rand()>>3)&1) && (ninfo>0) ) {
+            x = x%ninfo;
+            p = info[x].address;
+            if( p ) {
+                printf("Freed #%1d at address %p\n",x,p);
+                Buddy_Free(p);
+                info[x].address = 0;
+                info[x].size    = 0;
+            }
+        Buddy_PrintMap();
+        }
     }
+    printf("\n\nSTOP\n");
+    while(1) {} // STOP
 }

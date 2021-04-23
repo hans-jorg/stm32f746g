@@ -3,12 +3,21 @@
 /**
  * @file    sdram.h
  *
- * @date    07/10/2020
+ * @date    04/21/2021
  * @author  Hans
  */
 
-void SDRAM_Init(void);
+int SDRAM_Init(int bank);
 
+/**
+ * @brief SDRAM Bank
+ *
+ * There are only two (SDRAM Banks 1 and 2) at FMC Banks 5 and 6, respectively
+ */
+///{
+#define SDRAM_BANK1             0
+#define SDRAM_BANK2             1
+///}
 /**
  *  @brief  SystemCoreClock for correct working of the SDRAM
  *
@@ -17,7 +26,7 @@ void SDRAM_Init(void);
  *  @note   Other frequencies are possible but the FMC and SDRAM must be reconfigured
  */
 
-#define SDRAMCLOCKFREQUENCY     200000000
+#define SDRAM_CLOCKFREQUENCY     200000000
 
 /**
  *  @brief  SDRAM address
@@ -25,14 +34,17 @@ void SDRAM_Init(void);
  *  @note   Address of SDRAM Bank 1. It is possible to remap it (not done).
  */
 
-#define SDRAMAREA               0xC000000
+#define SDRAM_ADDRESS            0xC0000000
 
 /**
  *  @brief  SDRAM size
  *
- *  @note   8 MBytes = 64 MBit = 0.5 SDRAM Capacity because only 16 bits are used.
+ *  @note   8 MBytes = 64 MBit
+ *
+ *  @note   Only half of the SDRAM is used because only 16 bits
+ *          of the 32 bits are used.
  */
 
-#define SDRAMSIZE               0x0800000
+#define SDRAM_SIZE               0x0800000
 
 #endif

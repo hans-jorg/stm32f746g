@@ -172,10 +172,12 @@ volatile char ch;
     return status;
 }
 
-/* ------------------------------my_rand()-------------------------------------
-my_rand, implementation of random number generater described by S. Park
-and K. Miller, in Communications of the ACM, Oct 88, 31:10, p. 1192-1201.
----------------------------------------------------------------------------- */
+/**
+ *  @brief  my_rand
+ *
+ *  @note my_rand is an implementation of random number generater described by S. Park
+ *        and K. Miller, in Communications of the ACM, Oct 88, 31:10, p. 1192-1201.
+ */
 
 long seed = 313;
 long int my_rand(void) {
@@ -200,7 +202,7 @@ static long int a = 16807L, m = 2147483647L, q = 127773L, r = 2836L;
  * @note    Initializes GPIO and SDRAM, blinks LED and test SDRAM access
  */
 #define LINEMAX 100
-
+#define TEST 3
 int main(void) {
 char line[LINEMAX+1];
 
@@ -218,7 +220,7 @@ char line[LINEMAX+1];
     fgets(line,LINEMAX,stdin);
     SDRAM_Init(SDRAM_BANK1);
 
-#ifdef SIMPLE_TEST
+#if TEST == 1
     uint16_t w = 0x1234;
     uint16_t wr;
     uint16_t *p = (uint16_t *) 0xC0000000;
@@ -233,7 +235,7 @@ char line[LINEMAX+1];
         Delay(100);
         w++;
     }
-#else
+#elif TEST == 2
     printf("Press ENTER to test to External RAM\n");
     fgets(line,LINEMAX,stdin);
     uint16_t w = 0x1234;
@@ -250,5 +252,21 @@ char line[LINEMAX+1];
             printf("Read %x\n",wr);
         p++;
     }
+#elif TEST == 3
+    printf("Press ENTER to test to External RAM\n");
+    fgets(line,LINEMAX,stdin);
+    uint16_t w = 0x1234;
+    uint16_t wr;
+    uint16_t *p = (uint16_t *) 0xC0000000;
+    for(;;) {
+        printf("%p\r",p);
+        w = my_rand();
+        *p = w;
+        wr = *p;
+        if( w != wr )
+            printf("\nWrote %x Read %x\n",w,wr);
+        p++;
+    }
+
 #endif
 }

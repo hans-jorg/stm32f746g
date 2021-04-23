@@ -71,8 +71,8 @@ Projects
 19 | ----                | ----                                 | -
 20 | ----                | ----                                 | -
 21 | ----                | ----                                 | -
-22 | ExternalRAM         | External RAM                         | Not tested
-23 | Buddy               | Using buddy allocator on external RAM| Not tested
+22 | ExternalRAM         | External RAM                         | OK
+23 | Buddy               | Using buddy allocator on external RAM| OK
 24 | LCD                 | Using the on board LCD               | ?
 25 | MicroSD             | Using the on board MicroSD           | ?
 26 | Flash               | Using the on board flash memory      | ?
