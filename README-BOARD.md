@@ -284,11 +284,13 @@ DQM1        |  FMC_NBL1    | PE1     |  AF12
 
 ### LCD
 
-The STM32F646 tem uma unidade de controle de LCD (LTDC) e também uma acelerado ChromeART (DMA2D)
+The STM32F646 has a LCD control interface and an accelerator, called ChromeART (DMA2D).
 
-The LCD unit is a 4.3" Liquid Crystal Display (LCD) display with Capacitive Touch Panel (CTP). It is produced by Rocktech under the code RK043FN48H-CT672B.
+The LCD unit is a 4.3" Liquid Crystal Display (LCD) display with Capacitive Touch Panel (CTP). 
+It is produced by Rocktech under the code RK043FN48H-CT672B.
 
-It can display 16777216 colors (RGB888 interface).
+It is produced by Rocktech under the code RK043FN48H-CT672B. Its resolution is 480x272 and can
+ display 16777216 colors (RGB888 interface).
 
 The main features are:
 
@@ -341,7 +343,7 @@ The connection for LCD are:
   SDA         | LCD_RST/NRST      | NRST                   |
 
 
-The alternative for LCD pins are shown below. The used for LCD connection are marked.
+The alternative for LCD pins are shown below. Those used for LCD connection are marked.
 
 
 LCD Signal   | ALT     |  Pin

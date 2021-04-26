@@ -750,42 +750,42 @@ uint32_t mAND,mOR; // Mask
 #else
 
 static const GPIO_PinConfiguration pinconfig_common[] = {
-   {  GPIOD,   14,      12  },       //     DQ0
-   {  GPIOD,   15,      12  },       //     DQ1
-   {  GPIOD,   0,       12  },       //     DQ2
-   {  GPIOD,   1,       12  },       //     DQ3
-   {  GPIOE,   7,       12  },       //     DQ4
-   {  GPIOE,   8,       12  },       //     DQ5
-   {  GPIOE,   9,       12  },       //     DQ6
-   {  GPIOE,   10,      12  },       //     DQ7
-   {  GPIOE,   11,      12  },       //     DQ8
-   {  GPIOE,   12,      12  },       //     DQ9
-   {  GPIOE,   13,      12  },       //     DQ10
-   {  GPIOE,   14,      12  },       //     DQ11
-   {  GPIOE,   15,      12  },       //     DQ12
-   {  GPIOD,   8,       12  },       //     DQ13
-   {  GPIOD,   9,       12  },       //     DQ14
-   {  GPIOD,   10,      12  },       //     DQ15
-   {  GPIOF,   0,       12  },       //     A0
-   {  GPIOF,   1,       12  },       //     A1
-   {  GPIOF,   2,       12  },       //     A2
-   {  GPIOF,   3,       12  },       //     A3
-   {  GPIOF,   4,       12  },       //     A4
-   {  GPIOF,   5,       12  },       //     A5
-   {  GPIOF,   12,      12  },       //     A6
-   {  GPIOF,   13,      12  },       //     A7
-   {  GPIOF,   14,      12  },       //     A8
-   {  GPIOF,   15,      12  },       //     A9
-   {  GPIOG,   0,       12  },       //     A10
-   {  GPIOG,   1,       12  },       //     A11
-   {  GPIOG,   4,       12  },       //     BA0
-   {  GPIOG,   5,       12  },       //     BA1
-   {  GPIOF,   11,      12  },       //     RAS
-   {  GPIOG,   15,      12  },       //     CAS
-   {  GPIOH,   5,       12  },       //     WE
-   {  GPIOG,   8,       12  },       //     CLK
-   {  GPIOE,   0,       12  },       //     DQM0
-   {  GPIOE,   1,       12  },       //     DQM1
+   {  GPIOD,   14,      12, 2,  0, 3, 0, 0  },       //     DQ0
+   {  GPIOD,   15,      12, 2,  0, 3, 0, 0  },       //     DQ1
+   {  GPIOD,   0,       12, 2,  0, 3, 0, 0  },       //     DQ2
+   {  GPIOD,   1,       12, 2,  0, 3, 0, 0  },       //     DQ3
+   {  GPIOE,   7,       12, 2,  0, 3, 0, 0  },       //     DQ4
+   {  GPIOE,   8,       12, 2,  0, 3, 0, 0  },       //     DQ5
+   {  GPIOE,   9,       12, 2,  0, 3, 0, 0  },       //     DQ6
+   {  GPIOE,   10,      12, 2,  0, 3, 0, 0  },       //     DQ7
+   {  GPIOE,   11,      12, 2,  0, 3, 0, 0  },       //     DQ8
+   {  GPIOE,   12,      12, 2,  0, 3, 0, 0  },       //     DQ9
+   {  GPIOE,   13,      12, 2,  0, 3, 0, 0  },       //     DQ10
+   {  GPIOE,   14,      12, 2,  0, 3, 0, 0  },       //     DQ11
+   {  GPIOE,   15,      12, 2,  0, 3, 0, 0  },       //     DQ12
+   {  GPIOD,   8,       12, 2,  0, 3, 0, 0  },       //     DQ13
+   {  GPIOD,   9,       12, 2,  0, 3, 0, 0  },       //     DQ14
+   {  GPIOD,   10,      12, 2,  0, 3, 0, 0  },       //     DQ15
+   {  GPIOF,   0,       12, 2,  0, 3, 0, 0  },       //     A0
+   {  GPIOF,   1,       12, 2,  0, 3, 0, 0  },       //     A1
+   {  GPIOF,   2,       12, 2,  0, 3, 0, 0  },       //     A2
+   {  GPIOF,   3,       12, 2,  0, 3, 0, 0  },       //     A3
+   {  GPIOF,   4,       12, 2,  0, 3, 0, 0  },       //     A4
+   {  GPIOF,   5,       12, 2,  0, 3, 0, 0  },       //     A5
+   {  GPIOF,   12,      12, 2,  0, 3, 0, 0  },       //     A6
+   {  GPIOF,   13,      12, 2,  0, 3, 0, 0  },       //     A7
+   {  GPIOF,   14,      12, 2,  0, 3, 0, 0  },       //     A8
+   {  GPIOF,   15,      12, 2,  0, 3, 0, 0  },       //     A9
+   {  GPIOG,   0,       12, 2,  0, 3, 0, 0  },       //     A10
+   {  GPIOG,   1,       12, 2,  0, 3, 0, 0  },       //     A11
+   {  GPIOG,   4,       12, 2,  0, 3, 0, 0  },       //     BA0
+   {  GPIOG,   5,       12, 2,  0, 3, 0, 0  },       //     BA1
+   {  GPIOF,   11,      12, 2,  0, 3, 0, 0  },       //     RAS
+   {  GPIOG,   15,      12, 2,  0, 3, 0, 0  },       //     CAS
+   {  GPIOH,   5,       12, 2,  0, 3, 0, 0  },       //     WE
+   {  GPIOG,   8,       12, 2,  0, 3, 0, 0  },       //     CLK
+   {  GPIOE,   0,       12, 2,  0, 3, 0, 0  },       //     DQM0
+   {  GPIOE,   1,       12, 2,  0, 3, 0, 0  },       //     DQM1
 //
    {     0,    0,       0  }         // End of List Mark
 };
@@ -793,15 +793,15 @@ static const GPIO_PinConfiguration pinconfig_common[] = {
 
 static const GPIO_PinConfiguration pinconfig_bank1[] = {
     // PC3/CLKE, PH3/CS
-   {  GPIOC,   3,       12  },       //     CS = SDNE0
-   {  GPIOH,   3,       12  },       //     CLKE = SDNE0
+   {  GPIOC,   3,       12, 2,  0, 3, 0, 0  },       //     CS = SDNE0
+   {  GPIOH,   3,       12, 2,  0, 3, 0, 0  },       //     CLKE = SDNE0
    {     0,    0,       0  }         // End of List Mark
 };
 
 static const GPIO_PinConfiguration pinconfig_bank2[] = {
     // 6/CS 7/CLKE for Bank2 (There are alternatives on PB6 and PB5)
-   {  GPIOH,   6,       12  },       //     SDNE1
-   {  GPIOH,   7,       12  },       //     SDCKE1
+   {  GPIOH,   6,       12, 2,  0, 3, 0, 0  },       //     SDNE1
+   {  GPIOH,   7,       12, 2,  0, 3, 0, 0  },       //     SDCKE1
    {     0,    0,       0  }         // End of List Mark
 };
 
