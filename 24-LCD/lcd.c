@@ -13,8 +13,24 @@
 
 #define BIT(N) (1U<<(N))
 
+
 /**
- * @brief   Characteristics of the LCD
+ *  @brief  Characteristics of the LCD interface
+ *
+ * | Signal  | Description                 |  Min     |  Max     |
+ * |---------|-----------------------------|----------|----------|
+ * | LCD_CLK | LTDC clock output frequency |  -       |  45 MHz  |
+ *
+ *  @note LCD_CLK is generated from the R output of the PLLSAI
+ *
+ *  @note There is a divisor (LLSAIDIVR) of the R output signal that can assume the
+ *        values 2, 4, 8 and 16. Is is set in the field PLLSAIDIVR of the RCC_DCKFGR1 register.
+ *  @note The input of the PLLSAI is the same of Main PLL. In this project
+ *        it is 1 MHz, obtained by dividing the 25 MHz clock input by M=25, set in the
+ *        field PLLM of the RCC_PLLCFGR register.
+ */
+/**
+ * @brief   Characteristics of the LCD display
  *
  * @note    Device Caracteristics from Rocktech RK043FN48H-CT672B Datasheet
  *
@@ -130,7 +146,7 @@
 
 #ifdef FAST_INITIALIZATION
 
-static void ConfigurePins(void) {
+static void ConfigureLCDPins(void) {
 uint32_t mFIELD, mVALUE;
 
     /********* Configuring LCD signals *******************/
@@ -378,7 +394,54 @@ static const GPIO_PinConfiguration configtable[] = {
     {     0,     0,     0, 0, 0, 0, 0 ,0 },// End of table indicator
 };
 
+
+static void ConfigureLCDPins(void) {
+
+    /* Configure pins from table*/
+    GPIO_ConfigureMultiplePins(configtable);
+
+}
 #endif
+
+/*
+ * @brief   Configuration for PLLSAI
+ *
+ * @note    Assumes PLL Main will use HSE (crystal) and have a 1 MHz input for PLL
+ *
+ * @note    $$ f_{VCOOUT} = f_{INPUT} * N / M $$
+ *          $$ f_{OUTP} = {VCOOUT} / P $$
+ *          $$ f_{OUTQ} = {VCOOUT} / Q $$
+ *          $$ f_{OUTR} = {VCOOUT} / R $$
+ *
+ *          $$ f_{INPUT} = "16 MHz (HSI)" or "25 MHz (HSE)" $$
+ *          $$ M = {2..63} identical to the one used in Main PLL
+ *          $$ N = {50..432 } $$
+ *          $$ P = {2, 4, 6, 8 } $$
+ *          $$ Q = {2..15 } $$
+ *          $$ R = {2..7} $$
+
+
+ * @note    LCD_CLK should be in range 5-12, with typical value 9 MHz.
+ *
+ * @note    There is an extra divisor in PLLSAIDIVR[1:0] of RCC_DCKCFGR, that can
+ *          have value 2, 4, 8 or 16.
+ *
+ * @note    So the R output must be 18, 36, 72 or 144 MHz.
+ *          But USB, RNG and SDMMC needs 48 MHz. The LCM of 48 and 9 is 144.
+ *
+ * @note   f_LCDCLK  = 9 MHz        PLLSAIRDIV=8
+ *
+ */
+
+static const PLLConfiguration_t  pllsaiconfig  = {
+    .source         = RCC_PLLCFGR_PLLSRC_HSI,
+    .M              = HSE_FREQ/1000,                        // f_IN = 1 MHz
+    .N              = 144,                                  // f_VCO = 144 MHz
+    .P              = 3,                                    // f_P = 48 MHz
+    .Q              = 3,                                    // f_Q = 48 MHz
+    .R              = 2                                     // f_R = 72 MHz
+};
+
 /**
  *
  */
@@ -391,11 +454,13 @@ static int  LCDCLOCK_Initialized = 0;
  *
  * @note    This should be set only when PLLSAI is disabled
  */
-void LCD_SetClock(uint32_t div) {
+static int LCD_SetClock(uint32_t div) {
 uint32_t pllsaidivr;
 
     if( RCC->CR&RCC_CR_PLLSAION )   // Do nothing when PLLSAI is enabled
-        return;
+        return -1;
+
+
 
     pllsaidivr = div;
     switch(div) {
@@ -404,13 +469,14 @@ uint32_t pllsaidivr;
     case 8:  pllsaidivr = 2; break;
     case 16: pllsaidivr = 3; break;
     default:
-        return; // ignore wrong divisor
+        return -2; // ignore wrong divisor
     }
 
     RCC->DCKCFGR1 = (RCC->DCKCFGR1&~RCC_DCKCFGR1_PLLSAIDIVR)
                     |(pllsaidivr<<RCC_DCKCFGR1_PLLSAIDIVR_Pos);
 
     LCDCLOCK_Initialized = 1;
+    return 0;
 }
 
 
@@ -438,12 +504,8 @@ void LCD_Init(void) {
     if( (RCC->CR & RCC_CR_PLLSAIRDY) == 0 )
         return;
 
-#ifdef FAST_INITIALIZATION
-    ConfigurePins();
-#else
-    /* Configure pins from table*/
-    GPIO_ConfigureMultiplePins(configtable);
-#endif
+    /* Configure pins for LCD usage */
+    ConfigureLCDPins();
 
     /* Configure additional pins */
     GPIO_Init(GPIOI,BIT(12),BIT(12));

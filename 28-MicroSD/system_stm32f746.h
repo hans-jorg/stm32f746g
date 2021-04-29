@@ -144,6 +144,14 @@ void SystemInit(void);
 //}
 
 /**
+ * @brief PLL Clock Generator
+ */
+//@{
+#define PLL_MAIN (0)
+#define PLL_SAI  (1)
+#define PLL_I2S  (2)
+///@}
+/**
  * @brief PLL parameters
  */
 
@@ -154,14 +162,41 @@ typedef struct {
     uint32_t    P;
     uint32_t    Q;              /* for other PLL units */
     uint32_t    R;
-    /* filled by CalculatePLLOutFrequencies */
+} PLLConfiguration_t;
+
+/**
+ * @brief PLL frequencies calculated by CalculatePLLOutFrequencies
+ */
+typedef struct {
     uint32_t    infreq;         // = SYSFREQ
     uint32_t    pllinfreq;      // = SYSFREQ/M
     uint32_t    vcofreq;        // = PLLINFREQ*N
     uint32_t    poutfreq;       // = VCOFREQ/P
     uint32_t    qoutfreq;       // = VCOFREQ/Q
     uint32_t    routfreq;       // = VCOFREQ/R
-} PLL_Configuration;
+} PLLOutputFrequencies_t;
+
+/**
+ *  @brief  Main PLL standard configuration for 200 MHz using HSE as clock source
+ */
+extern const PLLConfiguration_t  MainPLLConfiguration_200MHz;
+
+/**
+ *  @brief  Main PLL standard configuration for 216 MHz using HSE as clock source
+ */
+extern const PLLConfiguration_t  MainPLLConfiguration_216MHz;
+
+/**
+ *  @brief  Main PLL standard configuration for maximal frequency (216 MHz)
+ *          using HSE as clock source
+ */
+extern const PLLConfiguration_t  MainPLLConfiguration_Max;
+
+/**
+ *  @brief  SAI PLL standard configuration for 48 MHz frequency (used by USB)
+ *          using HSE as clock source
+ */
+extern const PLLConfiguration_t  PLLSAIConfiguration_48MHz;
 
 /**
  * @note    Additional functions
@@ -192,15 +227,13 @@ uint32_t SystemFindNearestPower2Exp(uint32_t divisor);
 uint32_t SystemFindLargestPower2(uint32_t divisor);
 uint32_t SystemFindLargestPower2Exp(uint32_t divisor);
 
-// Additional PLL routines
-#define PLL_MAIN (0)
-#define PLL_SAI  (1)
-#define PLL_I2S  (2)
 
-void SystemConfigMainPLL(PLL_Configuration *pllconfig);
-void SystemConfigSAIPLL(PLL_Configuration *pllconfig);
-void SystemConfigI2SPLL(PLL_Configuration *pllconfig);
-uint32_t SystemGetPLLConfiguration(uint32_t whichone, PLL_Configuration *pllconfig);
-
+void SystemConfigMainPLL(const PLLConfiguration_t *pllconfig);
+void SystemConfigSAIPLL(const PLLConfiguration_t *pllconfig);
+void SystemConfigI2SPLL(const PLLConfiguration_t *pllconfig);
+int  SystemGetPLLConfiguration(uint32_t whichone, PLLConfiguration_t *pllconfig);
+int  SystemCalcPLLFrequencies(const PLLConfiguration_t *pllconfig, PLLOutputFrequencies_t *pllfreq);
+int  SystemGetPLLFrequencies(uint32_t whichone, PLLOutputFrequencies_t *pllfreq);
+int  SystemCheckPLLConfiguration(const PLLConfiguration_t *pllconfig);
 
 #endif

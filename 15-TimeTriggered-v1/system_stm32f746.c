@@ -19,6 +19,71 @@
 #include "system_stm32f746.h"
 
 
+
+/**
+ *  @brief  Standard configuration for 200 MHz using HSE as clock source
+ */
+const PLLConfiguration_t  MainPLLConfiguration_200MHz = {
+    .source = CLOCKSRC_HSE,
+    .M = HSE_OSCILLATOR_FREQ/1000000,       // f_INT = 1 MHz
+    .N = 400,                               // f_VCO = 400 MHz
+    .P = 2,                                 // f_OUT = 200 MHz
+    .Q = 2,                                 // not used
+    .R = 2                                  // not used
+};
+
+/**
+ *  @brief  Standard configuration for 216 MHz using HSE as clock source
+ */
+const PLLConfiguration_t  MainPLLConfiguration_216MHz = {
+    .source = CLOCKSRC_HSE,
+    .M = HSE_OSCILLATOR_FREQ/1000000,       // f_INT = 1 MHz
+    .N = 432,                               // f_VCO = 432 MHz
+    .P = 2,                                 // f_OUT = 216 MHz
+    .Q = 2,                                 // not used
+    .R = 2                                  // not used
+};
+
+/**
+ *  @brief  Standard configuration for maximal frequency (216 MHz) using HSE as clock source
+ */
+const PLLConfiguration_t  MainPLLConfiguration_Max = {
+    .source = CLOCKSRC_HSE,
+    .M = HSE_OSCILLATOR_FREQ/1000000,       // f_INT = 1 MHz
+    .N = 432,                               // f_VCO = 432 MHz
+    .P = 2,                                 // f_OUT = 216 MHz
+    .Q = 2,                                 // not used
+    .R = 2                                  // not used
+};
+
+/**
+ *  @brief  SAI PLL standard configuration for 48 MHz frequency (used by USB)
+ *          using HSE as clock source
+ *
+ *
+ * @note    Assumes PLL Main will use HSE (crystal) and have a 1 MHz input for PLL
+ *
+ * @note    LCD_CLK should be in range 5-12, with typical value 9 MHz.
+ *
+ * @note    There is an extra divisor in PLLSAIDIVR[1:0] of RCC_DCKCFGR, that can
+ *          have value 2, 4, 8 or 16.
+ *
+ * @note    So the R output must be 18, 36, 72 or 144 MHz.
+ *          But USB, RNG and SDMMC needs 48 MHz. The LCM of 48 and 9 is 144.
+ *
+ *          f_LCDCLK  = 9 MHz        PLLSAIRDIV=8
+ *
+ */
+const PLLConfiguration_t  PLLSAIConfiguration_48MHz = {
+    .source         = RCC_PLLCFGR_PLLSRC_HSI,
+    .M              = HSE_FREQ/1000,                        // f_IN = 1 MHz
+    .N              = 144,                                  // f_VCO = 144 MHz
+    .P              = 3,                                    // f_P = 48 MHz
+    .Q              = 3,                                    // f_Q = 48 MHz
+    .R              = 2                                     // f_R = 72 MHz
+};
+
+
 /**
  *  internal functions
  */
@@ -64,7 +129,7 @@ static const uint32_t ppre_table[] = {
  * @brief   Clock Configuration for 200 MHz
  * @note    It is a power of 2 in range 1 to 16
  */
-static PLL_Configuration ClockConfiguration200MHz = {
+static PLLConfiguration_t ClockConfiguration200MHz = {
     .source = CLOCKSRC_HSE,     /* Clock source = HSE */
     .M = HSE_FREQ/1000000,      /* f_IN = 1 MHz   */
     .N = 400,                   /* f_PLL = 400 MHz*/
@@ -408,7 +473,7 @@ uint32_t p2;
  *          SYSCLK = PLL_VCO / PLL_R
  */
 static uint32_t
-CalculateMainPLLOutFrequency(PLL_Configuration *pllconfig) {
+CalculateMainPLLOutFrequency(const PLLConfiguration_t *pllconfig) {
 uint64_t outfreq,infreq;
 uint32_t clocksource;
 
@@ -438,11 +503,11 @@ uint32_t clocksource;
  *          PLLI2SR = PLLSAIR = OUTR
  *          MAINOUT = PLLCLK = PLLSAIP = OUTP
  */
-static uint32_t
-CalculatePLLOutFrequencies(PLL_Configuration *pllconfig) {
-uint64_t outfreq,infreq;
+int
+SystemCalcPLLFrequencies(const PLLConfiguration_t *pllconfig, PLLOutputFrequencies_t *pllfreq) {
+uint64_t outfreq,infreq,vcofreq;
 uint32_t clocksource;
-
+    
     clocksource = pllconfig->source;
 
     if( clocksource == CLOCKSRC_HSI) {
@@ -452,16 +517,106 @@ uint32_t clocksource;
     } else {
         return 0;
     }
-    // Overflow possible ?
-    if( pllconfig->P )
-        pllconfig->poutfreq  = (infreq*pllconfig->N)/pllconfig->M/pllconfig->P;
-    if( pllconfig->Q )
-        pllconfig->qoutfreq  = (infreq*pllconfig->N)/pllconfig->M/pllconfig->Q;
-    if( pllconfig->R )
-        pllconfig->routfreq  = (infreq*pllconfig->N)/pllconfig->M/pllconfig->R;
+    pllfreq->infreq = infreq;
+    pllfreq->pllinfreq = infreq/pllconfig->M;
+    vcofreq = (infreq*pllconfig->N)/pllconfig->M;
+    pllfreq->vcofreq = vcofreq;
 
-    return (uint32_t) pllconfig->poutfreq;
+    pllfreq->poutfreq = 0;
+    pllfreq->qoutfreq = 0;
+    pllfreq->routfreq = 0;
+    if( pllconfig->P )
+        pllfreq->poutfreq  = vcofreq/pllconfig->P;
+    if( pllconfig->Q )
+        pllfreq->qoutfreq  = vcofreq/pllconfig->Q;
+    if( pllconfig->R )
+        pllfreq->routfreq  = vcofreq/pllconfig->R;
+
+    return (uint32_t) pllfreq->poutfreq;
 }
+
+/**
+ * @brief   SystemGetPLLConfiguration
+ *
+ * @note    Fill the struct apointed by pllconfig with the PLL parameters
+ */
+int  SystemGetPLLConfiguration(uint32_t whichone, PLLConfiguration_t *pllconfig) {
+
+    /* Common to all */
+    if( RCC->PLLCFGR&RCC_PLLCFGR_PLLSRC )
+        pllconfig->source = CLOCKSRC_HSE;
+    else
+        pllconfig->source = CLOCKSRC_HSI;
+    pllconfig->M = (RCC->PLLCFGR&RCC_PLLCFGR_PLLM_Msk)>>RCC_PLLCFGR_PLLM_Pos;
+
+    switch(whichone) {
+    case PLL_MAIN:
+        pllconfig->N = (RCC->PLLCFGR&RCC_PLLCFGR_PLLN_Msk)>>RCC_PLLCFGR_PLLN_Pos;
+        pllconfig->P = (RCC->PLLCFGR&RCC_PLLCFGR_PLLP_Msk)>>RCC_PLLCFGR_PLLP_Pos;
+        pllconfig->Q = (RCC->PLLCFGR&RCC_PLLCFGR_PLLP_Msk)>>RCC_PLLCFGR_PLLQ_Pos;
+        pllconfig->R = 0;
+        break;
+    case PLL_SAI:
+        pllconfig->N = (RCC->PLLSAICFGR&RCC_PLLSAICFGR_PLLSAIN_Msk)>>RCC_PLLSAICFGR_PLLSAIN_Pos;
+        pllconfig->P = (RCC->PLLSAICFGR&RCC_PLLSAICFGR_PLLSAIP_Msk)>>RCC_PLLSAICFGR_PLLSAIP_Pos;
+        pllconfig->Q = (RCC->PLLSAICFGR&RCC_PLLSAICFGR_PLLSAIR_Msk)>>RCC_PLLSAICFGR_PLLSAIQ_Pos;
+        pllconfig->R = (RCC->PLLSAICFGR&RCC_PLLSAICFGR_PLLSAIR_Msk)>>RCC_PLLSAICFGR_PLLSAIR_Pos;
+        break;
+    case PLL_I2S:
+        pllconfig->N = (RCC->PLLI2SCFGR&RCC_PLLI2SCFGR_PLLI2SN_Msk)>>RCC_PLLI2SCFGR_PLLI2SN_Pos;
+        pllconfig->P = (RCC->PLLI2SCFGR&RCC_PLLI2SCFGR_PLLI2SP_Msk)>>RCC_PLLI2SCFGR_PLLI2SP_Pos;
+        pllconfig->Q = (RCC->PLLI2SCFGR&RCC_PLLI2SCFGR_PLLI2SR_Msk)>>RCC_PLLI2SCFGR_PLLI2SQ_Pos;
+        pllconfig->R = (RCC->PLLI2SCFGR&RCC_PLLI2SCFGR_PLLI2SR_Msk)>>RCC_PLLI2SCFGR_PLLI2SR_Pos;
+        break;
+    }
+    /* Correct P divisor because it is encoded as 0, 1, 2 and 3 */
+    pllconfig->P = (pllconfig->P)*2+2;
+
+    return 0;
+}
+
+/**
+ * @brief   SystemGetPLLFrequencies
+ *
+ * @note    Fill the struct apointed by pllfreq with corresponding frequencies
+ */
+int  SystemGetPLLFrequencies(uint32_t whichone, PLLOutputFrequencies_t *pllfreq) {
+PLLConfiguration_t pllconfig;
+
+    SystemGetPLLConfiguration(whichone,&pllconfig);
+    SystemCalcPLLFrequencies(&pllconfig,pllfreq);
+
+    return 0;
+}
+
+/**
+ * @brief   SystemCheckPLLConfiguration
+ *
+ * @note    returns 0 if configuration is OK
+ *
+ * @note    Since there is no R in the Main PLL Clock generator, a zero value is accepted
+ *
+ */
+int  SystemCheckPLLConfiguration(const PLLConfiguration_t *pllconfig) {
+
+    if( pllconfig->M < 2 || pllconfig->M > 63 )
+        return -1;
+
+    if( pllconfig->N < 50 || pllconfig->M > 432 )
+        return -2;
+
+    if( (pllconfig->P!=2) && (pllconfig->P!=4) && (pllconfig->P!=6) && (pllconfig->P!=8) )
+        return -3;
+
+    if( pllconfig->Q < 2 || pllconfig->Q > 15 )
+        return -4;
+
+    if( pllconfig->R && (pllconfig->R < 2 || pllconfig->R > 7) )
+        return -4;
+
+    return 0;
+}
+
 
 /**
  * @brief   SystemGetSYSCLKFrequency
@@ -475,7 +630,7 @@ uint32_t src;
 uint32_t sysclk_freq;
 uint32_t base_freq;
 uint32_t pllsrc;
-PLL_Configuration pllconfig;
+PLLConfiguration_t pllconfig;
 
     rcc_cr = RCC->CR;
     rcc_cfgr = RCC->CFGR;
@@ -632,7 +787,7 @@ uint32_t k;
  */
 
 void
-SystemConfigMainPLL(PLL_Configuration *pllconfig) {
+SystemConfigMainPLL(const PLLConfiguration_t *pllconfig) {
 uint32_t freq,src;
 uint32_t rcc_pllcfgr;
 uint32_t clocksource;
@@ -697,7 +852,7 @@ uint32_t clocksource;
  */
 
 void
-SystemConfigSAIPLL(PLL_Configuration *pllconfig) {
+SystemConfigSAIPLL(const PLLConfiguration_t *pllconfig) {
 uint32_t freq,src;
 uint32_t rcc_pllsaicfgr;
 uint32_t clocksource;
@@ -744,7 +899,7 @@ uint32_t clocksource;
  */
 
 void
-SystemConfigI2SPLL(PLL_Configuration *pllconfig) {
+SystemConfigI2SPLL(const PLLConfiguration_t *pllconfig) {
 uint32_t freq,src;
 uint32_t rcc_plli2scfgr;
 uint32_t clocksource;
@@ -888,7 +1043,7 @@ uint32_t ppre2;
  *          frequency.
   */
 uint32_t SystemSetCoreClockFrequency(uint32_t freq) {
-PLL_Configuration clockconf;
+PLLConfiguration_t clockconf;
 
     if( freq >= HCLKMAX ) {
         freq = HCLKMAX;
@@ -1074,6 +1229,8 @@ SystemInit(void) {
     /* Additional initialization here */
 
 }
+
+
 
 
 

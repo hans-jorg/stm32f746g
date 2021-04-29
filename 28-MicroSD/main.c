@@ -51,48 +51,6 @@ void Delay(uint32_t delay) {
 }
 
 
-/*
- * @brief   Configuration for Main PLL
- *
- * @note    PLL Main will use HSE (crystal) and uses a 1 MHz input for PLL
- */
-
-static PLL_Configuration Clock200MHz = {
-    .source = CLOCKSRC_HSE,
-    .M = HSE_OSCILLATOR_FREQ/1000000,       // f_INT = 1 MHz
-    .N = 400,                               // f_VCO = 400 MHz
-    .P = 2,                                 // f_OUT = 200 MHz
-    .Q = 2,                                 // not used
-    .R = 2                                  // not used
-};
-
-/*
- * @brief   Configuration for PLLSAI
- *
- * @note    Assumes PLL Main will use HSE (crystal) and have a 1 MHz input for PLL
- *
- * @note    LCD_CLK should be in range 5-12, with typical value 9 MHz.
- *
- * @note    There is an extra divisor in PLLSAIDIVR[1:0] of RCC_DCKCFGR, that can
- *          have value 2, 4, 8 or 16.
- *
- * @note    So the R output must be 18, 36, 72 or 144 MHz.
- *          But USB, RNG and SDMMC needs 48 MHz. The LCM of 48 and 9 is 144.
- *
- *          f_LCDCLK  = 9 MHz        PLLSAIRDIV=8
- *
- */
-
-PLL_Configuration  pllsaiconfig  = {
-    .source         = RCC_PLLCFGR_PLLSRC_HSI,
-    .M              = HSE_FREQ/1000,                        // f_IN = 1 MHz
-    .N              = 144,                                  // f_VCO = 144 MHz
-    .P              = 3,                                    // f_P = 48 MHz
-    .Q              = 3,                                    // f_Q = 48 MHz
-    .R              = 2                                     // f_R = 72 MHz
-};
-
-
 /**
  * @brief   main
  *
@@ -102,7 +60,7 @@ PLL_Configuration  pllsaiconfig  = {
 int main(void) {
 
     /* Set Clock to 200 MHz */
-    SystemConfigMainPLL(&Clock200MHz);
+    SystemConfigMainPLL(&MainPLLConfiguration_200MHz);
     SystemSetCoreClock(CLOCKSRC_PLL,1);
 
 
@@ -110,10 +68,7 @@ int main(void) {
 
     printf("Starting....\n");
 
-    /* WTF */
-    RCC->DCKCFGR1 = (RCC->DCKCFGR1&~RCC_DCKCFGR1_PLLSAIDIVR)|(8<<RCC_DCKCFGR1_PLLSAIDIVR_Pos);
-
-    SystemConfigSAIPLL(&pllsaiconfig);
+    SystemConfigSAIPLL(&PLLSAIConfiguration_48MHz);
 
 
     /*

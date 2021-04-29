@@ -49,15 +49,6 @@ void Delay(uint32_t delay) {
 
 }
 
-static PLL_Configuration Clock200MHz = {
-    .source = CLOCKSRC_HSE,
-    .M = HSE_OSCILLATOR_FREQ/1000000,       // f_INT = 1 MHz
-    .N = 400,                               // f_VCO = 400 MHz
-    .P = 2,                                 // f_OUT = 200 MHz
-    .Q = 2,                                 // not used
-    .R = 2                                  // not used
-};
-
 
 static const uint32_t uartconfig =  UART_NOPARITY | UART_8BITS | UART_STOP_2 |
                                     UART_BAUD_9600;
@@ -150,13 +141,9 @@ uint32_t v;
 Uid u;
 uint32_t ramused,flashused;
 
-#if 1
-    /* configure clock to 200 MHz */
+    SystemConfigMainPLL(&MainPLLConfiguration_200MHz);
     SystemSetCoreClock(CLOCKSRC_PLL,1);
-#else
-    SystemConfigMainPLL(&Clock200MHz);
-    SystemSetCoreClock(CLOCKSRC_PLL,1);
-#endif
+
     SysTick_Config(SystemCoreClock/1000);
 
     LED_Init();

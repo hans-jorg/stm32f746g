@@ -21,23 +21,6 @@
 #include "buddy.h"
 
 
-
-/*
- * @brief   Configuration for Main PLL
- *
- * @note    PLL Main will use HSE (crystal) and uses a 1 MHz input for PLL
- */
-
-static PLL_Configuration Clock200MHz = {
-    .source = CLOCKSRC_HSE,
-    .M = HSE_OSCILLATOR_FREQ/1000000,       // f_INT = 1 MHz
-    .N = 400,                               // f_VCO = 400 MHz
-    .P = 2,                                 // f_OUT = 200 MHz
-    .Q = 2,                                 // not used
-    .R = 2                                  // not used
-};
-
-
 static volatile uint32_t tick_ms = 0;
 static volatile uint32_t delay_ms = 0;
 static int led_initialized = 0;
@@ -141,7 +124,7 @@ int ninfo = 0;
     printf("Starting.at %ld KHz...\n",SystemCoreClock/1000);
 
     /* Set Clock to 200 MHz */
-    SystemConfigMainPLL(&Clock200MHz);
+    SystemConfigMainPLL(&MainPLLConfiguration_200MHz);
     SystemSetCoreClock(CLOCKSRC_PLL,1);
 
     printf("Now running at %ld KHz...\n",SystemCoreClock/1000);

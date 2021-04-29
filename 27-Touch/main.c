@@ -20,33 +20,6 @@
 
 #define OPERATING_FREQUENCY (200000000)
 
-/*
- * @brief   Configuration for PLLSAI
- *
- * @note    Assumes PLL Main will use HSE (crystal) and have a 1 MHz input for PLL
- *
- * @note    LCD_CLK should be in range 5-12, with typical value 9 MHz.
- *
- * @note    There is an extra divisor in PLLSAIDIVR[1:0] of RCC_DCKCFGR, that can
- *          have value 2, 4, 8 or 16.
- *
- * @note    So the R output must be 18, 36, 72 or 144 MHz.
- *          But USB, RNG and SDMMC needs 48 MHz. The LCM of 48 and 9 is 144.
- *
- *          f_LCDCLK  = 9 MHz        PLLSAIRDIV=8
- *
- */
-
-PLL_Configuration  pllsaiconfig  = {
-    .source         = RCC_PLLCFGR_PLLSRC_HSI,
-    .M              = HSE_FREQ/1000,                        // f_IN = 1 MHz
-    .N              = 144,                                  // f_VCO = 144 MHz
-    .P              = 3,                                    // f_P = 48 MHz
-    .Q              = 3,                                    // f_Q = 48 MHz
-    .R              = 2                                     // f_R = 72 MHz
-};
-
-
 /**
  * @brief   Quick and dirty delay routine
  *
@@ -87,7 +60,7 @@ int main(void) {
 
     LCD_SetClock(8);
 
-    SystemConfigSAIPLL(&pllsaiconfig);
+    SystemConfigSAIPLL(&PLLSAIConfiguration_48MHz);
 
     LCD_Init();
 

@@ -50,16 +50,6 @@ void Delay(uint32_t delay) {
 
 }
 
-static PLL_Configuration Clock200MHz = {
-    .source = CLOCKSRC_HSE,
-    .M = HSE_OSCILLATOR_FREQ/1000000,       // f_INT = 1 MHz
-    .N = 400,                               // f_VCO = 400 MHz
-    .P = 2,                                 // f_OUT = 200 MHz
-    .Q = 2,                                 // not used
-    .R = 2                                  // not used
-};
-
-
 /**
  * @brief   Linker information
  */

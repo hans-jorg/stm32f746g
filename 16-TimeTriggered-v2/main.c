@@ -32,30 +32,6 @@ void SysTick_Handler(void) {
     tick_ms++;
 }
 
-/**
- * @brief   PLL Configuration for 200 MHz
- */
-
-static PLL_Configuration Clock216MHz = {
-    .source = CLOCKSRC_HSE,
-    .M = HSE_OSCILLATOR_FREQ/1000000,       // f_INT = 1 MHz
-    .N = 432,                               // f_VCO = 432 MHz
-    .P = 2,                                 // f_OUT = 216 MHz
-    .Q = 2,                                 // not used
-    .R = 2                                  // not used
-};
-
-static PLL_Configuration Clock200MHz = {
-    .source = CLOCKSRC_HSE,
-    .M = HSE_OSCILLATOR_FREQ/1000000,       // f_INT = 1 MHz
-    .N = 400,                               // f_VCO = 400 MHz
-    .P = 2,                                 // f_OUT = 200 MHz
-    .Q = 2,                                 // not used
-    .R = 2                                  // not used
-};
-
-
-
 void Blink(void) {
     if( blinking )
         LED_Toggle();
@@ -76,7 +52,7 @@ int taskno_blink;
     //SystemSetCoreClock(CLOCKSRC_HSE,100);
 
     /* configure clock to 200 MHz */
-    SystemConfigMainPLL(&Clock200MHz);
+    SystemConfigMainPLL(&MainPLLConfiguration_200MHz);
     SystemSetCoreClock(CLOCKSRC_PLL,1);
 
     SysTick_Config(SystemCoreClock/1000);
