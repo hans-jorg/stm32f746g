@@ -171,82 +171,6 @@ static inline int iabs(int k) { return k<0?-k:k; }
 
 
 /**
- * @brief HSE Clock Enable/Disable
- *
- * @note    Do not disable it, if it drives the core
- **/
-///@{
-static inline void EnableHSE(void) {
-#ifdef HSE_EXTERNAL_OSCILLATOR
-    RCC->CR |= RCC_CR_HSEON|RCC_CR_HSEBYP;
-#else
-    RCC->CR |= RCC_CR_HSEON;
-#endif
-    while( (RCC->CR&RCC_CR_HSERDY) == 0 ) {}
-}
-
-static inline void DisableHSE(void) {
-    RCC->CR &= ~(RCC_CR_HSEON|RCC_CR_HSEBYP);
-}
-///@}
-
-/**
- * @brief HSI Clock Enable/Disable
- *
- * @note    Do not disable it, if it drives the core
- **/
-///@{
-static inline void EnableHSI(void) {
-    RCC->CR |= RCC_CR_HSION;
-    while( (RCC->CR&RCC_CR_HSIRDY) == 0 ) {}
-}
-
-static inline void DisableHSI(void) {
-    RCC->CR &= ~(RCC_CR_HSION);
-}
-///@}
-
-/**
- * @brief   Main PLL Disable
- *
- * @note    Do not disable it, if it drives the core
- **/
-///@{
-static inline void EnableMainPLL(void) {
-
-    RCC->CR |= RCC_CR_PLLON;
-
-    // Wait until it stabilizes
-    while( (RCC->CR&RCC_CR_PLLRDY)!=RCC_CR_PLLRDY ) {}
-}
-static inline void DisableMainPLL(void) {
-
-    RCC->CR &= ~RCC_CR_PLLON;
-
-}
-///@}
-
-
-/**
- * @brief LSE Clock Enable/Disable
- **/
-///@{
-static inline void EnableLSE(void) {
-#ifdef LSE_EXTERNAL_OSCILLATOR
-    RCC->BDCR |= RCC_BDCR_LSEON|RCC_BDCR_LSEBYP;
-#else
-    RCC->BDCR |= RCC_BDCR_LSEON;
-#endif
-    while( (RCC->CR&RCC_BDCR_LSERDY) == 0 ) {}
-}
-
-static inline void DisableLSE(void) {
-    RCC->BDCR &= ~(RCC_BDCR_LSEON|RCC_BDCR_LSEBYP);
-}
-///@}
-
-
-/**
  * @brief   UnlockFlashRegisters
  **/
 static inline void UnlockFlashRegisters(void) {
@@ -796,21 +720,21 @@ uint32_t clocksource;
 
     // If core clock source is PLL change it to HSI
     if( (RCC->CFGR&RCC_CFGR_SWS) == RCC_CFGR_SWS_PLL ) {
-        EnableHSI();
+        SystemEnableHSI();
         RCC->CFGR = (RCC->CFGR&RCC_CFGR_SW)|RCC_CFGR_SW_HSI;
     }
     // Disable Main PLL
-    DisableMainPLL();
+    SystemDisableMainPLL();
 
     // Configure it
     switch(clocksource) {
     case CLOCKSRC_HSI:
-        EnableHSI();
+        SystemEnableHSI();
         freq = HSI_FREQ;
         src  = RCC_CFGR_SW_HSI;
         break;
     case CLOCKSRC_HSE:
-        EnableHSE();
+        SystemEnableHSE();
         freq = HSE_FREQ;
         src  = RCC_CFGR_SW_HSE;
         break;
@@ -838,7 +762,7 @@ uint32_t clocksource;
 
     RCC->PLLCFGR = rcc_pllcfgr;
 
-    EnableMainPLL();
+    SystemEnableMainPLL();
 
     MainPLLConfigured = 1;
 }
@@ -852,7 +776,7 @@ uint32_t clocksource;
  */
 
 void
-SystemConfigSAIPLL(const PLLConfiguration_t *pllconfig) {
+SystemConfigPLLSAI(const PLLConfiguration_t *pllconfig) {
 uint32_t freq,src;
 uint32_t rcc_pllsaicfgr;
 uint32_t clocksource;
@@ -899,7 +823,7 @@ uint32_t clocksource;
  */
 
 void
-SystemConfigI2SPLL(const PLLConfiguration_t *pllconfig) {
+SystemConfigPLLI2S(const PLLConfiguration_t *pllconfig) {
 uint32_t freq,src;
 uint32_t rcc_plli2scfgr;
 uint32_t clocksource;
@@ -1006,11 +930,11 @@ uint32_t ppre2;
         // Change clock source
         switch(newsrc) {
         case CLOCKSRC_HSI:
-            EnableHSI();
+            SystemEnableHSI();
             RCC->CFGR = (RCC->CFGR&~RCC_CFGR_SW)|RCC_CFGR_SW_HSI;
             break;
         case CLOCKSRC_HSE:
-            EnableHSE();
+            SystemEnableHSE();
             RCC->CFGR = (RCC->CFGR&~RCC_CFGR_SW)|RCC_CFGR_SW_HSE;
             break;
         case CLOCKSRC_PLL:
@@ -1198,7 +1122,7 @@ SystemInit(void) {
     RCC->CIR = 0x00000000;
 
     /* Enable HSE but do not switch to it */
-    EnableHSE();
+    SystemEnableHSE();
 
 
     // Enable Peripheral Clocks

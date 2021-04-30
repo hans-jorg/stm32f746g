@@ -229,11 +229,122 @@ uint32_t SystemFindLargestPower2Exp(uint32_t divisor);
 
 
 void SystemConfigMainPLL(const PLLConfiguration_t *pllconfig);
-void SystemConfigSAIPLL(const PLLConfiguration_t *pllconfig);
-void SystemConfigI2SPLL(const PLLConfiguration_t *pllconfig);
+void SystemConfigPLLSAI(const PLLConfiguration_t *pllconfig);
+void SystemConfigPLLI2S(const PLLConfiguration_t *pllconfig);
 int  SystemGetPLLConfiguration(uint32_t whichone, PLLConfiguration_t *pllconfig);
 int  SystemCalcPLLFrequencies(const PLLConfiguration_t *pllconfig, PLLOutputFrequencies_t *pllfreq);
 int  SystemGetPLLFrequencies(uint32_t whichone, PLLOutputFrequencies_t *pllfreq);
 int  SystemCheckPLLConfiguration(const PLLConfiguration_t *pllconfig);
+
+/**
+ * @brief   Main PLL Enable/Disable
+ *
+ * @note    Do not disable it, if it drives the core
+ **/
+///@{
+static inline void SystemEnableMainPLL(void) {
+
+    RCC->CR |= RCC_CR_PLLON;
+
+    // Wait until it stabilizes
+    while( (RCC->CR&RCC_CR_PLLRDY)!=RCC_CR_PLLRDY ) {}
+}
+static inline void SystemDisableMainPLL(void) {
+
+    RCC->CR &= ~RCC_CR_PLLON;
+
+}
+///@}
+
+/**
+ * @brief   PLL SAI Enable/Disable
+ */
+///@{
+static inline void SystemEnablePLLSAI(void) {
+
+    RCC->CR |= RCC_CR_PLLSAION;
+
+    // Wait until it stabilizes
+    while( (RCC->CR&RCC_CR_PLLSAIRDY)!=RCC_CR_PLLSAIRDY ) {}
+}
+static inline void SystemDisablePLLSAI(void) {
+
+    RCC->CR &= ~RCC_CR_PLLSAION;
+
+}
+///@}
+
+/**
+ * @brief   PLL SAI Enable/Disable
+ */
+///@{
+static inline void SystemEnablePLLI2S(void) {
+
+    RCC->CR |= RCC_CR_PLLI2SON;
+
+    // Wait until it stabilizes
+    while( (RCC->CR&RCC_CR_PLLI2SRDY)!=RCC_CR_PLLI2SRDY ) {}
+}
+static inline void SystemDisablePLLI2S(void) {
+
+    RCC->CR &= ~RCC_CR_PLLI2SON;
+
+}
+///@}
+
+
+/**
+ * @brief HSE Clock Enable/Disable
+ *
+ * @note    Do not disable it, if it drives the core
+ **/
+///@{
+static inline void SystemEnableHSE(void) {
+#ifdef HSE_EXTERNAL_OSCILLATOR
+    RCC->CR |= RCC_CR_HSEON|RCC_CR_HSEBYP;
+#else
+    RCC->CR |= RCC_CR_HSEON;
+#endif
+    while( (RCC->CR&RCC_CR_HSERDY) == 0 ) {}
+}
+
+static inline void SystemDisableHSE(void) {
+    RCC->CR &= ~(RCC_CR_HSEON|RCC_CR_HSEBYP);
+}
+///@}
+
+/**
+ * @brief HSI Clock Enable/Disable
+ *
+ * @note    Do not disable it, if it drives the core
+ **/
+///@{
+static inline void SystemEnableHSI(void) {
+    RCC->CR |= RCC_CR_HSION;
+    while( (RCC->CR&RCC_CR_HSIRDY) == 0 ) {}
+}
+
+static inline void SystemDisableHSI(void) {
+    RCC->CR &= ~(RCC_CR_HSION);
+}
+///@}
+
+/**
+ * @brief LSE Clock Enable/Disable
+ **/
+///@{
+static inline void SystemEnableLSE(void) {
+#ifdef LSE_EXTERNAL_OSCILLATOR
+    RCC->BDCR |= RCC_BDCR_LSEON|RCC_BDCR_LSEBYP;
+#else
+    RCC->BDCR |= RCC_BDCR_LSEON;
+#endif
+    while( (RCC->CR&RCC_BDCR_LSERDY) == 0 ) {}
+}
+
+static inline void SystemDisableLSE(void) {
+    RCC->BDCR &= ~(RCC_BDCR_LSEON|RCC_BDCR_LSEBYP);
+}
+///@}
 
 #endif
