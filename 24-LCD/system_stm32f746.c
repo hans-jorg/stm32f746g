@@ -768,7 +768,7 @@ uint32_t clocksource;
 }
 
 /**
- * @brief   SystemConfigSAIPLL
+ * @brief   SystemConfigPLLSAI
  *
  * @note    Configure SAI PLL unit
  *
@@ -815,7 +815,7 @@ uint32_t clocksource;
 }
 
 /**
- * @brief   SystemConfigSAIPLL
+ * @brief   SystemConfigPLLSAI
  *
  * @note    Configure SAI PLL unit
  *

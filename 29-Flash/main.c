@@ -68,7 +68,7 @@ int main(void) {
 
     printf("Starting....\n");
 
-    SystemConfigSAIPLL(&PLLSAIConfiguration_48MHz);
+    SystemConfigPLLSAI(&PLLSAIConfiguration_48MHz);
 
 
     /*

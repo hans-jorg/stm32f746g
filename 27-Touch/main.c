@@ -60,7 +60,7 @@ int main(void) {
 
     LCD_SetClock(8);
 
-    SystemConfigSAIPLL(&PLLSAIConfiguration_48MHz);
+    SystemConfigPLLSAI(&PLLSAIConfiguration_48MHz);
 
     LCD_Init();
 
