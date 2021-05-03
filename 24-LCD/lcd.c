@@ -7,12 +7,67 @@
 
 #include "stm32f746xx.h"
 #include "system_stm32f746.h"
-#include "gpio.h"
 #include "lcd.h"
 
 
-#define BIT(N) (1U<<(N))
+#define BIT(N)          (1U<<(N))
+#define RGB(R,G,B)      ((((uint32_t)(B))<<16)|(((uint32_t)(G))<<8)|(((uint32_t)(R))))
 
+
+/**
+ *  @brief  Default values
+ */
+///@{
+#define BACKGROUND_COLOR        RGB(255,0,0)
+
+
+///@}
+
+/*
+ * @brief   LCD Connection
+ *
+ * LCD signal   | Board signal      | MCU signal             |
+ *--------------|-------------------|------------------------|
+ *  CLK         | LCD_CLK           | PI14                   |
+ *  LCD_R       | LCD_R0-7          | PI15 PJ0-6             |
+ *  LCD_G       | LCD_G0-7          | PJ7-11 PK0-2           |
+ *  LCD_B       | LCD_B0-7          | PE4 PJ13-15 PG12 PK4-6 |
+ *  HSYNC       | LCD_HSYNC         | PI10                   |
+ *  VSYNC       | LCD_VSYNC         | PI9                    |
+ *  DE          | LCD_DE            | PK7                    |
+ *  SCL         | LCD_SCL           | PH7                    |
+ *  SDA         | LCD_SDA           | PH8                    |
+ *  RST         | LCD_RST/NRST      | NRST                   |
+ *  INT         | LCD_INT           | PI13                   |
+ *  DISP        | LCD_DISP          | PI12                   |
+ *  Backlight   | LCD_BL_CTRL       | PK3                    |
+ *
+ * @note I2CX signals (LCD_SCL and LCD_SDA) are shared with an audio device
+ *
+ * @note LCD_BL_CTRL, LCD_DISP, LCD_INT, LCD_RST are not controlled by the LCD
+ *       interface
+ */
+
+/*
+ * @brief   Mask for LCD signals
+ *
+ * @note    LCD_BACKLIGHTCTRL  controls the enable pin of the STLD40DPUR (hite LED power
+ *          supply for large display backlight)
+ *
+ * @note    LCD_DISP controls normal operation (1) or stand-by (0)
+ *
+ * @note    LCD_INT interrupts the MCU
+ *
+ */
+/** On port K */
+///@{
+#define LCD_BACKLIGHTCTRL_MASK  BIT(3)
+///@}
+/** On port I */
+///@{
+#define LCD_INTERRUPT_MASK      BIT(13)
+#define LCD_NORMALSTANDBY_MASK  BIT(12)
+///@}
 
 /**
  *  @brief  Characteristics of the LCD interface
@@ -29,6 +84,14 @@
  *        it is 1 MHz, obtained by dividing the 25 MHz clock input by M=25, set in the
  *        field PLLM of the RCC_PLLCFGR register.
  */
+
+/**
+ * @brief   Point to base address of LTDC Layer registers
+ *
+ * @note    Extra Layer2 at 0 to make possible to use integer 1 and 2 to represent
+ *          the layer. An extra benefit is that 0 can be used as an index too.
+ */
+static LTDC_Layer_TypeDef *LTDC_Layer[3] = {LTDC_Layer2, LTDC_Layer1, LTDC_Layer2};
 /**
  * @brief   Characteristics of the LCD display
  *
@@ -50,53 +113,82 @@
  *   VSYNC pulse width    |    1  |   10  |       | HSYNC Period
  */
 
+/**
+ * @brief   Struct to store information about display
+ */
+typedef struct {
+    uint32_t    frequency;          /// LCD frequency
+    uint16_t    divider;            /// divider to be used ??
+    uint16_t    width;              /// Visible width
+    uint16_t    height;             /// Visible height
+    uint16_t    hsync;              /// Horizontal synchronization
+    uint16_t    vsync;              /// Vertical synchronization (unit is HSYNC Period)
+    uint16_t    hfp;                /// Horizontal front porch (unit is LCD_CLK Period)
+    uint16_t    hbp;                /// Horizontal back porch  (unit is LCD_CLK Period)
+    uint16_t    vfp;                /// Vertical front porch (unit is HSYNC Period)
+    uint16_t    vbp;                /// Vertical back porch (unit is HSYNC Period)
+    uint16_t    pitch[5];           /// Pitch used to store lines in memory (in bytes)
+                                    /// For 1,2,3,4 bytes (Position 0 not used)
 
-/* Units are DCLK = LCD_CLK Periods */
-#define HSW             2
-#define HBP            40
-#define HFP             8
-#define HAW           480
-
-/* Units are HSYNC Periods */
-#define VSW             2
-#define VBP            12
-#define VFP             4
-#define VAH           272
-
-#define  RK043FN48H_WIDTH    ((uint16_t)480)          /* LCD PIXEL WIDTH            */
-#define  RK043FN48H_HEIGHT   ((uint16_t)272)          /* LCD PIXEL HEIGHT           */
+} DisplayProperties_t;
 
 /**
-  * @brief  RK043FN48H Timing
+  * @brief  RK043FN48H properties
   */
-#define  RK043FN48H_HSYNC            ((uint16_t)41)   /* Horizontal synchronization */
-#define  RK043FN48H_HBP              ((uint16_t)13)   /* Horizontal back porch      */
-#define  RK043FN48H_HFP              ((uint16_t)32)   /* Horizontal front porch     */
-#define  RK043FN48H_VSYNC            ((uint16_t)10)   /* Vertical synchronization   */
-#define  RK043FN48H_VBP              ((uint16_t)2)    /* Vertical back porch        */
-#define  RK043FN48H_VFP              ((uint16_t)2)    /* Vertical front porch       */
 
-#define  RK043FN48H_FREQUENCY_DIVIDER    5            /* LCD Frequency divider      */
-
-
+const DisplayProperties_t dispRK043 = {
+    .frequency  =   9000000,        // range [5..12] MHz
+    .divider    =   5,              //
+    .width      =   480,            //
+    .height     =   272,            //
+    .hsync      =   41,             //
+    .vsync      =   10,             //
+    .hfp        =   32,             // or 8
+    .hbp        =   13,             // or 40
+    .vfp        =   2,              // or 4
+    .vbp        =   2,              // or 12
+    .pitch      = { 0,              // Position not used!!!!
+                    512,            // L8 and other 1 byte representation
+                    1024,           // RGB565 and other 2 bytes representation
+                    1536,           // RGB888 (3 bytes)
+                    2048 },         // for ARGB8888 (4 bytes)
+};
 
 /**
- * @brief   LCD Connection
+ * @brief Pointer to current display
  *
- * LCD signal   | Board signal      | MCU signal             |
- *--------------|-------------------|------------------------|
- *  CLK         | LCD_CLK           | PI14                   |
- *  LCD_R       | LCD_R0-7          | PI15 PJ0-6             |
- *  LCD_G       | LCD_G0-7          | PJ7-11 PK0-2           |
- *  LCD_B       | LCD_B0-7          | PE4 PJ13-15 PG12 PK4-6 |
- *  HSYNC       | LCD_HSYNC         | PI10                   |
- *  VSYNC       | LCD_VSYNC         | PI9                    |
- *  DE          | LCD_DE            | PK7                    |
- *  INT         | LCD_INT           | PI13                   |
- *  SCL         | LCD_SCL           | PH7                    |
- *  SDA         | LCD_SDA           | PH8                    |
- *  SDA         | LCD_RST/NRST      | NRST                   |
- *
+ * @note  For now, only one
+ */
+const DisplayProperties_t *display = &dispRK043;
+
+/**
+ * @brief Symbols to make it easier to write complex expressions
+ */
+///@{
+#define LCD_FREQ   (display->frequency)
+#define HSW     (2)
+#define HAW     (display->width)
+#define HFP     (display->hfp)
+#define HBP     (display->hbp)
+#define VSW     (2)
+#define VAH     (display->height)
+#define VBP     (display->vbp)
+#define VFP     (display->vfp)
+///@}
+
+static const int pixelsize[] = {
+        4,  // 000: ARGB8888
+        3,  // 001: RGB888
+        2,  // 010: RGB565
+        2,  // 011: ARGB1555
+        2,  // 100: ARGB4444
+        1,  // 101: L8 (8-bit luminance)
+        1,  // 110: AL44 (4-bit alpha, 4-bit luminance)
+        1   // 111: AL88 (8-bit alpha, 8-bit luminance)
+};
+
+/**
+ *  @brief Pin Configuration for LCD
  *
  * Alternate Functions.(Table 12 of datasheet)
  *
@@ -144,7 +236,61 @@
  *  LCD_BL_CTRL  | GPIO   | K3     |  Backlight PWM
  */
 
-#ifdef FAST_INITIALIZATION
+#ifdef LCD_USEGPIO
+
+#include "gpio.h"
+
+static const GPIO_PinConfiguration configtable[] = {
+    { GPIOI,    14,    14, 2, 0, 3, 0, 0 },        // LCD_CLK
+    { GPIOI,     9,    14, 2, 0, 3, 0, 0 },       // LCD_VSYNC
+    { GPIOI,    10,    14, 2, 0, 3, 0, 0 },       // LCD_HSYNC
+    { GPIOK,     7,    14, 2, 0, 3, 0, 0 },       // LCD_DE
+// Red
+    { GPIOI,    15,    14, 2, 0, 3, 0, 0 },       // LCD_R0
+    { GPIOJ,     0,    14, 2, 0, 3, 0, 0 },       // LCD_R1
+    { GPIOJ,     1,    14, 2, 0, 3, 0, 0 },       // LCD_R2
+    { GPIOJ,     2,    14, 2, 0, 3, 0, 0 },       // LCD_R3
+    { GPIOJ,     3,    14, 2, 0, 3, 0, 0 },       // LCD_R4
+    { GPIOJ,     4,    14, 2, 0, 3, 0, 0 },       // LCD_R5
+    { GPIOJ,     5,    14, 2, 0, 3, 0, 0 },       // LCD_R6
+    { GPIOJ,     6,    14, 2, 0, 3, 0, 0 },       // LCD_R7
+// Green
+    { GPIOJ,     7,    14, 2, 0, 3, 0, 0 },       // LCD_G0
+    { GPIOJ,     8,    14, 2, 0, 3, 0, 0 },       // LCD_G1
+    { GPIOJ,     9,    14, 2, 0, 3, 0, 0 },       // LCD_G2
+    { GPIOJ,    10,    14, 2, 0, 3, 0, 0 },       // LCD_G3
+    { GPIOJ,    11,    14, 2, 0, 3, 0, 0 },       // LCD_G4
+    { GPIOK,     0,    14, 2, 0, 3, 0, 0 },       // LCD_G5
+    { GPIOK,     1,    14, 2, 0, 3, 0, 0 },       // LCD_G6
+    { GPIOK,     2,    14, 2, 0, 3, 0, 0 },       // LCD_G7
+// Blue
+    { GPIOE,     4,    14, 2, 0, 3, 0, 0 },       // LCD_B0
+    { GPIOJ,    13,    14, 2, 0, 3, 0, 0 },       // LCD_B1
+    { GPIOJ,    14,    14, 2, 0, 3, 0, 0 },       // LCD_B2
+    { GPIOJ,    15,    14, 2, 0, 3, 0, 0 },       // LCD_B3
+    { GPIOG,    12,    14, 2, 0, 3, 0, 0 },       // LCD_B4
+    { GPIOK,     4,    14, 2, 0, 3, 0, 0 },       // LCD_B5
+    { GPIOK,     5,    14, 2, 0, 3, 0, 0 },       // LCD_B6
+    { GPIOK,     6,    14, 2, 0, 3, 0, 0 },       // LCD_B7
+
+// I2C
+    { GPIOH,     7,     4, 0, 2, 3, 0, 0 },       // LCD_SCL / AUDIO SCL (I2C3_SDA)
+    { GPIOH,     8,     4, 0, 2, 3, 0, 0 },       // LCD_SDA / AUDIO SDA (I2C3_SCL)
+// Others
+    { GPIOI,    13,     0, 0, 1, 0, 0, 0 },       // LCD INT = input
+    { GPIOI,    12,     0, 1, 0, 3, 0, 0 },       // LCD DISP = output
+    { GPIOK,     3,     0, 1, 0, 2, 0 ,0 },       // LCD Backlight Control = output
+    {     0,     0,     0, 0, 0, 0, 0 ,0 },       // End of table indicator
+};
+
+
+static void ConfigureLCDPins(void) {
+
+    /* Configure pins from table*/
+    GPIO_ConfigureMultiplePins(configtable);
+
+}
+#else
 
 static void ConfigureLCDPins(void) {
 uint32_t mFIELD, mVALUE;
@@ -349,59 +495,110 @@ uint32_t mFIELD, mVALUE;
     GPIOK->MODER  = (GPIOK->MODER&~mFIELD)|mVALUE;
 
 }
+#endif
+
+/**
+ * @brief   Turn LCD Backlight On/Off
+ *
+ * @note    GPIOK Pin 3 controls the backlight
+ */
+
+///@{
+void  LCD_BacklightOn(void) {
+
+#ifdef LCD_USEGPIO
+    GPIO_Set(GPIOK,LCD_BACKLIGHTCTRL_MASK);
 #else
-
-static const GPIO_PinConfiguration configtable[] = {
-    { GPIOI,    14,    14, 2, 0, 3, 0, 0 },        // LCD_CLK
-    { GPIOI,     9,    14, 2, 0, 3, 0, 0 },       // LCD_VSYNC
-    { GPIOI,    10,    14, 2, 0, 3, 0, 0 },       // LCD_HSYNC
-    { GPIOK,     7,    14, 2, 0, 3, 0, 0 },       // LCD_DE
-// Red
-    { GPIOI,    15,    14, 2, 0, 3, 0, 0 },       // LCD_R0
-    { GPIOJ,     0,    14, 2, 0, 3, 0, 0 },       // LCD_R1
-    { GPIOJ,     1,    14, 2, 0, 3, 0, 0 },       // LCD_R2
-    { GPIOJ,     2,    14, 2, 0, 3, 0, 0 },       // LCD_R3
-    { GPIOJ,     3,    14, 2, 0, 3, 0, 0 },       // LCD_R4
-    { GPIOJ,     4,    14, 2, 0, 3, 0, 0 },       // LCD_R5
-    { GPIOJ,     5,    14, 2, 0, 3, 0, 0 },       // LCD_R6
-    { GPIOJ,     6,    14, 2, 0, 3, 0, 0 },       // LCD_R7
-// Green
-    { GPIOJ,     7,    14, 2, 0, 3, 0, 0 },       // LCD_G0
-    { GPIOJ,     8,    14, 2, 0, 3, 0, 0 },       // LCD_G1
-    { GPIOJ,     9,    14, 2, 0, 3, 0, 0 },       // LCD_G2
-    { GPIOJ,    10,    14, 2, 0, 3, 0, 0 },       // LCD_G3
-    { GPIOJ,    11,    14, 2, 0, 3, 0, 0 },       // LCD_G4
-    { GPIOK,     0,    14, 2, 0, 3, 0, 0 },       // LCD_G5
-    { GPIOK,     1,    14, 2, 0, 3, 0, 0 },       // LCD_G6
-    { GPIOK,     2,    14, 2, 0, 3, 0, 0 },       // LCD_G7
-// Blue
-    { GPIOE,     4,    14, 2, 0, 3, 0, 0 },       // LCD_B0
-    { GPIOJ,    13,    14, 2, 0, 3, 0, 0 },       // LCD_B1
-    { GPIOJ,    14,    14, 2, 0, 3, 0, 0 },       // LCD_B2
-    { GPIOJ,    15,    14, 2, 0, 3, 0, 0 },       // LCD_B3
-    { GPIOG,    12,    14, 2, 0, 3, 0, 0 },       // LCD_B4
-    { GPIOK,     4,    14, 2, 0, 3, 0, 0 },       // LCD_B5
-    { GPIOK,     5,    14, 2, 0, 3, 0, 0 },       // LCD_B6
-    { GPIOK,     6,    14, 2, 0, 3, 0, 0 },       // LCD_B7
-
-// I2C
-    { GPIOH,     7,     4, 0, 2, 3, 0, 0 },       // LCD_SCL / AUDIO SCL (I2C3_SDA)
-    { GPIOH,     8,     4, 0, 2, 3, 0, 0 },       // LCD_SDA / AUDIO SDA (I2C3_SCL)
-// Others
-    { GPIOI,    13,     0, 0, 1, 0, 0, 0 },// LCD INT = input
-    { GPIOI,    12,     0, 1, 0, 3, 0, 0 },// LCD DISP = output
-    { GPIOK,     3,     0, 1, 0, 2, 0 ,0 },// LCD Backlight Control = output
-    {     0,     0,     0, 0, 0, 0, 0 ,0 },// End of table indicator
-};
-
-
-static void ConfigureLCDPins(void) {
-
-    /* Configure pins from table*/
-    GPIO_ConfigureMultiplePins(configtable);
+    GPIOK->BSRR |= LCD_BACKLIGHTCTRL_MASK;
+#endif
 
 }
+
+void  LCD_BacklightOff(void) {
+
+#ifdef LCD_USEGPIO
+    GPIO_Clear(GPIOK,LCD_BACKLIGHTCTRL_MASK);
+#else
+    GPIOK->BSRR |= (LCD_BACKLIGHTCTRL_MASK<<16);
 #endif
+
+}
+///@}
+
+/**
+ * @brief   Turn LCD Backlight On/Off
+ *
+ * @note    GPIOK Pin 3 controls the backlight
+ */
+
+///@{
+void  LCD_NormalOperation(void) {
+
+#ifdef LCD_USEGPIO
+    GPIO_Set(GPIOI,LCD_NORMALSTANDBY_MASK);
+#else
+    GPIOI->BSRR |= LCD_NORMALSTANDBY_MASK;
+#endif
+
+}
+
+void  LCD_StandBy(void) {
+
+#ifdef LCD_USEGPIO
+    GPIO_Clear(GPIOI,LCD_NORMALSTANDBY_MASK);
+#else
+    GPIOI->BSRR |= (LCD_NORMALSTANDBY_MASK<<16);
+#endif
+
+}
+///@}
+
+
+
+/**
+ * @brief   Enable/Disable LCD Controler
+ *
+ * @note    GPIOK Pin 3 controls the backlight
+ */
+
+///@{
+void  LCD_Enable(void) {
+
+    LTDC->GCR |= LTDC_GCR_LTDCEN;
+
+}
+
+void  LCD_Disable(void) {
+
+    LTDC->GCR &= ~LTDC_GCR_LTDCEN;
+
+}
+///@}
+
+
+/**
+ * @brief   Turn LCD Backlight On/Off
+ *
+ * @note    GPIOK Pin 3 controls the backlight
+ */
+
+///@{
+void  LCD_On(void) {
+
+    LCD_Enable();
+    LCD_NormalOperation();
+    LCD_BacklightOn();
+
+}
+
+void  LCD_Off(void) {
+
+    LCD_Disable();
+    LCD_StandBy();
+    LCD_BacklightOff();
+}
+///@}
+
 
 /*
  * @brief   Configuration for PLLSAI
@@ -428,41 +625,38 @@ static void ConfigureLCDPins(void) {
  *
  * @note    So the R output must be 18, 36, 72 or 144 MHz.
  *          But USB, RNG and SDMMC needs 48 MHz. The LCM of 48 and 9 is 144.
+ *          But there are a minimal value for the divisor equal to 2.
+ *          $$ f_{OUTR} = 72 $$
  *
- * @note   f_LCDCLK  = 9 MHz        PLLSAIRDIV=8
+ * @note    For f_LCDCLK  = 9 MHz the extra divisor PLLSAIRDIV must be 8
  *
  */
 
-static const PLLConfiguration_t  pllsaiconfig  = {
-    .source         = RCC_PLLCFGR_PLLSRC_HSI,
-    .M              = HSE_FREQ/1000,                        // f_IN = 1 MHz
-    .N              = 144,                                  // f_VCO = 144 MHz
-    .P              = 3,                                    // f_P = 48 MHz
-    .Q              = 3,                                    // f_Q = 48 MHz
-    .R              = 2                                     // f_R = 72 MHz
-};
-
 /**
- *
+ * @brief   Flag to indicate clock for the LCD is set
  */
 static int  LCDCLOCK_Initialized = 0;
 
 /**
  * @brief   Set Clock for LCD
  *
- * @param   div must be 2, 4, 8 or 16
- *
- * @note    This should be set only when PLLSAI is disabled
+ * @note    LCD_CLOCK for the display used must be in the range [5..12]
  */
-static int LCD_SetClock(uint32_t div) {
+int LCD_SetClock(void) {
 uint32_t pllsaidivr;
-
-    if( RCC->CR&RCC_CR_PLLSAION )   // Do nothing when PLLSAI is enabled
-        return -1;
-
+int div;
+PLLOutputFrequencies_t pllfreq;
 
 
-    pllsaidivr = div;
+    if( ! (RCC->CR&RCC_CR_PLLSAION) ) {
+        SystemConfigPLLSAI(&PLLSAIConfiguration_48MHz);
+        SystemEnablePLLSAI();
+    }
+
+    SystemGetPLLFrequencies(PLL_SAI, &pllfreq);
+    div = pllfreq.routfreq/LCD_FREQ;
+
+
     switch(div) {
     case 2:  pllsaidivr = 0; break;
     case 4:  pllsaidivr = 1; break;
@@ -494,7 +688,7 @@ void LCD_Init(void) {
 
     /* If LCD Clock not initialized */
     if( !LCDCLOCK_Initialized )
-        return;
+        LCD_SetClock();
 
     /* If PLLSAI not on, return */
     if( (RCC->CR & RCC_CR_PLLSAION) == 0 )
@@ -506,10 +700,6 @@ void LCD_Init(void) {
 
     /* Configure pins for LCD usage */
     ConfigureLCDPins();
-
-    /* Configure additional pins */
-    GPIO_Init(GPIOI,BIT(12),BIT(12));
-    GPIO_Init(GPIOK,0,BIT(3));
 
     // Enable clock for LCD
     RCC->APB2ENR |= RCC_APB2ENR_LTDCEN;
@@ -524,21 +714,262 @@ void LCD_Init(void) {
                  |(VSW+VBP-1)<<LTDC_BPCR_AVBP_Pos;
     LTDC->AWCR =  (HSW+HBP+HAW-1)<<LTDC_AWCR_AAW_Pos
                  |(VSW+VBP+VAH-1)<<LTDC_AWCR_AAW_Pos;
-    LTDC->TWCR  = 0;
-    LTDC->TWCR |= (HSW+HBP+HAW+HFP-1)<<LTDC_TWCR_TOTALW_Pos
+    LTDC->TWCR  = (HSW+HBP+HAW+HFP-1)<<LTDC_TWCR_TOTALW_Pos
                  |(VSW+VBP+VAH+VFP-1)<<LTDC_TWCR_TOTALW_Pos;
-    LTDC->TWCR |= (HSW+HBP+HAW+HFP-1)<<LTDC_TWCR_TOTALH_Pos
-                 |(VSW+VBP+VAH+VFP-1)<<LTDC_TWCR_TOTALH_Pos;
+
+    // Set background color
+    LTDC->BCCR = BACKGROUND_COLOR;
+
+    /* Enable interrupts */
+    //LTDC->IER  |= (LTDC_IER_RRIE|LTDC_IER_TERRIE|LTDC_IER_FUIE|LTDC_IER_LIE);
 
 
-    LTDC->IER  |= (LTDC_IER_RRIE|LTDC_IER_TERRIE|LTDC_IER_FUIE|LTDC_IER_LIE);
+    LCD_NormalOperation();
+    LCD_BacklightOn();
+
 }
 
 
 /*
- * @brief   LCD_FillFrameBuffer
+ * @brief   LCD Set Background Color
+ */
+
+void
+LCD_SetBackgroundColor( uint32_t bgcolor ) {
+
+    LTDC->GCR = bgcolor;
+}
+
+/*
+ * @brief   LCD Set Default Color for layer
+ */
+
+void
+LCD_SetDefaultColor(int layer,  uint32_t color ) {
+
+    LTDC_Layer[layer]->DCCR = color;
+}
+
+/*
+ * @brief   LCD Set Color Key for layer
+ */
+
+void
+LCD_SetColorKey(int layer,  uint32_t c ) {
+
+    LTDC_Layer[layer]->CKCR = c;
+}
+
+
+/*
+ * @brief   LCD Get Frame Buffer Address of a specified layer
+ */
+void *
+LCD_GetFrameBufferAddress(int layer) {
+
+   return (void *) LTDC_Layer[layer]->CFBAR;
+}
+
+/*
+ * @brief   LCD Set format for layer
+ */
+void  LCD_SetFormat(int layer, int format) {
+
+    LTDC_Layer[layer]->PFCR = format;
+}
+
+/*
+ * @brief   LCD Get Format used in layer
+ */
+int   LCD_GetFormat(int layer) {
+
+    return LTDC_Layer[layer]->PFCR;
+}
+
+/*
+ * @brief   LCD Get Pixel Size in bytes of the layer specified
+ */
+int   LCD_GetPixelSize(int layer) {
+
+    return pixelsize[LCD_GetFormat(layer)];
+}
+
+/*
+ * @brief   LCD Get Pixel Size in bytes of the layer specified
  *
- * @note    Fill the frame buffer using only word access
+ * @note    Uses the pitch information to calculate the demanded
+ *          area size
+ */
+int   LCD_GetMinimalFullFrameBufferSize(int format) {
+int ps = pixelsize[format];
+
+    return display->pitch[ps]*display->height;
+
+}
+
+/*
+ * @brief   LCD Set Frame Buffer for layer
+ */
+
+void
+LCD_SetFullSizeFrameBuffer(int layer, void *area, int format) {
+LTDC_Layer_TypeDef *p = LTDC_Layer[layer];
+uint32_t ps,w,h;
+
+    ps        = pixelsize[format];
+    h         = display->height;
+    w         = display->width;
+    p->PFCR   = format;
+    p->CFBAR  = (uint32_t) area;
+    p->CFBLNR = display->height;
+    p->CFBLR  = (display->pitch[ps]<<LTDC_LxCFBLR_CFBP_Pos)
+               |((display->width*ps+3)<<LTDC_LxCFBLR_CFBLL_Pos);
+    p->WHPCR  = ((HSW+HBP+w-1)<LTDC_LxWHPCR_WHSPPOS_Pos)
+               |((0)<<LTDC_LxWHPCR_WHSTPOS_Pos);
+    p->WVPCR  = ((VSW+VBP+h-1)<LTDC_LxWVPCR_WVSPPOS_Pos)
+               |((0)<<LTDC_LxWVPCR_WVSTPOS_Pos);
+
+    //////////////////////////////////////////////
+
+
+    // Enable layer
+    p->CR |= LTDC_LxCR_LEN;
+}
+
+/**
+ * @brief Get Framebuffer height
+ *
+ * @note  Returns the number of lines
+ */
+int
+LCD_GetHeight(int layer) {
+
+    return (LTDC_Layer[layer]->CFBLNR&LTDC_LxCFBLNR_CFBLNBR_Msk)>>LTDC_LxCFBLNR_CFBLNBR_Pos;
+
+}
+
+/**
+ * @brief Get Framebuffer width in pixels
+ */
+int
+LCD_GetWidth(int layer) {
+LTDC_Layer_TypeDef *p = LTDC_Layer[layer];
+int w, format, ps;
+
+
+    format = p->PFCR;
+    ps = pixelsize[format];
+    w = (p->CFBLR&LTDC_LxCFBLR_CFBLL_Msk)>>LTDC_LxCFBLR_CFBLL_Pos;
+    w -= 3;
+    w /= ps;
+
+    return w;
+
+}
+
+/**
+ * @brief Get Framebuffer pitch
+ *
+ * @note This is the distance in bytes
+ */
+int
+LCD_GetPitch(int layer) {
+
+    return (LTDC_Layer[layer]->CFBLR&LTDC_LxCFBLR_CFBP_Msk)>>LTDC_LxCFBLR_CFBP_Pos;
+
+}
+
+
+/**
+ * @brief   Get Line Address
+ *
+ * @note    It uses the pitch information to calculate the start position
+ *          of a line in buffer
+ */
+void *LCD_GetLineAddress(int layer, int line) {
+LTDC_Layer_TypeDef *p = LTDC_Layer[layer];
+
+    uint32_t base = p->CFBAR;
+    uint32_t pitch = p->CFBLR>>LTDC_LxCFBLR_CFBP_Pos;
+
+    return (void *) (base + line*pitch);
+}
+
+/**
+ * @brief   fill1
+ *
+ * @note    fill a memory area with a 1 byte value
+ *
+ */
+static void fill1( void *area, int n, unsigned c) {
+uint8_t uc;
+uint8_t *p;
+uint32_t uv;
+uint32_t *q;
+
+    p = (uint8_t *) area;
+    uc = c&0xFF;
+    // align to a word address (last two bits are zero)
+    while( (n>0) && ((((uintptr_t)p)&0x3)!=0) ) {
+        *p++ = uc;
+        n--;
+    }
+    // after that, can fill 4 bytes at one
+    uv = (uc<<24)|(uc<<16)|(uc<<8)|uc;
+    q = (uint32_t *) p;
+    while( n > 3 ) {
+        *q++ = uv;
+        n -= 4;
+    }
+    p = (uint8_t *) q;
+    while( n>0 ) {
+        *p++ = uc;
+        n--;
+    }
+
+}
+
+/**
+ * @brief   fill2
+ *
+ * @note    Fill a memory area with a 16-bit value
+ *
+ */
+static void fill2( void *area, int n, unsigned c) {
+uint8_t *p;
+uint16_t uc;
+uint32_t uv;
+uint32_t *q;
+
+    p = (uint8_t *) area;
+    uc = c&0xFFFF;
+    // align to a even address
+    while( ((uintptr_t) p)&3 ) {
+        *p++ = uc;
+        n--;
+        uc = (uc>>8)|(uc<<8);
+    }
+    // after that, can fill 4 bytes at one
+    uv = (uc<<16)|uc;
+    q = (uint32_t *) p;
+    while( n > 3 ) {
+        *q++ = uv;
+        n -= 4;
+    }
+    // fill the remaining bytes
+    p = (uint8_t *) q;
+    while( n > 0 ) {
+        *p++ = uc;
+        n--;
+        uc = (uc>>8)|(uc<<8);
+    }
+}
+
+
+/**
+ * @brief   fill3
+ *
+ * @note    Fill the frame buffer with a 3-byte value
  *
  * @note    Memory organization
  *            word  | Pixel
@@ -547,20 +978,121 @@ void LCD_Init(void) {
  *            +1    | G2 B2 R1 G1
  *            +2    | R3 G3 B3 R2
  */
-void
-LCD_FillFrameBuffer( RGB_t *frame, RGB_t v ) {
+static void fill3( void *area, int n, unsigned c) {
 uint32_t w1,w2,w3;
-uint32_t *p = (uint32_t *) frame;
+uint8_t *p;
+uint32_t uc;
+uint32_t *q;
 
-    w1 = (v.B<<24)|(v.R<<16)|(v.G<<8)|v.B;
-    w2 = (v.G<<24)|(v.B<<16)|(v.R<<8)|v.G;
-    w3 = (v.R<<24)|(v.G<<16)|(v.B<<8)|v.R;
+    p = (uint8_t *) area;
+    uc = c&0xFFFFFF;
+    // align to a even address
+    while( ((uintptr_t) p)&3 ) {
+        *p++ = uc;
+        n--;
+        uc = ((uc>>8)|(uc<<16))&0xFFFFFF;
+    }
+    // after that, can fill 4 bytes at one
+    q = (uint32_t *) p;
+    // uc = 0ABC
+    w1 = (uc<<8)|(uc>>16);      // ABCA
+    w2 = (uc<<16)|(uc>>8);      // BCAB
+    w3 = (uc<<24)|uc;           // CABC
+    while( n > 11 ) {
+        *q++ = w3;
+        *q++ = w2;
+        *q++ = w1;
+        n -= 12;
+    }
+    // fill the remaining bytes
+    p = (uint8_t *) q;
+    while( n > 0 ) {
+        *p++ = uc;
+        n--;
+        uc = ((uc>>8)|(uc<<16))&0xFFFFFF;
+    }
+}
 
-    for(int i=0;i<(LCD_DW*LCD_DH+3)/4;i+=3) {
-        p[0] = w1;
-        p[1] = w2;
-        p[2] = w3;
-        p+=3;
+/*
+ * @brief   fill4
+ *
+ * @note    Fill the frame buffer with a 4-byte value
+ */
+
+static void fill4( void *area, int n, unsigned c) {
+uint8_t *p;
+uint32_t uc;
+uint32_t *q;
+
+    p = (uint8_t *) area;
+    uc = c;
+    // align to a even address
+    while( ((uintptr_t) p)&3 ) {
+        *p++ = uc;
+        n--;
+        uc = (uc>>8)|(uc<<24);
+    }
+    // after that, can fill 4 bytes at one
+    q = (uint32_t *) p;
+    while( n > 3 ) {
+        *q++ = uc;
+        n -= 4;
+    }
+    // fill the remaining bytes
+    p = (uint8_t *) q;
+    while( n > 0 ) {
+        *p++ = uc;
+        n--;
+        uc = (uc>>8)|(uc<<24);
+    }
+
+}
+
+
+/*
+ * @brief   LCD_FillFrameBuffer
+ *
+ * @note    Fill the frame buffer with a color using an efficient algorithm
+ */
+void
+LCD_FillFrameBuffer(int layer, unsigned color ) {
+LTDC_Layer_TypeDef *p = LTDC_Layer[layer];
+int  ps;
+char *area;
+int  w,h,pitch;
+int i;
+
+    ps     = LCD_GetPixelSize(layer);
+    area   = (char *) LCD_GetFrameBufferAddress(layer);
+    w      = LCD_GetWidth(layer);
+    h      = LCD_GetHeight(layer);
+    pitch  = LCD_GetPitch(layer);
+
+    switch(ps) {
+    case 1:
+        w = LCD_GetPitch(layer);
+        fill1(area,w*h,color);
+        break;
+    case 2:
+        for(i=0;i<h;i++) {
+            area = (char *) LCD_GetLineAddress(layer,i);
+            fill2(area,pitch,color);
+        }
+        break;
+    case 3:
+        for(i=0;i<h;i++) {
+            area = (char *) LCD_GetLineAddress(layer,i);
+            fill3(area,pitch,color);
+        }
+        break;
+    case 4:
+        for(i=0;i<h;i++) {
+            area = (char *) LCD_GetLineAddress(layer,i);
+            fill4(area,pitch,color);
+        }
+        break;
+    default:
+        break;
     }
 }
 

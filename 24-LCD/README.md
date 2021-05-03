@@ -8,6 +8,19 @@ The board has a 4.3" LCD display with Capacitive Touch Panel (CTP).
 
 The STM32F646 has a LCD control interface and an accelerator, called ChromeART (DMA2D).
 
+It support the following formats.
+
+
+| Format    | Size in bits  |
+|-----------|---------------|
+| ARGB8888  |        32     |
+| RGB888    |        24     |
+| RGB565    |        16     |
+| ARGB1555  |        16     |
+| ARGB4444  |        16     |
+| L8        |         8     |
+| AL44      |         8     |
+| AL88      |         8     |
 
 
 
@@ -72,6 +85,7 @@ The LCD interface in the MCU has the following features, among others:
 * Support for ARGB8888, RGB888, RGB565, ARGB 1555, ARGB4444, L8, AL44, AL88.
 * Color keying]
 * Integrated PFC (pixel format converter)
+* Support for resolutions up to 1024x768 pixels (See RM, section 18.4.1)
 
 
 
@@ -199,6 +213,135 @@ As described in the schematics the I2C interface of the CTP uses the default
 address 01110000 (=0x70). The Audio WM8994ECS/R uses the address 0x00110100 (=0x34), as in 
 the Discovery board or 0x00110110 (=0x36) according tho pin CS/ADDR, low or high, respectively.
 
+Timing
+------
+
+There are many registers that needed to be configured, based on the display information.
+
+| Parameter | Description                              | Unit
+|-----------|------------------------------------------|-------------------
+| HSYNC     | Horizontal synchronization pulse width   | LCD_CLK Period
+| HBP       | Horizontal back porch width              | LCD_CLK Period
+| HAW       | Horizontal active widht                  | LCD_CLK Period
+| HFP       | Horizontal front porch width             | LCD_CLK Period
+| VSYNC     | Vertical synchronization pulse width     | Horizontal scan line time
+| VBP       | Vertical back porch width                | Horizontal scan line time
+| VAH       | Vertical active height                   | Horizontal scan line time
+| VFP       | Vertical front porch width               | Horizontal scan line time
+
+The porches represent not visible areas.
+
+The registers involved in the configuration process are show below.
+
+| Register | Description
+|----------|-------------------------------------------------------
+| SSCR     | Synchronization size configuration register
+| BPCR     | Back porch configuration register
+| AWCR     | Active widht configuration register
+| TWCR     | Total width configuration register
+
+The fields are:
+
+| Field   | Register | Content               | Description
+|---------|----------|-----------------------|----------------------------------
+| HSW     | SSCR     | HSYNC-1               | 12 | Horizontal synchronization width
+| AHBP    | BPCR     | HSYNC+HBP-1           | 12 | Accumulated horizontal back porch
+| AAW     | AWCR     | HSYNC+HBP+HAW-1       | 12 | Accumulated active width
+| TOTALW  | TWCR     | HSYNC+HBP+HAW+HFP-1   | 12 | Total width 
+| VSW     | SSCR     | VSYNC-1               | 11 | Vertical synchronization width
+| AVBP    | BPCR     | VSYNBC+VBP-1          | 11 | Accumulated vertical back porch
+| AAH     | AWCR     | VSYNC+VBP+VAH-1       | 11 | Accumulated active height
+| TOTALH  | TWCR     | VSYNC+VBP+VAH+VFP-1   | 11 | Total width
+
+
+Layer
+-----
+
+The controller support up to 2 layer. Layer 2 is always considered above Layer 1.
+The layers can be blended.
+
+The layers can have different formats and a PFC (Pixel Format Convert) inside the
+LCD controller convert the data in framebuffer into the format used internally by
+the controller (ARGB888).
+
+The layer can be smaller than the active area and can be positioned inside it,
+but a layer must be fully contained inside the active area.
+
+Area not associated with a layer has the background color set in register BCCR;
+
+The line length can be smaller than the area used to store a line. The extra bytes area ignored.
+The number of bytes between consecutive lines is called pitch and it is set in field XXXX of the register CFBLR.
+
+
+A layer is configured in the following registers:
+
+| Register    |   Field   |  Description                            |
+|-------------|-----------|-----------------------------------------|
+|  CFBAR      |  CFBADD   | Framebuffer start address               |
+|  PFCR       |  PF       | Pixel format used in frame buffer       |
+|  CFBLR      |  CFBP     | Line size used in framebuffer (pitch)   |
+|  CFBLR      |  CFBL     | Line length of framebuffer + 3          |
+|  CFBLNR     |  CFBLNBR  | Number of lines in frame buffer         |
+|  WHPCR      |  WHSPPOS  | Horizontal stop position of framebuffer |
+|  WHPCR      |  WHSTPOS  | Horizontal start position of framebuffer|
+|  WVPCR      |  WVSPPOS  | Vertical stop position of framebuffer   |
+|  WVPCR      |  WVSTPOS  | Vertical start position of framebuffer  |
+
+Restrictions:  
+WHSPPOS >= AHBP+1  
+WHSTPOS <= AAW
+WVSPPOS >= AVBP+1
+WVSTPOS <= AAH
+
+> NOTE: The positioning includes the back porch!!!!!!
+
+
+The size of the framebuffer depends on the resolution (width and heigth) and pixel format.
+
+For the 480x272 LCD (with 480x272=130560 pixels) used in the Discovery board, 
+
+| Pixel format |Pixel size|  Framebuffer size in bytes  |  Framebuffer size in KBytes 
+|--------------|----------|-----------------------------|----------------------------
+| ARGB888      |     4    |             522240          |             510
+| RGB888       |     3    |             391680          |             383
+| RGB565       |     2    |             261120          |             255      
+| ARGB1555     |     2    |             261120          |             255
+| ARGB4444     |     2    |             261120          |             255
+| L8           |     1    |             130560          |             128
+| AL44         |     1    |             130560          |             128
+| AL88         |     1    |             130560          |             128
+
+
+The framebuffer can be in internal RAM ou in an external RAM using the FMC interface,
+ like the SDRAM. 
+
+> NOTE: External RAM run at a clock frequency half or third of the system frequency. This limits the memory bandwidth. 
+
+> NOTE: The LCD interface pushes the memory usage (bandwidth) to the limit.
+
+The positioning and the line size used impact the performance of the LCD interface. LCD uses 64/128 bytes burst, but memory bursts stop at a 1 KByte boundary.
+
+The line width must be a multiple of 64/128 for AHB/AXI. So to improve performance  extra bytes must be added at the end of a line.
+
+Using RGB888, 3 Bytes per pixel, a line with 480 pixel has 1440 bytes. At the first line, there are 22 64-byte bursts (16 in the first Kbyte segment and 6 in the second 1 Kbyte segment) and a 32 byte burst. At the second line, there are 9 64-bytes burst, but during the 10th  burst, the 1Kbyte boundary is reached and the burst is stopped. After that, all accesses are single reads, and the performances sinks.
+
+According the AN4861, there are two solutions:
+
+* Reduce the layer window and framebuffer line width. This reduces the visible area. In this case, this means to use a framebuffer, that has a  448 pixel line width. To center it, an offset of 16 can be used. So the line has 1344 = 21*16 bytes.
+
+* Add dummy bytes at the end of every line. In the 480 width example, adding 96 bytes to the line width, one get a line with 1536 bytes. There are still 22 64-bytes bursts and a 32 byte burst at the first line. At the second line, this repeats. And so every two lines.
+
+The device can handle lines greater than the active width. There are two factors to define the line in 
+
+
+
+For the LCD display used, with 480x272 resolution, the above alternatives for RGB888 are:
+
+* Use a 448 width, adjusting the start and stop position, 16 and  464 , respectively, to center it.
+* Use a 512 pitch,
+
+
+--------------------------------
 
 
 
@@ -250,12 +393,16 @@ SAI1 and SAI2 clock signals, used by DMA, Serial Audio Interface (SAI) 1 and 2.
  References
  ----------
  
- 1. [RK043FN48H-CT672B Datasheet](https://mikrocontroller.bplaced.net/wordpress/wp-content/uploads/2018/01/RK043FN48H-CT672B-V1.0.pdf)
- 2. [OTA5180A Datasaheet](https://www.newhavendisplay.com/resources_dataFiles/datasheets/LCDs/OTA5180A.pdf)
- 3. [FTA5336GQQ Datasheet](https://www.newhavendisplay.com/resources_dataFiles/datasheets/touchpanel/FT5336.pdf)
- 4. [A little about graphics subsystem internals on microcontrollers](https://alexkalmuk.medium.com/a-little-about-graphics-subsystem-internals-on-microcontrollers-d952cfd0966a)
- 5. [Source for FT5336 driver](https://os.mbed.com/teams/ST/code/BSP_DISCO_F746NG/file/c9112f0c67e3/ft5336.h/)
- 6. [Info about RK043FN66HS-CTG](https://community.st.com/s/question/0D50X0000B5H5uf/display-rk043fn66hsctg-from-rocktech)
+1. [STM32F75xxx and STM32F74xxx advanced Arm ® -based 32-bit MCUs Reference Manual - RM0385](https://www.st.com/resource/en/reference_manual/dm00124865-stm32f75xxx-and-stm32f74xxx-advanced-arm-based-32-bit-mcus-stmicroelectronics.pdf)
+2. [STM32F746NG Data sheet](https://www.st.com/resource/en/datasheet/stm32f746ng.pdf)
+3. [AN4861 - LCD-TFT display controller (LTDC) on STM32 MCUs](https://www.st.com/resource/en/application_note/dm00287603-lcdtft-display-controller-ltdc-on-stm32-mcus-stmicroelectronics.pdf) 
+4. [RK043FN48H-CT672B Datasheet](https://mikrocontroller.bplaced.net/wordpress/wp-content/uploads/2018/01/RK043FN48H-CT672B-V1.0.pdf)
+5. [OTA5180A Datasaheet](https://www.newhavendisplay.com/resources_dataFiles/datasheets/LCDs/OTA5180A.pdf)
+6. [FTA5336GQQ Datasheet](https://www.newhavendisplay.com/resources_dataFiles/datasheets/touchpanel/FT5336.pdf)
+7. [A little about graphics subsystem internals on microcontrollers](https://alexkalmuk.medium.com/a-little-about-graphics-subsystem-internals-on-microcontrollers-d952cfd0966a)
+8. [Source for FT5336 driver](https://os.mbed.com/teams/ST/code/BSP_DISCO_F746NG/file/c9112f0c67e3/ft5336.h/)
+9. [Info about RK043FN66HS-CTG](https://community.st.com/s/question/0D50X0000B5H5uf/display-rk043fn66hsctg-from-rocktech)
+
 
  
  

@@ -715,6 +715,7 @@ SystemConfigMainPLL(const PLLConfiguration_t *pllconfig) {
 uint32_t freq,src;
 uint32_t rcc_pllcfgr;
 uint32_t clocksource;
+int      pllwascoreclock = 0;
 
     clocksource = pllconfig->source;
 
@@ -722,6 +723,7 @@ uint32_t clocksource;
     if( (RCC->CFGR&RCC_CFGR_SWS) == RCC_CFGR_SWS_PLL ) {
         SystemEnableHSI();
         RCC->CFGR = (RCC->CFGR&RCC_CFGR_SW)|RCC_CFGR_SW_HSI;
+        pllwascoreclock = 1;
     }
     // Disable Main PLL
     SystemDisableMainPLL();
@@ -765,6 +767,11 @@ uint32_t clocksource;
     SystemEnableMainPLL();
 
     MainPLLConfigured = 1;
+
+    /* If it was the core clock, change back */
+    if( pllwascoreclock ) {
+        RCC->CFGR = (RCC->CFGR&RCC_CFGR_SW)|RCC_CFGR_SW_PLL;
+    }
 }
 
 /**
@@ -772,7 +779,6 @@ uint32_t clocksource;
  *
  * @note    Configure SAI PLL unit
  *
- * @note    If core clock source (HCLK) is PLL, it is changed to HSI
  */
 
 void
@@ -815,11 +821,10 @@ uint32_t clocksource;
 }
 
 /**
- * @brief   SystemConfigPLLSAI
+ * @brief   SystemConfigPLLI2S
  *
- * @note    Configure SAI PLL unit
+ * @note    Configure I2S PLL unit
  *
- * @note    If core clock source (HCLK) is PLL, it is changed to HSI
  */
 
 void
