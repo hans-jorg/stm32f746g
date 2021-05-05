@@ -133,7 +133,7 @@ int ninfo = 0;
 
     printf("Press ENTER to initialize ExtRAM\n");
     fgets(line,LINEMAX,stdin);
-    SDRAM_Init(SDRAM_BANK1);
+    SDRAM_Init();
 
     printf("Initializing buddy allocator\n");
     Buddy_Init((char *) SDRAM_ADDRESS,SDRAM_SIZE,MINSIZE);

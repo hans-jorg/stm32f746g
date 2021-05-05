@@ -105,7 +105,7 @@ int format = LCD_FORMAT_RGB888;
     LCD_TurnBacklightOff();
 
     message("Initializing SDRAM");
-    SDRAM_Init(SDRAM_BANK1);
+    SDRAM_Init();
 
     message("Writing 0x12345678 to SDRAM");
     *((uint32_t *) 0xc0000000) = 0x12345678;
