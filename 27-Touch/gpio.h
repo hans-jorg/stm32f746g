@@ -17,10 +17,10 @@ typedef struct {
     GPIO_TypeDef   *gpio;       /* GPIOA, GPIOB ... GPIOK */
     unsigned        pin:4;      /* pin of port */
     unsigned        af:4;       /* Alternate function */
-    unsigned        mode:3;     /* Input(0)/Output(1)/Alternate(2)/Analog(3) */
-    unsigned        otype:2;    /* Output type: Push-pull (0), Open-Drain(1) */
-    unsigned        ospeed:2;   /* Low(0), Medium(1), High Speed(2) or Very High Speed(3) */
-    unsigned        pupd:2;     /* Nothing(0),Pullup(1), Pulldown(2) */
+    unsigned        mode:3;     /* Input/Output/Alternate/Analog */
+    unsigned        otype:2;    /* Output type */
+    unsigned        ospeed:2;   /* Low, Medium, High Speed or Very High Speed */
+    unsigned        pupd:2;     /* Pullup, Pulldown or nothing */
     unsigned        initial:1;  /* initial value for output*/
 } GPIO_PinConfiguration;
 

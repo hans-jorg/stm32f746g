@@ -75,7 +75,7 @@ static inline void GPIO_Toggle( GPIO_TypeDef *gpio, uint32_t mask ) {
        gpio->ODR ^= mask;             // Use XOR to toggle output
 }
 
-static inline unsigned GPIO_Read( GPIO_TypeDef *gpio, uint32_t mask ) {
+static inline unsigned GPIO_Read( GPIO_TypeDef *gpio) {
        return gpio->IDR;
 }
 #endif
