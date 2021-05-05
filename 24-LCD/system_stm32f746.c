@@ -772,6 +772,7 @@ int      pllwascoreclock = 0;
     if( pllwascoreclock ) {
         RCC->CFGR = (RCC->CFGR&RCC_CFGR_SW)|RCC_CFGR_SW_PLL;
     }
+   SystemCoreClockUpdate();
 }
 
 /**
@@ -986,6 +987,7 @@ PLLConfiguration_t clockconf;
 
     SystemConfigMainPLL(&clockconf);
     SystemSetCoreClock(CLOCKSRC_PLL,1);
+    SystemCoreClockUpdate();
     return freq;
 }
 
@@ -1158,6 +1160,7 @@ SystemInit(void) {
     /* Additional initialization here */
 
 }
+
 
 
 

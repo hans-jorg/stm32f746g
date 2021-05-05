@@ -11,14 +11,19 @@
 
 
 #define BIT(N)          (1U<<(N))
-#define RGB(R,G,B)      ((((uint32_t)(B))<<16)|(((uint32_t)(G))<<8)|(((uint32_t)(R))))
 
+/**
+ * @brief Use GPIO library to initialize and control pins
+ *
+ * @note  Comment it to use a faster but larger implementation
+ */
+#define LCD_USEGPIO 1
 
 /**
  *  @brief  Default values
  */
 ///@{
-#define BACKGROUND_COLOR        RGB(255,0,0)
+#define BACKGROUND_COLOR        RGB(0,0,255)
 
 
 ///@}
@@ -118,6 +123,7 @@ static LTDC_Layer_TypeDef *LTDC_Layer[3] = {LTDC_Layer2, LTDC_Layer1, LTDC_Layer
  */
 typedef struct {
     uint32_t    frequency;          /// LCD frequency
+    uint32_t    polarity;           /// polarity of control signals (Use LTDC_CGR_xxPOL symbols)
     uint16_t    divider;            /// divider to be used ??
     uint16_t    width;              /// Visible width
     uint16_t    height;             /// Visible height
@@ -138,6 +144,7 @@ typedef struct {
 
 const DisplayProperties_t dispRK043 = {
     .frequency  =   9000000,        // range [5..12] MHz
+    .polarity   =   0,              // Use LTDC_CGR_xxPOL symbols)
     .divider    =   5,              //
     .width      =   480,            //
     .height     =   272,            //
@@ -165,15 +172,16 @@ const DisplayProperties_t *display = &dispRK043;
  * @brief Symbols to make it easier to write complex expressions
  */
 ///@{
-#define LCD_FREQ   (display->frequency)
-#define HSW     (2)
-#define HAW     (display->width)
-#define HFP     (display->hfp)
-#define HBP     (display->hbp)
-#define VSW     (2)
-#define VAH     (display->height)
-#define VBP     (display->vbp)
-#define VFP     (display->vfp)
+#define LCD_FREQ    (display->frequency)
+#define HSW         (2)
+#define HAW         (display->width)
+#define HFP         (display->hfp)
+#define HBP         (display->hbp)
+#define VSW         (2)
+#define VAH         (display->height)
+#define VBP         (display->vbp)
+#define VFP         (display->vfp)
+#define POL         (display->polarity)
 ///@}
 
 static const int pixelsize[] = {
@@ -239,9 +247,19 @@ static const int pixelsize[] = {
 #ifdef LCD_USEGPIO
 
 #include "gpio.h"
-
+/* Pin Configuration Fields                                                    */
+/* GPIOx: GPIO interface        [GPIOA...GPIOK]                                */
+/*     AF: Alternate function   [0:GPIO,2:I2C, ... 14:LCD]                     */
+/*     M:  Mode                 [0:Input, 1=Output,2=AF,3=Analog]              */
+/*     OT: Output Type          [0:Push-pull, 1=Open-drain ]                   */
+/*     S:  Speed                [0:Low, 1:Medium, 2:High, 3:Very high]         */
+/*     P:  Pull-down/Pull-up    [0:None, 1:Pull-up, 2:Pull-down]               */
+/*     I:  Initial              [0: Low, 1:High]                               */
 static const GPIO_PinConfiguration configtable[] = {
-    { GPIOI,    14,    14, 2, 0, 3, 0, 0 },        // LCD_CLK
+
+/*    GPIOx    Pin     AF  M  O  S  P  I  */
+// Control
+    { GPIOI,    14,    14, 2, 0, 3, 0, 0 },       // LCD_CLK
     { GPIOI,     9,    14, 2, 0, 3, 0, 0 },       // LCD_VSYNC
     { GPIOI,    10,    14, 2, 0, 3, 0, 0 },       // LCD_HSYNC
     { GPIOK,     7,    14, 2, 0, 3, 0, 0 },       // LCD_DE
@@ -300,7 +318,11 @@ uint32_t mFIELD, mVALUE;
     /*
      * Port   GPIOE
      */
+                // Enabling clock
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOEEN;
+    __NOP(); __DSB();
                 // Configuring Mode
+
     mFIELD =    GPIO_MODER_MODER4_Msk;
     mVALUE =   (2<<GPIO_MODER_MODER4_Pos);
     GPIOE->MODER  = (GPIOE->MODER&~mFIELD)|mVALUE;
@@ -313,6 +335,9 @@ uint32_t mFIELD, mVALUE;
     /*
      * Port   GPIOG
      */
+                // Enabling clock
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOGEN;
+    __NOP(); __DSB();
                 // Configuring Mode
     mFIELD =    GPIO_MODER_MODER12_Msk;
     mVALUE =   (2<<GPIO_MODER_MODER12_Pos);
@@ -326,6 +351,9 @@ uint32_t mFIELD, mVALUE;
     /*
      * Port   GPIOI
      */
+                // Enabling clock
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOIEN;
+    __NOP(); __DSB();
                 // Configuring Mode
     mFIELD =   GPIO_MODER_MODER9_Msk
               |GPIO_MODER_MODER10_Msk
@@ -359,6 +387,9 @@ uint32_t mFIELD, mVALUE;
     /*
      * Port   GPIOJ
      */
+                // Enabling clock
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOJEN;
+    __NOP(); __DSB();
                 // Configuring Mode
     mFIELD =   GPIO_MODER_MODER0_Msk
               |GPIO_MODER_MODER1_Msk
@@ -384,7 +415,7 @@ uint32_t mFIELD, mVALUE;
               |(2<<GPIO_MODER_MODER13_Pos)
               |(2<<GPIO_MODER_MODER14_Pos)
               |(2<<GPIO_MODER_MODER15_Pos);
-    GPIOI->MODER  = (GPIOI->MODER&~mFIELD)|mVALUE;
+    GPIOJ->MODER  = (GPIOJ->MODER&~mFIELD)|mVALUE;
 
                 // Configuring Alternate Function (Pins 7-0)
     mFIELD =   GPIO_AFRL_AFRL0_Msk
@@ -422,9 +453,14 @@ uint32_t mFIELD, mVALUE;
               |(14<<GPIO_AFRL_AFRL7_Pos);
     GPIOJ->AFR[1]  = (GPIOJ->AFR[1]&~mFIELD)|mVALUE;
 
+
+
     /*
      * Port   GPIOK
      */
+                // Enabling clock
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOIEN;
+    __NOP(); __DSB();
                 // Configuring Mode
     mFIELD =   GPIO_MODER_MODER0_Msk
               |GPIO_MODER_MODER1_Msk
@@ -440,7 +476,7 @@ uint32_t mFIELD, mVALUE;
               |(2<<GPIO_MODER_MODER5_Pos)
               |(2<<GPIO_MODER_MODER6_Pos)
               |(2<<GPIO_MODER_MODER7_Pos);
-    GPIOI->MODER  = (GPIOI->MODER&~mFIELD)|mVALUE;
+    GPIOK->MODER  = (GPIOK->MODER&~mFIELD)|mVALUE;
 
                 // Configuring Alternate Function (Pins 7-0)
     mFIELD =   GPIO_AFRL_AFRL0_Msk
@@ -462,13 +498,15 @@ uint32_t mFIELD, mVALUE;
     /*
      * I2C signals
      */
+                // Enabling clock
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOHEN;
+    __NOP(); __DSB();
                 // Configuring Mode
     mFIELD =   GPIO_MODER_MODER7_Msk
               |GPIO_MODER_MODER8_Msk;
     mVALUE =   (2<<GPIO_MODER_MODER7_Pos)
               |(2<<GPIO_MODER_MODER8_Pos);
     GPIOH->MODER  = (GPIOH->MODER&~mFIELD)|mVALUE;
-
                 // Configuring Alternate Function (Pins 7-0)
     mFIELD =   GPIO_AFRL_AFRL7_Msk;
     mVALUE =   (4<<GPIO_AFRL_AFRL7_Pos);
@@ -478,18 +516,26 @@ uint32_t mFIELD, mVALUE;
     mVALUE =   (4<<GPIO_AFRL_AFRL0_Pos);
     GPIOH->AFR[1]  = (GPIOH->AFR[1]&~mFIELD)|mVALUE;
     /*
-     * LCD Control signals
+     * LCD Control signals using GPIO
      *
      *     LCD_INT      PI13    input   LCD interrupt signal
      *     LCD_DISP     PI12    output
      *     LCD_BL_CTRL  PK3     output
      */
+                // Enabling clock
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOIEN;
+    __NOP(); __DSB();
+                // Configuring mode
     mFIELD =   GPIO_MODER_MODER12_Msk
               |GPIO_MODER_MODER13_Msk;
     mVALUE =   (1<<GPIO_MODER_MODER12_Pos)
               |(0<<GPIO_MODER_MODER13_Pos);
     GPIOI->MODER  = (GPIOI->MODER&~mFIELD)|mVALUE;
 
+                // Enabling clock
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOKEN;
+    __NOP(); __DSB();
+                // Configuring mode
     mFIELD =   GPIO_MODER_MODER3_Msk;
     mVALUE =   (1<<GPIO_MODER_MODER3_Pos);
     GPIOK->MODER  = (GPIOK->MODER&~mFIELD)|mVALUE;
@@ -504,21 +550,31 @@ uint32_t mFIELD, mVALUE;
  */
 
 ///@{
-void  LCD_BacklightOn(void) {
+void  LCD_TurnBacklightOn(void) {
 
 #ifdef LCD_USEGPIO
+    GPIO_Init(GPIOK,0,LCD_BACKLIGHTCTRL_MASK);
     GPIO_Set(GPIOK,LCD_BACKLIGHTCTRL_MASK);
 #else
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOKEN;
+    __NOP(); __DSB();
+    GPIOK->MODER  = (GPIOK->MODER&~GPIO_MODER_MODER3_Msk)
+                    |(1<<GPIO_MODER_MODER3_Pos);
     GPIOK->BSRR |= LCD_BACKLIGHTCTRL_MASK;
 #endif
 
 }
 
-void  LCD_BacklightOff(void) {
+void  LCD_TurnBacklightOff(void) {
 
 #ifdef LCD_USEGPIO
+    GPIO_Init(GPIOK,0,LCD_BACKLIGHTCTRL_MASK);
     GPIO_Clear(GPIOK,LCD_BACKLIGHTCTRL_MASK);
 #else
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOKEN;
+    __NOP(); __DSB();
+    GPIOK->MODER  = (GPIOK->MODER&~GPIO_MODER_MODER3_Msk)
+                    |(1<<GPIO_MODER_MODER3_Pos);
     GPIOK->BSRR |= (LCD_BACKLIGHTCTRL_MASK<<16);
 #endif
 
@@ -532,7 +588,7 @@ void  LCD_BacklightOff(void) {
  */
 
 ///@{
-void  LCD_NormalOperation(void) {
+void  LCD_PutDisplayOperation(void) {
 
 #ifdef LCD_USEGPIO
     GPIO_Set(GPIOI,LCD_NORMALSTANDBY_MASK);
@@ -542,7 +598,7 @@ void  LCD_NormalOperation(void) {
 
 }
 
-void  LCD_StandBy(void) {
+void  LCD_LCD_PutDisplayStandBy(void) {
 
 #ifdef LCD_USEGPIO
     GPIO_Clear(GPIOI,LCD_NORMALSTANDBY_MASK);
@@ -562,13 +618,13 @@ void  LCD_StandBy(void) {
  */
 
 ///@{
-void  LCD_Enable(void) {
+void  LCD_EnableController(void) {
 
     LTDC->GCR |= LTDC_GCR_LTDCEN;
 
 }
 
-void  LCD_Disable(void) {
+void  LCD_DisableController(void) {
 
     LTDC->GCR &= ~LTDC_GCR_LTDCEN;
 
@@ -585,17 +641,17 @@ void  LCD_Disable(void) {
 ///@{
 void  LCD_On(void) {
 
-    LCD_Enable();
-    LCD_NormalOperation();
-    LCD_BacklightOn();
+    LCD_EnableController();
+    LCD_PutDisplayOperation();
+    LCD_TurnBacklightOn();
 
 }
 
 void  LCD_Off(void) {
 
-    LCD_Disable();
-    LCD_StandBy();
-    LCD_BacklightOff();
+    LCD_DisableController();
+    LCD_LCD_PutDisplayStandBy();
+    LCD_TurnBacklightOff();
 }
 ///@}
 
@@ -666,8 +722,12 @@ PLLOutputFrequencies_t pllfreq;
         return -2; // ignore wrong divisor
     }
 
+    // Configure divisor for LCD controller
     RCC->DCKCFGR1 = (RCC->DCKCFGR1&~RCC_DCKCFGR1_PLLSAIDIVR)
                     |(pllsaidivr<<RCC_DCKCFGR1_PLLSAIDIVR_Pos);
+
+    // Enable clock for LCD controller
+    RCC->APB2ENR |= RCC_APB2ENR_LTDCEN;
 
     LCDCLOCK_Initialized = 1;
     return 0;
@@ -706,16 +766,18 @@ void LCD_Init(void) {
 
     // Reset LCD
 
-
+    // configure polarity of control signals
+    LTDC->GCR =   (LTDC->GCR&~(LTDC_GCR_DEPOL|LTDC_GCR_HSPOL|LTDC_GCR_VSPOL|LTDC_GCR_PCPOL))
+                 |(POL);
     // Configure LCD geometry
     LTDC->SSCR =  (HSW-1)<<LTDC_SSCR_HSW_Pos
                  |(VSW-1)<<LTDC_SSCR_VSH_Pos;
     LTDC->BPCR =  (HSW+HBP-1)<<LTDC_BPCR_AHBP_Pos
                  |(VSW+VBP-1)<<LTDC_BPCR_AVBP_Pos;
     LTDC->AWCR =  (HSW+HBP+HAW-1)<<LTDC_AWCR_AAW_Pos
-                 |(VSW+VBP+VAH-1)<<LTDC_AWCR_AAW_Pos;
+                 |(VSW+VBP+VAH-1)<<LTDC_AWCR_AAH_Pos;
     LTDC->TWCR  = (HSW+HBP+HAW+HFP-1)<<LTDC_TWCR_TOTALW_Pos
-                 |(VSW+VBP+VAH+VFP-1)<<LTDC_TWCR_TOTALW_Pos;
+                 |(VSW+VBP+VAH+VFP-1)<<LTDC_TWCR_TOTALH_Pos;
 
     // Set background color
     LTDC->BCCR = BACKGROUND_COLOR;
@@ -724,8 +786,8 @@ void LCD_Init(void) {
     //LTDC->IER  |= (LTDC_IER_RRIE|LTDC_IER_TERRIE|LTDC_IER_FUIE|LTDC_IER_LIE);
 
 
-    LCD_NormalOperation();
-    LCD_BacklightOn();
+    LCD_PutDisplayOperation();
+    LCD_TurnBacklightOn();
 
 }
 
@@ -737,8 +799,11 @@ void LCD_Init(void) {
 void
 LCD_SetBackgroundColor( uint32_t bgcolor ) {
 
-    LTDC->GCR = bgcolor;
+    LTDC->BCCR = bgcolor;
 }
+
+
+//////////////////////////// LAYER routines ////////////////////////////////////////////////////////
 
 /*
  * @brief   LCD Set Default Color for layer
@@ -749,6 +814,15 @@ LCD_SetDefaultColor(int layer,  uint32_t color ) {
 
     LTDC_Layer[layer]->DCCR = color;
 }
+
+/*
+ * @brief   LCD Set format for layer
+ */
+void  LCD_SetFormat(int layer, int format) {
+
+    LTDC_Layer[layer]->PFCR = format;
+}
+
 
 /*
  * @brief   LCD Set Color Key for layer
@@ -770,13 +844,6 @@ LCD_GetFrameBufferAddress(int layer) {
    return (void *) LTDC_Layer[layer]->CFBAR;
 }
 
-/*
- * @brief   LCD Set format for layer
- */
-void  LCD_SetFormat(int layer, int format) {
-
-    LTDC_Layer[layer]->PFCR = format;
-}
 
 /*
  * @brief   LCD Get Format used in layer

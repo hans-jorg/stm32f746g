@@ -13,6 +13,8 @@
  ******************************************************************************/
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
 
 #include "stm32f746xx.h"
 #include "system_stm32f746.h"
@@ -184,7 +186,6 @@ static long int a = 16807L, m = 2147483647L, q = 127773L, r = 2836L;
  * @note    Initializes GPIO and SDRAM, blinks LED and test SDRAM access
  */
 #define LINEMAX 100
-#define TEST 3
 int main(void) {
 char line[LINEMAX+1];
 
@@ -200,55 +201,109 @@ char line[LINEMAX+1];
 
     printf("Press ENTER to initialize ExtRAM\n");
     fgets(line,LINEMAX,stdin);
-    SDRAM_Init(SDRAM_BANK1);
+    SDRAM_Init();
 
-#if TEST == 1
     uint16_t w = 0x1234;
     uint16_t wr;
     uint16_t *p = (uint16_t *) 0xC0000000;
-    for (;;) {
-        printf("Press ENTER to write to External RAM\n");
-        fgets(line,LINEMAX,stdin);
-        printf("Write %X to %p\n",w,p);
-        *p = w;
+    uint32_t lw = 0x12345678;
+    uint32_t lwr;
+    uint32_t *lp = (uint32_t *) 0xC0000000;
+    while(1) {
+        puts("Choose test");
+        puts("1 - Write pattern using 16 bit access");
+        puts("2 - Write random pattern using 16-bit access");
+        puts("3 - Write random pattern using 16-bit access");
+        puts("4 - Write pattern using 32 bit access");
+        puts("5 - Write random pattern using 32-bit access");
+        puts("6 - Write random pattern using 32-bit access");
+        puts("7 - Reset apontadores");
+        fputs(">",stdout);
+        fgets(line,100,stdin);
+        int test = atoi(line);
+        if( test == 0 ) continue;
+        int k;
 
-        wr = *p++;
-        printf("Read %X from %p\n",wr,p);
-        Delay(100);
-        w++;
+        switch(test) {
+        case 1:
+            for (k=0;k<16;k++) {
+                printf("Write %04X to %p. ",w,p);
+                *p = w;
+                __DSB();
+                wr = *p;
+                printf("Read %04X =>  %s\n",wr,(w==wr)?"OK":"Error");
+                w++;
+                p++;
+            }
+            break;
+        case 2:
+            for(k=0;k<16;k++) {
+                w = my_rand();
+                printf("Wrote %04X to %p  ",w,p);
+                *p = w;
+                __DSB();
+                wr = *p;
+                if ( w == wr )
+                    printf("OK\n",wr);
+                else
+                    printf("Read %04X\n",wr);
+                p++;
+            }
+            break;
+        case 3:
+            for(k=0;k<16;k++) {
+                printf("%p\r",p);
+                w = my_rand();
+                *p = w;
+                __DSB();
+                wr = *p;
+                if( w != wr )
+                    printf("\nWrote %04X Read %04X\n",w,wr);
+                p++;
+            }
+            break;
+        case 4:
+            for (k=0;k<16;k++) {
+                printf("Write %08X to %p\n",lw,lp);
+                *lp = lw;
+                __DSB();
+                lwr = *lp;
+                printf("Read %04X =>  %s\n",lwr,(lw==lwr)?"OK":"Error");
+                lw++;
+                lp++;
+            }
+            break;
+        case 5:
+            for(k=0;k<16;k++) {
+                lw = my_rand();
+                printf("Wrote %08X to %p  ",lw,lp);
+                *lp = lw;
+                __DSB();
+                lwr = *lp;
+                if ( lw == lwr )
+                    printf("OK\n",lwr);
+                else
+                    printf("Read %08\n",lwr);
+                lp++;
+            }
+            break;
+        case 6:
+            for(k=0;k<16;k++) {
+                printf("%p\r",lp);
+                lw = my_rand();
+                *lp = lw;
+                 __DSB();
+               lwr = *lp;
+                if( lw != lwr )
+                    printf("\nWrote %08X Read %08X\n",lw,lwr);
+                lp++;
+            }
+            break;
+        case 7:
+            w = 0x1234;
+            p = (uint16_t *) 0xC0000000;
+            lw = 0x12345678;
+            lp = (uint32_t *) 0xC0000000;
+        }
     }
-#elif TEST == 2
-    printf("Press ENTER to test to External RAM\n");
-    fgets(line,LINEMAX,stdin);
-    uint16_t w = 0x1234;
-    uint16_t wr;
-    uint16_t *p = (uint16_t *) 0xC0000000;
-    for(;;) {
-        w = my_rand();
-        printf("Wrote %X to %p  ",w,p);
-        *p = w;
-        wr = *p;
-        if ( w == wr )
-            printf("OK\n",wr);
-        else
-            printf("Read %x\n",wr);
-        p++;
-    }
-#elif TEST == 3
-    printf("Press ENTER to test to External RAM\n");
-    fgets(line,LINEMAX,stdin);
-    uint16_t w = 0x1234;
-    uint16_t wr;
-    uint16_t *p = (uint16_t *) 0xC0000000;
-    for(;;) {
-        printf("%p\r",p);
-        w = my_rand();
-        *p = w;
-        wr = *p;
-        if( w != wr )
-            printf("\nWrote %x Read %x\n",w,wr);
-        p++;
-    }
-
-#endif
 }

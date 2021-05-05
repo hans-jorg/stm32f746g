@@ -185,7 +185,7 @@
 #define SD_MODE    (2)
 #define SD_OTYPE   (0)
 #define SD_OSPEED  (3)
-#define SD_PUPD    (0)
+#define SD_PUPD    (1)
 
 
 static void
@@ -748,8 +748,17 @@ uint32_t mAND,mOR; // Mask
 
 }
 #else
-
+/* Pin Configuration Fields                                                    */
+/* GPIOx: GPIO interface        [GPIOA...GPIOK]                                */
+/*     AF: Alternate function   [0:GPIO,2:I2C, ... 14:LCD]                     */
+/*     M:  Mode                 [0:Input, 1=Output,2=AF,3=Analog]              */
+/*     OT: Output Type          [0:Push-pull, 1=Open-drain ]                   */
+/*     S:  Speed                [0:Low, 1:Medium, 2:High, 3:Very high]         */
+/*     P:  Pull-down/Pull-up    [0:None, 1:Pull-up, 2:Pull-down]               */
+/*     I:  Initial              [0: Low, 1:High]                               */
 static const GPIO_PinConfiguration pinconfig_common[] = {
+
+/*    GPIOx    Pin      AF  M   O  S  P  I  */
    {  GPIOD,   14,      12, 2,  0, 3, 0, 0  },       //     DQ0
    {  GPIOD,   15,      12, 2,  0, 3, 0, 0  },       //     DQ1
    {  GPIOD,   0,       12, 2,  0, 3, 0, 0  },       //     DQ2

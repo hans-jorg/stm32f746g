@@ -7,17 +7,8 @@
  * @author  Hans
  */
 
-int SDRAM_Init(int bank);
+int SDRAM_Init();
 
-/**
- * @brief SDRAM Bank
- *
- * There are only two (SDRAM Banks 1 and 2) at FMC Banks 5 and 6, respectively
- */
-///{
-#define SDRAM_BANK1             0
-#define SDRAM_BANK2             1
-///}
 /**
  *  @brief  SystemCoreClock for correct working of the SDRAM
  *

@@ -213,6 +213,24 @@ As described in the schematics the I2C interface of the CTP uses the default
 address 01110000 (=0x70). The Audio WM8994ECS/R uses the address 0x00110100 (=0x34), as in 
 the Discovery board or 0x00110110 (=0x36) according tho pin CS/ADDR, low or high, respectively.
 
+Polarity
+--------
+
+The LCD controller supports display with different polarity of control signals. The polarity to be
+used can be set in register LTCD_GCR. The default is clock not inverted and all others active low.
+
+The Rk043 has the polarity of control signals shown below, as can be obtained from the example 
+implementation.
+
+| Display signal | LCD signal | Polarity      |   Symbol      |
+|----------------|------------|---------------|---------------|
+|   DCLK         | LCD_CLK    |  Not inverted |     0         |
+|   DE           | LCD_DE     |  Active low*  |     0         |
+|   VSYNC        | LCD_VSYNC  |  Active low   |     0         |
+|   HSYNC        | LCD_HSYNC  |  Active low   |     0         |
+
+OBS: This contradicts what is deduced from the waveforms in the datasheet.
+
 Timing
 ------
 

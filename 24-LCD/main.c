@@ -11,9 +11,13 @@
  *
  ******************************************************************************/
 
+#include <stdint.h>
+#include <stdio.h>
 #include "stm32f746xx.h"
 #include "system_stm32f746.h"
 #include "led.h"
+#include "sdram.h"
+#include "buddy.h"
 #include "lcd.h"
 
 
@@ -41,6 +45,33 @@ void ms_delay(volatile int ms) {
    }
 }
 
+/**
+ * @brief   flag
+ */
+int verbose = 1;
+
+/*
+ * @brief   prints a message and waits for ENTER to continue
+ */
+
+void messagewithconfirm(char *s) {
+int c;
+    if( ! verbose )
+        return;
+    fputs(s,stdout);
+    while( (c=getchar())!='\n' ) {}
+}
+
+
+/*
+ * @brief   prints a message
+ */
+
+int message(char *s) {
+int c;
+    if( verbose )
+        puts(s);
+}
 
 
 /**
@@ -52,27 +83,90 @@ void ms_delay(volatile int ms) {
  */
 
 int main(void) {
+int fbsize;
+void *fbarea;
+int format = LCD_FORMAT_RGB888;
 
-
-    SystemSetCoreClockFrequency(OPERATING_FREQUENCY);
-
+    message("Initializing LED");
     LED_Init();
 
+    message("Setting clock to operating frequency");
+    SystemConfigMainPLL(&MainPLLConfiguration_200MHz);
+    SystemSetCoreClock(CLOCKSRC_PLL,1);
+    printf("Frequency is now %d Hz\n",SystemCoreClock);
+
+    messagewithconfirm("Press ENTER to turn OFF backlight without LCD initialization");
+    LCD_TurnBacklightOff();
+
+    messagewithconfirm("Press ENTER to initialize LCD");
     LCD_Init();
 
+    messagewithconfirm("Press ENTER to turn OFF backlight");
+    LCD_TurnBacklightOff();
+
+    message("Initializing SDRAM");
+    SDRAM_Init(SDRAM_BANK1);
+
+    message("Writing 0x12345678 to SDRAM");
+    *((uint32_t *) 0xc0000000) = 0x12345678;
+
+    message("Reading from SDRAM");
+    uint32_t r = *((uint32_t *) 0xc0000000);
+    printf("Read %0x\n",r);
+
+
+    message("Initializing buddy allocator");
+    Buddy_Init((char*) SDRAM_ADDRESS,SDRAM_SIZE,8192);
+
+    messagewithconfirm("Press ENTER to enable controller");
+    LCD_EnableController();
+
+    messagewithconfirm("Press ENTER to turn ON backlight");
+    LCD_TurnBacklightOn();
+
+    messagewithconfirm("Press ENTER to enter normal operation");
+    LCD_PutDisplayOperation();
+
+    messagewithconfirm("Press ENTER to get the frame buffer size");
+    fbsize = LCD_GetMinimalFullFrameBufferSize(format);
+    printf("Minimal size is %d\n",fbsize);
+
+    messagewithconfirm("Press ENTER to allocate area");
+    fbarea = Buddy_Alloc(fbsize);
+    printf("Allocated at address %p\n",fbarea);
+
+    messagewithconfirm("Press ENTER to set background color");
+    LCD_SetBackgroundColor(RGB(255,0,255));
+
+    messagewithconfirm("Press ENTER to set the frame buffer to layer 1");
+    LCD_SetFullSizeFrameBuffer(1, fbarea, format);
+
     /*
-     * Blink LED
+     * Blink LCD
      */
+
+
     for (;;) {
-#if 1
-       ms_delay(500);
-       LED_Toggle();
-#else
-        ms_delay(500);
-        LED_Set();
-        ms_delay(500);
-        LED_Clear();
-        ms_delay(500);
-#endif
+        messagewithconfirm("Press ENTER to make layer 1 all RED");
+        LCD_FillFrameBuffer(1,RGB(255,0,0));
+
+        messagewithconfirm("Press ENTER to make layer 1 all GREEN");
+        LCD_FillFrameBuffer(1,RGB(0,255,0));
+
+        messagewithconfirm("Press ENTER to make layer 1 all BLUE");
+        LCD_FillFrameBuffer(1,RGB(0,0,255));
+
+        messagewithconfirm("Press ENTER to make layer 1 all YELLOW?");
+        LCD_FillFrameBuffer(1,RGB(255,255,0));
+
+        messagewithconfirm("Press ENTER to make layer 1 all YELLOW?");
+        LCD_FillFrameBuffer(1,RGB(255,255,0));
+
+        messagewithconfirm("Press ENTER to make layer 1 all MAGENTA?");
+        LCD_FillFrameBuffer(1,RGB(255,0,255));
+
+        messagewithconfirm("Press ENTER to make layer 1 all MAGENTA?");
+        LCD_FillFrameBuffer(1,RGB(0,255,255));
+
     }
 }

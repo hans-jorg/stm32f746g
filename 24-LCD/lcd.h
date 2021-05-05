@@ -10,6 +10,14 @@
 #include "stm32f746xx.h"
 #include "system_stm32f746.h"
 
+/**
+ * @brief   Create a RGB color in an unsigned int
+ *
+ * @note    The order is reversed!!!
+ *
+ * @note    The 8 low order bits are 0 (Why?)
+ */
+#define RGB(R,G,B)      ((0L)|((R)<<16|((G)<<8)|((B)<<0)))
 
 /*
  * @brief   LCD Set Pixel Format
@@ -38,18 +46,16 @@ typedef struct {
 } RGB_t;
 
 
-void  LCD_BacklightOn(void);
-void  LCD_BacklightOff(void);
-void  LCD_NormalOperation(void);
-void  LCD_StandBy(void);
-void  LCD_Enable(void);
-void  LCD_Disable(void);
-
-
 void  LCD_Init(void);
 
+void  LCD_TurnBacklightOn(void);
+void  LCD_TurnBacklightOff(void);
+void  LCD_PutDisplayOperation(void);
+void  LCD_PutDisplayStandBy(void);
+void  LCD_EnableController(void);
+void  LCD_DisableController(void);
+
 void  LCD_SetBackgroundColor( uint32_t bg );
-void  LCD_SetDefaultColor(int layer,  uint32_t c );
 void  LCD_SetColorKey(int layer,  uint32_t c );
 
 /**
@@ -62,18 +68,20 @@ void  LCD_SetColorKey(int layer,  uint32_t c );
  *        * Partial size: Format, position and size must be specified
  */
 void  LCD_SetFullSizeFrameBuffer(int layer, void *area, int format);
+void  LCD_SetDefaultColor(int layer, uint32_t c );
+void  LCD_SetDefaultColor(int layer, uint32_t c );
+void  LCD_FillFrameBuffer(int layer, unsigned c );
+
 void *LCD_GetLineAddress(int layer, int line);
 int   LCD_GetHeight(int layer);
 int   LCD_GetWidth(int layer);
 int   LCD_GetPitch(int layer);
-
 void *LCD_GetFrameBufferAddress(int layer);
 void  LCD_SetFormat(int layer, int format);
 int   LCD_GetFormat(int layer);
 int   LCD_GetPixelSize(int layer);
 
 int   LCD_GetMinimalFullFrameBufferSize(int format);
-void  LCD_FillFrameBuffer(int layer, unsigned c );
 //void  LCD_SetFrameBuffer(int layer, int format, void *area, int w, int h );
 //int   LCD_GetMinimalFrameBufferSize(int format);
 #endif
