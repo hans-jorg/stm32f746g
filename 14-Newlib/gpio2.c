@@ -30,6 +30,7 @@
 
 #define PUPDDEFAULT     (0)
 #define OTYPEDEFAULT    (0)
+#define OSPEEDDEFAULT   (1)
 
 /**
  * @defgroup    macros-1
@@ -160,12 +161,11 @@ int pos;
             pos4 -= 32;
             gpio->AFR[1] = (gpio->AFR[1]&~(0xF<<pos4))|(conf->af<<pos4);
         }
-        gpio->MODER   = (gpio->MODER&~(3<<pos2))|(2<<pos2);
-        // Set remaining configurations to default
-        gpio->OSPEEDR = (gpio->OSPEEDR&~(3<<pos2))|(0<<pos2);
-        gpio->PUPDR   = (gpio->PUPDR&~(3<<pos2))|(0<<pos2);
-        gpio->OTYPER  = (gpio->OTYPER&~(BIT(pos)));
-        gpio->ODR     = (gpio->ODR&~BIT(pos));
+        gpio->MODER   = (gpio->MODER&~(3<<pos2))|(conf->mode<<pos2);
+        gpio->OSPEEDR = (gpio->OSPEEDR&~(3<<pos2))|(conf->ospeed<<pos2);
+        gpio->PUPDR   = (gpio->PUPDR&~(3<<pos2))|(conf->pupd<<pos2);
+        gpio->OTYPER  = (gpio->OTYPER&~(BIT(pos)))|(conf->otype<<pos);
+        gpio->ODR     = (gpio->ODR&~BIT(pos))|(conf->initial<<pos);
     } else {
         /* Configure pin to use GPIO function */
         if( pos < 8 ) {     // Use AFRL
@@ -197,7 +197,7 @@ void GPIO_ConfigureMultiplePins(const GPIO_PinConfiguration *pconfig) {
  * @brief   GPIO_ConfigurePinSimple
  */
 void
-GPIO_ConfigurePinSimple(GPIO_TypeDef *gpio, unsigned pin, unsigned af) {
+GPIO_ConfigurePinSimple(GPIO_TypeDef *gpio, unsigned pin, unsigned af, unsigned mode) {
 unsigned pos2,pos4;
 
     GPIO_EnableClock(gpio);
@@ -206,22 +206,22 @@ unsigned pos2,pos4;
     pos4 = pin*4;
 
     /* Configure pin to use alternate function */
-    if ( af != 0 ) {
-        gpio->MODER = (gpio->MODER&~(3<<pos2))|(2<<pos2);
-    }
-
     /* Configure pin which alternate function */
     if( pin < 8 ) { // Use AFRL
         gpio->AFR[0] = (gpio->AFR[0]&~(0xF<<pos4))|(af<<pos4);
     } else {            // Use AFRH
         gpio->AFR[1] = (gpio->AFR[1]&~(0xF<<(pos4-32)))|(af<<(4*pin-32));
     }
+    if( af != 0 ) {
+        gpio->MODER = (gpio->MODER&~(3<<pos2))|(2<<pos2);
+    } else {
+        gpio->MODER = (gpio->MODER&~(3<<pos2))|(mode<<pos2);
+    }
 
-    /*
-    gpio->OSPEEDR = (gpio->OSPEEDR&~(3<<pos2))|(ospeed<<pos2);
+    gpio->OSPEEDR = (gpio->OSPEEDR&~(3<<pos2))|(OSPEEDDEFAULT<<pos2);
     gpio->PUPDR   = (gpio->PUPDR&~(3<<pos2))|(PUPDDEFAULT<<pos2);
     gpio->OTYPER  = (gpio->OTYPER&~BIT(pin))|(OTYPEDEFAULT<<(pin));
-    */
+
 }
 
 /**
