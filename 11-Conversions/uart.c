@@ -266,6 +266,33 @@ uint32_t status;
     return uart->RDR;
 }
 
+/**
+ ** @brief Read a character from UART
+ **
+ ** @note  It does not block. It return 0 when there is no received character
+ **
+ **/
+int
+UART_ReadCharNoWait(int uartn) {
+USART_TypeDef *uart;
+uint32_t status;
+
+    if( uartn >= uarttabsize ) return -1;
+
+    uart = uarttab[uartn].device;
+
+    status = uart->ISR;
+    if( status & USART_ISR_ORE )  {  // overun error
+        uart->ICR |= USART_ICR_ORECF;
+    }
+
+    if ( uart->ISR & USART_ISR_RXNE ) {
+        return uart->RDR;
+    } else {
+        return 0;
+    }
+}
+
 
 /**
  ** @brief UART Send a string
