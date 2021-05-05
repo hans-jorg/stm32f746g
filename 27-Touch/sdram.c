@@ -19,13 +19,23 @@
  *  @brief  Pin initialization routines
  *
  *  @note   There are two versions:
- *          1: using direct access to register (faster but larger)
- *          2: using GPIO routines from a pin configuration table (smaller but slow))
+ *          1: using GPIO routines from a pin configuration table (smaller but slow))
+  *         2: using direct access to register (faster but larger)
  */
-#ifndef SDRAM_FAST_INITIALIZATION
-#define SDRAM_FAST_INITIALIZATION (1)
-#endif
+//#define SDRAM_USEGPIO             (1)
 
+
+/**
+ * @brief SDRAM Bank
+ *
+ * There are only two (SDRAM Banks 1 and 2) at FMC Banks 5 and 6, respectively
+ *
+ * @note Only SDRAM Bank1 implemented!!!!!
+ */
+///{
+#define SDRAM_BANK1             0
+#define SDRAM_BANK2             1
+///}
 
 /**
  *  @brief  SDRAMBIT    generates bit mask
@@ -56,22 +66,43 @@
  *
  */
 
-/*
- * OBS: There are some differences between STM32F746G Discovery Demo and
- * the code in BSP/stm32g_discovery_sdram.c
+/**
+ * @brief SDRAM parameters
  *
- * TRAS = 6      7
- * TRC  = 6      7
+ *  | Parameter      | Description                    | Value   |  CubeMX |
+ *  |----------------|--------------------------------|---------|---------|
+ *  |SDRAM_RPIPE     | Read pipe delay (0,1,2 HCLK)   |    0    |     0   |
+ *  |SDRAM_RBURST    | Burst read  (0: no, 1: always) |    1    |     1   |
+ *  |SDRAM_SDCLK     | SDRAM Clock (0:no, 2: /2, 3: /3|    2    |     2   |
+ *  |SDRAM_WP        | Write protection (0:no, 1:yes) |    0    |     0   |
+ *  |SDRAM_CAS       | CAS Latency (1,2,3 cycles)     |    2    |     3   |
+ *  |SDRAM_NB        | Number of banks (0:2, 1:4)     |    1    |     1   |
+ *  |SDRAM_MWID      | Data bus (0:8, 1:16, 2:32)     |    1    |     1   |
+ *  |SDRAM_NR        | Row address (0:11, 1:12, 2, 13)|    1    |     1   |
+ *  |SDRAM_NC        | Column address (x+8)           |    0    |     0   |
+ *  |SDRAM_TRCD      | Row to column delay (x+1)      |    2    |     2   |
+ *  |SDRAM_TRP       | Row precharge delay (x+1)      |    2    |     2   |
+ *  |SDRAM_TWR       | Write Recovery delay  (x+1)    |    2    |     3   |
+ *  |SDRAM_TRC       | Row cycle delay (x+1)          |    7    |     7   |
+ *  |SDRAM_TRAS      | Self refresh time (x+1)        |    4    |     4   |
+ *  |SDRAM_TXSR      | Exit self refresh delay (x+1)  |    7    |     7   |
+ *  |SDRAM_TMRD      | Load mode to active (x+1)      |    2    |     2   |
  *
+ *
+ * @note  There are some differences between STM32F746G Discovery Demo
+ *        and the code in BSP/stm32g_discovery_sdram.c
+ *
+ *        TRAS = 6      7
+ *        TRC  = 6      7
+
  */
 
-
-// Configuration of SDCRx
+//  Configuration of SDCRx
 #define SDRAM_RPIPE             0
 #define SDRAM_RBURST            1
 #define SDRAM_SDCLK             2
 #define SDRAM_WP                0
-#define SDRAM_CAS               0
+#define SDRAM_CAS               3
 #define SDRAM_NB                1
 #define SDRAM_MWID              1
 #define SDRAM_NR                1
@@ -80,26 +111,26 @@
 // Configuration of SDTRx
 #define SDRAM_TRCD              2
 #define SDRAM_TRP               2
-#define SDRAM_TWR               2
-#define SDRAM_TRC               6
+#define SDRAM_TWR               3
+#define SDRAM_TRC               7
 #define SDRAM_TRAS              4
-#define SDRAM_TXSR              6
+#define SDRAM_TXSR              7
 #define SDRAM_TMRD              2
 
 
 #define SDRAM_REFRESHCOUNT      1539
 
 /**
- *  @brief  FMC Commands
+ *  @brief  FMC Command Mode
  */
 ///@{
-#define SDRAM_COMMAND_NORMAL                0x0
-#define SDRAM_COMMAND_CLOCKCONFIGENABLE     0x1
-#define SDRAM_COMMAND_PALL                  0x2
-#define SDRAM_COMMAND_AUTOREFRESH           0x3
-#define SDRAM_COMMAND_LOADMODE              0x4
-#define SDRAM_COMMAND_SELF_REFRESH          0x5
-#define SDRAM_COMMAND_POWERDOWN             0x6
+#define SDRAM_MODE_NORMAL                0x0
+#define SDRAM_MODE_CLOCKCONFIGENABLE     0x1
+#define SDRAM_MODE_PALL                  0x2
+#define SDRAM_MODE_AUTOREFRESH           0x3
+#define SDRAM_MODE_LOADMODE              0x4
+#define SDRAM_MODE_SELFREFRESH           0x5
+#define SDRAM_MODE_POWERDOWN             0x6
 ///@}
 
 /**
@@ -107,7 +138,7 @@
  *
  *  @note   8 auto-refresh cycles every time AUTOREFRESH command is issued
  */
-#define SDRAM_AUTOREFRESH                   0x7
+#define SDRAM_AUTOREFRESH                   0x8
 
 /*
  *  @brief  Refresh count
@@ -142,16 +173,22 @@
 /**
  *  @brief  Mode register for MT48LC4M32B2
  *
- * Configuration used
- * Burst length     =  000 (1)
- * Burst type       =    0 (Sequential)
- * CAS Latency      =  010 (2)
- * Operation mode   =   00 (Standard Operation)
- * Write Burst Mode =    1 (Single Location Access)
+ * | Field            | Pos  | Value |  Description               |
+ * |------------------|------|-------|----------------------------|
+ * | Reserved         | 13-10|  000  | Must be 000                |
+ * | Write Burst Mode |  9-9 |    1  | Single Location Access     |
+ * | Operation mode   |  8-7 |   00  | Standard Operation)        |
+ * | CAS Latency      |  6-4 |  010  |  2                         |
+ * | Burst type       |  3-3 |    0  | Sequential                 |
+ * | Burst length     |  2-0 |  000  |  1                         |
  *
+ *      11 1100 0000 0000
+ *      32 1098 7654 3210
+ *      --------------
+ *      00 0010 0010 0000 = 0x220
  */
 
-#define SDRAM_MODE   0x220
+#define SDRAM_MODE   0x230
 
 
 /*******************^^^^^^ To be rewamped ^^^^^^ *************************************************/
@@ -160,9 +197,6 @@
 
 /**
  * @brief   Pin initialization
- *
- * @note    Uncomment the define USE_FAST_INITIALIZATION  to initialize without GPIO routines and
- *          tables
  *
  * @note    In initializes FMC for 12-bit column address and 16-bit data bus
  *
@@ -174,12 +208,89 @@
  *          | Mode              |     2     | Alternate function       |
  *          | OType             |     0     | Push pull                |
  *          | OSpeed            |     3     | Very High Speed          |
- *          | Pull-up/Push down |     0     | No push-up nor pull down |
+ *          | Pull-up/Push down |     1     | pull-up                  |
  */
 
 
-#if SDRAM_FAST_INITIALIZATION == 1
+#if SDRAM_USEGPIO == 1
 
+
+static const GPIO_PinConfiguration pinconfig_common[] = {
+/*    GPIOx    Pin      AF  M   O  S  P  I */
+   {  GPIOD,   14,      12, 2,  0, 3, 1, 0  },       //     DQ0
+   {  GPIOD,   15,      12, 2,  0, 3, 1, 0  },       //     DQ1
+   {  GPIOD,   0,       12, 2,  0, 3, 1, 0  },       //     DQ2
+   {  GPIOD,   1,       12, 2,  0, 3, 1, 0  },       //     DQ3
+   {  GPIOE,   7,       12, 2,  0, 3, 1, 0  },       //     DQ4
+   {  GPIOE,   8,       12, 2,  0, 3, 1, 0  },       //     DQ5
+   {  GPIOE,   9,       12, 2,  0, 3, 1, 0  },       //     DQ6
+   {  GPIOE,   10,      12, 2,  0, 3, 1, 0  },       //     DQ7
+   {  GPIOE,   11,      12, 2,  0, 3, 1, 0  },       //     DQ8
+   {  GPIOE,   12,      12, 2,  0, 3, 1, 0  },       //     DQ9
+   {  GPIOE,   13,      12, 2,  0, 3, 1, 0  },       //     DQ10
+   {  GPIOE,   14,      12, 2,  0, 3, 1, 0  },       //     DQ11
+   {  GPIOE,   15,      12, 2,  0, 3, 1, 0  },       //     DQ12
+   {  GPIOD,   8,       12, 2,  0, 3, 1, 0  },       //     DQ13
+   {  GPIOD,   9,       12, 2,  0, 3, 1, 0  },       //     DQ14
+   {  GPIOD,   10,      12, 2,  0, 3, 1, 0  },       //     DQ15
+   {  GPIOF,   0,       12, 2,  0, 3, 1, 0  },       //     A0
+   {  GPIOF,   1,       12, 2,  0, 3, 1, 0  },       //     A1
+   {  GPIOF,   2,       12, 2,  0, 3, 1, 0  },       //     A2
+   {  GPIOF,   3,       12, 2,  0, 3, 1, 0  },       //     A3
+   {  GPIOF,   4,       12, 2,  0, 3, 1, 0  },       //     A4
+   {  GPIOF,   5,       12, 2,  0, 3, 1, 0  },       //     A5
+   {  GPIOF,   12,      12, 2,  0, 3, 1, 0  },       //     A6
+   {  GPIOF,   13,      12, 2,  0, 3, 1, 0  },       //     A7
+   {  GPIOF,   14,      12, 2,  0, 3, 1, 0  },       //     A8
+   {  GPIOF,   15,      12, 2,  0, 3, 1, 0  },       //     A9
+   {  GPIOG,   0,       12, 2,  0, 3, 1, 0  },       //     A10
+   {  GPIOG,   1,       12, 2,  0, 3, 1, 0  },       //     A11
+   {  GPIOG,   4,       12, 2,  0, 3, 1, 0  },       //     BA0
+   {  GPIOG,   5,       12, 2,  0, 3, 1, 0  },       //     BA1
+   {  GPIOF,   11,      12, 2,  0, 3, 1, 0  },       //     RAS
+   {  GPIOG,   15,      12, 2,  0, 3, 1, 0  },       //     CAS
+   {  GPIOH,   5,       12, 2,  0, 3, 1, 0  },       //     WE
+   {  GPIOG,   8,       12, 2,  0, 3, 1, 0  },       //     CLK
+   {  GPIOE,   0,       12, 2,  0, 3, 1, 0  },       //     DQM0
+   {  GPIOE,   1,       12, 2,  0, 3, 1, 0  },       //     DQM1
+//
+   {     0,    0,        0, 0,  0, 0, 0, 0  }         // End of List Mark
+};
+
+
+static const GPIO_PinConfiguration pinconfig_bank1[] = {
+    // PC3/CLKE, PH3/CS
+   {  GPIOC,   3,       12, 2,  0, 3, 1, 0  },       //     CS = SDNE0
+   {  GPIOH,   3,       12, 2,  0, 3, 1, 0  },       //     CLKE = SDNE0
+//
+   {     0,    0,        0, 0,  0, 0, 0, 0  }         // End of List Mark
+};
+
+/* Not used in Discovery Board */
+static const GPIO_PinConfiguration pinconfig_bank2[] = {
+    // 6/CS 7/CLKE for Bank2 (There are alternatives on PB6 and PB5)
+   {  GPIOH,   6,       12, 2,  0, 3, 1, 0  },       //     CS = SDNE1
+   {  GPIOH,   7,       12, 2,  0, 3, 1, 0  },       //     CLKE = SDCKE1
+//
+   {     0,    0,        0, 0,  0, 0, 0, 0  }         // End of List Mark
+};
+
+static void
+ConfigureFMCSDRAMPins(int bank) {
+
+    /* Configure pins from table*/
+    GPIO_ConfigureMultiplePins(pinconfig_common);
+
+    if( bank == SDRAM_BANK1 ) {
+        GPIO_ConfigureMultiplePins(pinconfig_bank1);
+    } else {
+        GPIO_ConfigureMultiplePins(pinconfig_bank2);
+    }
+}
+
+#else
+
+/* Configuring pins using direct access to registers */
 
 #define SD_AF      (12)
 #define SD_MODE    (2)
@@ -669,7 +780,7 @@ uint32_t mAND,mOR; // Mask
         mOR  = (SD_PUPD<<GPIO_PUPDR_PUPDR3_Pos);
         GPIOC->PUPDR   = (GPIOC->PUPDR&~mAND)|mOR;
 
-        mAND = GPIO_OTYPER_OT0_Msk;
+        mAND = GPIO_OTYPER_OT3_Msk;
         mOR  = (SD_OTYPE<<GPIO_OTYPER_OT3_Pos);
         GPIOC->OTYPER  = (GPIOC->OTYPER&~mAND)|mOR;
 
@@ -681,10 +792,6 @@ uint32_t mAND,mOR; // Mask
         mAND =   GPIO_AFRL_AFRL3_Msk;
         mOR  =   (SD_AF<<GPIO_AFRL_AFRL3_Pos);
         GPIOH->AFR[0]  = (GPIOH->AFR[0]&~mAND)|mOR;
-
-        mAND =   0;
-        mOR  =   0;
-        GPIOH->AFR[1]  = (GPIOH->AFR[1]&~mAND)|mOR;
 
         mAND =   GPIO_MODER_MODER3_Msk;
         mOR  =   (SD_MODE<<GPIO_MODER_MODER3_Pos);
@@ -703,9 +810,10 @@ uint32_t mAND,mOR; // Mask
         GPIOH->OTYPER  = (GPIOH->OTYPER&~mAND)|mOR;
 
     } else if ( bank == SDRAM_BANK2 ) {
+        // Not used in Discovery board
         // Configure pins in GPIOH
         // 6/CS 7/CKE for Bank2 (There are alternatives on PB6 and PB5)
-
+        while(1) {}
         RCC->AHB1ENR |= RCC_AHB1ENR_GPIOHEN;
 
         mAND =   GPIO_AFRL_AFRL6_Msk
@@ -745,77 +853,6 @@ uint32_t mAND,mOR; // Mask
         GPIOH->OTYPER  = (GPIOH->OTYPER&~mAND)|mOR;
 
     }
-
-}
-#else
-
-static const GPIO_PinConfiguration pinconfig_common[] = {
-   {  GPIOD,   14,      12, 2,  0, 3, 0, 0  },       //     DQ0
-   {  GPIOD,   15,      12, 2,  0, 3, 0, 0  },       //     DQ1
-   {  GPIOD,   0,       12, 2,  0, 3, 0, 0  },       //     DQ2
-   {  GPIOD,   1,       12, 2,  0, 3, 0, 0  },       //     DQ3
-   {  GPIOE,   7,       12, 2,  0, 3, 0, 0  },       //     DQ4
-   {  GPIOE,   8,       12, 2,  0, 3, 0, 0  },       //     DQ5
-   {  GPIOE,   9,       12, 2,  0, 3, 0, 0  },       //     DQ6
-   {  GPIOE,   10,      12, 2,  0, 3, 0, 0  },       //     DQ7
-   {  GPIOE,   11,      12, 2,  0, 3, 0, 0  },       //     DQ8
-   {  GPIOE,   12,      12, 2,  0, 3, 0, 0  },       //     DQ9
-   {  GPIOE,   13,      12, 2,  0, 3, 0, 0  },       //     DQ10
-   {  GPIOE,   14,      12, 2,  0, 3, 0, 0  },       //     DQ11
-   {  GPIOE,   15,      12, 2,  0, 3, 0, 0  },       //     DQ12
-   {  GPIOD,   8,       12, 2,  0, 3, 0, 0  },       //     DQ13
-   {  GPIOD,   9,       12, 2,  0, 3, 0, 0  },       //     DQ14
-   {  GPIOD,   10,      12, 2,  0, 3, 0, 0  },       //     DQ15
-   {  GPIOF,   0,       12, 2,  0, 3, 0, 0  },       //     A0
-   {  GPIOF,   1,       12, 2,  0, 3, 0, 0  },       //     A1
-   {  GPIOF,   2,       12, 2,  0, 3, 0, 0  },       //     A2
-   {  GPIOF,   3,       12, 2,  0, 3, 0, 0  },       //     A3
-   {  GPIOF,   4,       12, 2,  0, 3, 0, 0  },       //     A4
-   {  GPIOF,   5,       12, 2,  0, 3, 0, 0  },       //     A5
-   {  GPIOF,   12,      12, 2,  0, 3, 0, 0  },       //     A6
-   {  GPIOF,   13,      12, 2,  0, 3, 0, 0  },       //     A7
-   {  GPIOF,   14,      12, 2,  0, 3, 0, 0  },       //     A8
-   {  GPIOF,   15,      12, 2,  0, 3, 0, 0  },       //     A9
-   {  GPIOG,   0,       12, 2,  0, 3, 0, 0  },       //     A10
-   {  GPIOG,   1,       12, 2,  0, 3, 0, 0  },       //     A11
-   {  GPIOG,   4,       12, 2,  0, 3, 0, 0  },       //     BA0
-   {  GPIOG,   5,       12, 2,  0, 3, 0, 0  },       //     BA1
-   {  GPIOF,   11,      12, 2,  0, 3, 0, 0  },       //     RAS
-   {  GPIOG,   15,      12, 2,  0, 3, 0, 0  },       //     CAS
-   {  GPIOH,   5,       12, 2,  0, 3, 0, 0  },       //     WE
-   {  GPIOG,   8,       12, 2,  0, 3, 0, 0  },       //     CLK
-   {  GPIOE,   0,       12, 2,  0, 3, 0, 0  },       //     DQM0
-   {  GPIOE,   1,       12, 2,  0, 3, 0, 0  },       //     DQM1
-//
-   {     0,    0,       0  }         // End of List Mark
-};
-
-
-static const GPIO_PinConfiguration pinconfig_bank1[] = {
-    // PC3/CLKE, PH3/CS
-   {  GPIOC,   3,       12, 2,  0, 3, 0, 0  },       //     CS = SDNE0
-   {  GPIOH,   3,       12, 2,  0, 3, 0, 0  },       //     CLKE = SDNE0
-   {     0,    0,       0  }         // End of List Mark
-};
-
-static const GPIO_PinConfiguration pinconfig_bank2[] = {
-    // 6/CS 7/CLKE for Bank2 (There are alternatives on PB6 and PB5)
-   {  GPIOH,   6,       12, 2,  0, 3, 0, 0  },       //     SDNE1
-   {  GPIOH,   7,       12, 2,  0, 3, 0, 0  },       //     SDCKE1
-   {     0,    0,       0  }         // End of List Mark
-};
-
-static void
-ConfigureFMCSDRAMPins(int bank) {
-
-    /* Configure pins from table*/
-    GPIO_ConfigureMultiplePins(pinconfig_common);
-
-    if( bank == SDRAM_BANK1 ) {
-        GPIO_ConfigureMultiplePins(pinconfig_bank1);
-    } else {
-        GPIO_ConfigureMultiplePins(pinconfig_bank2);
-    }
 }
 #endif
 
@@ -832,29 +869,6 @@ EnableFMCClock(void) {
 
 }
 
-
-/**
- *  @brief  Send Command to FMC
- *
- *  @note   Only for SDRAM Bank 1 (=FMC Bank 5)
- *
- *  @note   Parameters are in the same format of SDCMR Register
- *
- *  @note   returns 0 when runs OK or -1 if a timeout occurs
- */
-static int
-SendCommand(int bank, uint32_t command, uint32_t parameters, uint32_t timeout) {
-
-    parameters &= ~(FMC_SDCMR_MODE_Msk|FMC_SDCMR_CTB1|FMC_SDCMR_CTB2);
-    FMC_Bank5_6->SDCMR=(command<<FMC_SDCMR_MODE_Pos)|FMC_SDCMR_CTB1|parameters;
-
-    while( (FMC_Bank5_6->SDSR&FMC_SDSR_BUSY) &&(timeout-->0) ) {}
-
-    if( FMC_Bank5_6->SDSR&FMC_SDSR_BUSY )
-        return 0;
-    else
-        return -1;
-}
 
 
 /**
@@ -887,10 +901,10 @@ uint32_t sdtr1,sdtr2;
 
 
     if( bank == SDRAM_BANK1 ) {
-        sdcr1 = FMC_Bank5_6->SDCR[SDRAM_BANK1];
-        sdtr1 = FMC_Bank5_6->SDTR[SDRAM_BANK1];
+        sdcr1 = FMC_Bank5_6->SDCR[0];
+        sdtr1 = FMC_Bank5_6->SDTR[0];
         /* Clear fields in SDCR1 */
-        sdcr1 &=   ~(FMC_SDCR1_RPIPE_Msk
+        sdcr1 &=    ~(FMC_SDCR1_RPIPE_Msk
                     |FMC_SDCR1_RBURST_Msk
                     |FMC_SDCR1_SDCLK_Msk
                     |FMC_SDCR1_WP_Msk
@@ -899,7 +913,7 @@ uint32_t sdtr1,sdtr2;
                     |FMC_SDCR1_NR_Msk
                     |FMC_SDCR1_NC_Msk);
         /* Set fields in SDCR1 */
-        sdcr1 |=    (SDRAM_RPIPE<<FMC_SDCR1_RPIPE_Pos)
+        sdcr1 |=     (SDRAM_RPIPE<<FMC_SDCR1_RPIPE_Pos)
                     |(SDRAM_RBURST<<FMC_SDCR1_RBURST_Pos)
                     |(SDRAM_SDCLK<<FMC_SDCR1_SDCLK_Pos)
                     |(SDRAM_WP<<FMC_SDCR1_WP_Pos)
@@ -925,13 +939,13 @@ uint32_t sdtr1,sdtr2;
                     |(SDRAM_TXSR<<FMC_SDTR1_TXSR_Pos)
                     |(SDRAM_TMRD<<FMC_SDTR1_TMRD_Pos);
 
-        FMC_Bank5_6->SDCR[SDRAM_BANK1] = sdcr1;
-        FMC_Bank5_6->SDTR[SDRAM_BANK1] = sdtr1;
+        FMC_Bank5_6->SDCR[0] = sdcr1;
+        FMC_Bank5_6->SDTR[0] = sdtr1;
     } else {
-        sdcr1 = FMC_Bank5_6->SDCR[SDRAM_BANK1];
-        sdcr2 = FMC_Bank5_6->SDCR[SDRAM_BANK2];
-        sdtr1 = FMC_Bank5_6->SDTR[SDRAM_BANK1];
-        sdtr2 = FMC_Bank5_6->SDTR[SDRAM_BANK2];
+        sdcr1 = FMC_Bank5_6->SDCR[0];
+        sdcr2 = FMC_Bank5_6->SDCR[1];
+        sdtr1 = FMC_Bank5_6->SDTR[0];
+        sdtr2 = FMC_Bank5_6->SDTR[1];
         /* Clear fields that only can be written in SDCR1 */
         sdcr1 &=   ~(FMC_SDCR1_RPIPE_Msk
                     |FMC_SDCR1_RBURST_Msk
@@ -972,20 +986,11 @@ uint32_t sdtr1,sdtr2;
                     |(SDRAM_TXSR<<FMC_SDTR1_TXSR_Pos)
                     |(SDRAM_TMRD<<FMC_SDTR1_TMRD_Pos);
 
-        FMC_Bank5_6->SDCR[SDRAM_BANK1] = sdcr1;
-        FMC_Bank5_6->SDCR[SDRAM_BANK2] = sdcr2;
-        FMC_Bank5_6->SDTR[SDRAM_BANK1] = sdtr1;
-        FMC_Bank5_6->SDTR[SDRAM_BANK2] = sdtr2;
+        FMC_Bank5_6->SDCR[0] = sdcr1;
+        FMC_Bank5_6->SDCR[1] = sdcr2;
+        FMC_Bank5_6->SDTR[0] = sdtr1;
+        FMC_Bank5_6->SDTR[1] = sdtr2;
     }
-
-    sdtr1  =     (SDRAM_TRCD<<FMC_SDTR1_TRCD_Pos)
-                |(SDRAM_TRP<<FMC_SDTR1_TRP_Pos)
-                |(SDRAM_TWR<<FMC_SDTR1_TWR_Pos)
-                |(SDRAM_TRC<<FMC_SDTR1_TRC_Pos)
-                |(SDRAM_TRAS<<FMC_SDTR1_TRAS_Pos)
-                |(SDRAM_TXSR<<FMC_SDTR1_TXSR_Pos)
-                |(SDRAM_TMRD<<FMC_SDTR1_TMRD_Pos);
-
 
 }
 
@@ -1004,6 +1009,80 @@ ConfigureSDRAMRefresh(int bank) {
     FMC_Bank5_6->SDCR[bank] &= ~(FMC_SDCR1_WP);
 
 }
+
+
+/**
+ *  @brief  Send Command to SDRAM
+ *
+ *  @note   The parameter is the number of auto-refresh cycles when
+ *          the command mode is AUTOREFRESH and
+ *          the mode definition when the command mode is
+ *          LOADMODE
+ *
+ *  @note   The autorefresh is used only for the AUTOREFRESH command mode
+ *
+ *  @note   Format of SDCMR Register
+ *
+ *   |  Field    |  Position  |  Description                           |
+ *   |-----------|------------|----------------------------------------|
+ *   | MRD       |    21-9    | Mode register definition               |
+ *   | NRFS      |     8-5    | Auto refreshs                          |
+ *   | CTB1      |     4-4    | Target is bank 1                       |
+ *   | CTB2      |     3-3    | Target is bank 2                       |
+ *   | MODE      |     2-0    | Command mode                           |
+ *
+ *   List of command modes
+ *
+ *   | Mode        | Value | Description                               |
+ *   |-------------|-------|-------------------------------------------|
+ *   | NORMAL      |  000  | Normal mode                               |
+ *   | CLKCONFIG   |  001  | Clock configuration enable                |
+ *   | PALL        |  010  | All bank precharge                        |
+ *   | AUTOREFRESH |  011  | Autorefresh                               |
+ *   | LOADMODE    |  100  | Load Mode register                        |
+ *   | SELFREFRESH |  101  | Self refresh command                      |
+ *   | POWERDOWN   |  110  | Power down command                        |
+ *
+ *
+ *  @note   returns 0 when runs OK or -1 if a timeout occurs
+ */
+static int
+SendCommand(int bank, uint8_t mode, uint16_t parameter) {
+uint32_t sdcmr;
+int timeout = 0x7FFF;
+
+    sdcmr = 0;
+    if( bank == SDRAM_BANK1 ) sdcmr |= FMC_SDCMR_CTB1;
+    if( bank == SDRAM_BANK2 ) sdcmr |= FMC_SDCMR_CTB2;
+
+    // These command modes must be issued for both banks when both are used
+#if 0
+    if( mode == SDRAM_MODE_AUTOREFRESH || mode == SDRAM_MODE_PALL )
+        scdmr |= (FMC_SDCMR_CTB1|FMC_SDCMR_CTB2);
+#endif
+
+    // Autorefresh field (NRFS) only used for AUTOREFRESH command mode
+    if( (mode == SDRAM_MODE_AUTOREFRESH) && (parameter > 1) )
+        sdcmr |= ((parameter-1)<<FMC_SDCMR_NRFS_Pos);
+    // Mode register definition (MRD) only used for LOADMODE command mode
+    if( mode == SDRAM_MODE_LOADMODE )
+        sdcmr |= (parameter<<FMC_SDCMR_MRD_Pos);
+
+    // Set mode
+    sdcmr |= (mode<<FMC_SDCMR_MODE_Pos);
+
+    // Send command
+    FMC_Bank5_6->SDCMR = sdcmr;
+
+    while( (FMC_Bank5_6->SDSR&FMC_SDSR_BUSY) &&(timeout-->0) ) {}
+
+    if( FMC_Bank5_6->SDSR&FMC_SDSR_BUSY )
+        return 0;
+    else
+        return -1;
+}
+
+
 /**
  *  @brief  ConfigureFMC for SDRAM
  *
@@ -1012,46 +1091,45 @@ ConfigureSDRAMRefresh(int bank) {
  *  @note   The FCM SDRAM interface must be configured to run at half the speed
  *          of the core.
  *
- *  @note   Autorefresh = 1 always
+ *  @note   Send SDRAM initialization sequence
+ *
  */
 
 static void
-ConfigureSDRAM(int bank) {
-
-    /*
-     * SDRAM initialization sequence
-     */
+ConfigureSDRAMDevice(int bank) {
 
     /* Clock enable command */
-    SendCommand(bank,SDRAM_COMMAND_CLOCKCONFIGENABLE,0x0000,DEFAULT_TIMEOUT);
+    SendCommand(bank,SDRAM_MODE_CLOCKCONFIGENABLE,0x0000);
 
     SmallDelay(1000);       // 100 us, maybe systick is better */
 
     /* PALL command */
-    SendCommand(bank,SDRAM_COMMAND_PALL,0x0000,DEFAULT_TIMEOUT);
+    SendCommand(bank,SDRAM_MODE_PALL,0x0000);
 
     /* Auto refresh command */
-    SendCommand(bank,SDRAM_COMMAND_AUTOREFRESH,(SDRAM_AUTOREFRESH<<FMC_SDCMR_NRFS_Pos),DEFAULT_TIMEOUT);
+    SendCommand(bank,SDRAM_MODE_AUTOREFRESH,8);
 
     /* MRD register program */
-    SendCommand(bank,SDRAM_COMMAND_LOADMODE,(SDRAM_MODE<<FMC_SDCMR_MRD_Pos),DEFAULT_TIMEOUT);
-
+    SendCommand(bank,SDRAM_MODE_LOADMODE,SDRAM_MODE);
 
 }
+
+
+
+
 
 /**
  * @brief   SDRAM Init
  *
  * @note    Initializes the FMC unit and configure access to a SDRAM
  *
+ * @note    Only SDRAM Bank 1 tested!!!
+ *
  * @note    HCLK must be 200 MHz!!!!
  */
 int
-SDRAM_Init(int bank) {
+SDRAM_InitEx(int bank) {
 
-    /* The board has only one SDRAM, at Bank 1 */
-    if( bank != SDRAM_BANK1 )
-        return -1;
 
     if( SystemCoreClock != SDRAM_CLOCKFREQUENCY )
         return -1;
@@ -1060,17 +1138,34 @@ SDRAM_Init(int bank) {
     EnableFMCClock();
 
     /* Configure FMC pins for SDRAM interface*/
-    ConfigureFMCSDRAMPins(SDRAM_BANK1);
+    ConfigureFMCSDRAMPins(bank);
 
     /* Configure FMC interface for SDRAM */
-    ConfigureFMCSDRAM(SDRAM_BANK1);
+    ConfigureFMCSDRAM(bank);
 
     /* Configure SDRAM chip */
-    ConfigureSDRAM(SDRAM_BANK1);
+    ConfigureSDRAMDevice(bank);
 
     /* Configure Refresh */
-    ConfigureSDRAMRefresh(SDRAM_BANK1);
+    ConfigureSDRAMRefresh(bank);
 
     return 0;
+}
+
+
+/**
+ * @brief   SDRAM Init
+ *
+ * @note    Initializes the FMC unit and configure access to a SDRAM
+ *          in the Discovery board (MT48LC43M32B2)
+ *
+ * @note    HCLK must be 200 MHz!!!!
+ */
+
+int
+SDRAM_Init(void) {
+
+    return SDRAM_InitEx(SDRAM_BANK1);
+
 }
 

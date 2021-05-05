@@ -22,7 +22,7 @@
  *          1: using GPIO routines from a pin configuration table (smaller but slow))
   *         2: using direct access to register (faster but larger)
  */
-#define SDRAM_USEGPIO             (1)
+//#define SDRAM_USEGPIO             (1)
 
 
 /**
@@ -102,7 +102,7 @@
 #define SDRAM_RBURST            1
 #define SDRAM_SDCLK             2
 #define SDRAM_WP                0
-#define SDRAM_CAS               1
+#define SDRAM_CAS               3
 #define SDRAM_NB                1
 #define SDRAM_MWID              1
 #define SDRAM_NR                1
@@ -121,7 +121,7 @@
 #define SDRAM_REFRESHCOUNT      1539
 
 /**
- *  @brief  FMC Commands
+ *  @brief  FMC Command Mode
  */
 ///@{
 #define SDRAM_MODE_NORMAL                0x0
@@ -188,7 +188,7 @@
  *      00 0010 0010 0000 = 0x220
  */
 
-#define SDRAM_MODE   0x220
+#define SDRAM_MODE   0x230
 
 
 /*******************^^^^^^ To be rewamped ^^^^^^ *************************************************/
@@ -269,8 +269,8 @@ static const GPIO_PinConfiguration pinconfig_bank1[] = {
 /* Not used in Discovery Board */
 static const GPIO_PinConfiguration pinconfig_bank2[] = {
     // 6/CS 7/CLKE for Bank2 (There are alternatives on PB6 and PB5)
-   {  GPIOH,   6,       12, 2,  0, 3, 1, 0  },       //     SDNE1
-   {  GPIOH,   7,       12, 2,  0, 3, 1, 0  },       //     SDCKE1
+   {  GPIOH,   6,       12, 2,  0, 3, 1, 0  },       //     CS = SDNE1
+   {  GPIOH,   7,       12, 2,  0, 3, 1, 0  },       //     CLKE = SDCKE1
 //
    {     0,    0,        0, 0,  0, 0, 0, 0  }         // End of List Mark
 };
@@ -296,7 +296,7 @@ ConfigureFMCSDRAMPins(int bank) {
 #define SD_MODE    (2)
 #define SD_OTYPE   (0)
 #define SD_OSPEED  (3)
-#define SD_PUPD    (1)
+#define SD_PUPD    (0)
 
 
 static void
