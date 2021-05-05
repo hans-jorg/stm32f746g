@@ -68,16 +68,16 @@ DECLARE_FIFO_AREA(outputarea,OUTPUTAREASIZE);
  **/
 //@{
 static UART_Info uarttab[] = {
-    /* Device       txconfig        rxconfig   */
-    /*            Port  Pin AF     Port  Pin AF */
-    { USART1,    { GPIOA, 9, 7 }, { GPIOB, 7, 7 }, INTLEVEL,  USART1_IRQn },
-    { USART2,    { GPIOA, 2, 7 }, { GPIOA, 3, 7 }, INTLEVEL,  USART2_IRQn },
-    { USART3,    { GPIOD, 8, 7 }, { GPIOD, 9, 7 }, INTLEVEL,  USART3_IRQn },
-    { UART4,     { GPIOC,10, 8 }, { GPIOC,11, 8 }, INTLEVEL,  UART4_IRQn  },
-    { UART5,     { GPIOC,12, 7 }, { GPIOD, 2, 8 }, INTLEVEL,  UART5_IRQn  },
-    { USART6,    { GPIOC, 6, 8 }, { GPIOC, 7, 8 }, INTLEVEL,  USART6_IRQn },
-    { UART7,     { GPIOE, 8, 8 }, { GPIOE, 7, 8 }, INTLEVEL,  UART7_IRQn  },
-    { UART8,     { GPIOE, 1, 8 }, { GPIOE, 0, 8 }, INTLEVEL,  UART8_IRQn  }
+/* Device          txconfig                            rxconfig                                   */
+/*            Port  Pin AF  M  O  S  P  I   Port  Pin AF  M   O  S  P  I                          */
+{ USART1,   { GPIOA, 9, 7, 2, 1, 1, 0, 0 }, { GPIOB, 7, 7, 2, 1, 1, 0, 0 }, INTLEVEL, USART1_IRQn },
+{ USART2,   { GPIOA, 2, 7, 2, 1, 1, 0, 0 }, { GPIOA, 3, 7, 2, 1, 1, 0, 0 }, INTLEVEL, USART2_IRQn },
+{ USART3,   { GPIOD, 8, 7, 2, 1, 1, 0, 0 }, { GPIOD, 9, 7, 2, 1, 1, 0, 0 }, INTLEVEL, USART3_IRQn },
+{ UART4,    { GPIOC,10, 8, 2, 1, 1, 0, 0 }, { GPIOC,11, 8, 2, 1, 1, 0, 0 }, INTLEVEL, UART4_IRQn  },
+{ UART5,    { GPIOC,12, 7, 2, 1, 1, 0, 0 }, { GPIOD, 2, 8, 2, 1, 1, 0, 0 }, INTLEVEL, UART5_IRQn  },
+{ USART6,   { GPIOC, 6, 8, 2, 1, 1, 0, 0 }, { GPIOC, 7, 8, 2, 1, 1, 0, 0 }, INTLEVEL, USART6_IRQn },
+{ UART7,    { GPIOE, 8, 8, 2, 1, 1, 0, 0 }, { GPIOE, 7, 8, 2, 1, 1, 0, 0 }, INTLEVEL, UART7_IRQn  },
+{ UART8,    { GPIOE, 1, 8, 2, 1, 1, 0, 0 }, { GPIOE, 0, 8, 2, 1, 1, 0, 0 }, INTLEVEL, UART8_IRQn  }
 };
 static const int uarttabsize = sizeof(uarttab)/sizeof(UART_Info)-1;
 //@}
