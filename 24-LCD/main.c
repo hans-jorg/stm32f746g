@@ -295,11 +295,18 @@ int format = LCD_FORMAT_RGB888;
         messagewithconfirm("Press ENTER to draw vertical layer in BLACK");
         LCD_DrawVerticalLine(1,30,60,60,RGB(0,0,0));
         LCD_ReloadLayerByVerticalBlanking(1);
-
         printlayerinfo(2);
 
         messagewithconfirm("Press ENTER to swap layers");
         LCD_SwapLayers();
+        LCD_ReloadLayerByVerticalBlanking(1);
+
+        messagewithconfirm("Press ENTER to make layer 2 transparent");
+        LCD_SetLayerOpacity(2,0);
+        LCD_ReloadLayerByVerticalBlanking(1);
+
+        messagewithconfirm("Press ENTER to make layer 2 opaque");
+        LCD_SetLayerOpacity(2,255);
         LCD_ReloadLayerByVerticalBlanking(1);
 
         messagewithconfirm("Press ENTER to swap layers again");

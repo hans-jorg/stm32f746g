@@ -879,6 +879,28 @@ void  LCD_SetFormat(int layer, int format) {
 }
 
 
+
+/*
+ * @brief   LCD SetLayerOpacity
+ *
+ * @note    Set of constant alpha opacity
+ */
+void  LCD_SetLayerOpacity(int layer, int opacity) {
+uint32_t bfcr;
+
+    if( opacity > 255 ) opacity = 255;
+
+    LTDC_Layer[layer]->CACR = opacity;
+
+    bfcr = LTDC_Layer[layer]->BFCR;
+    if( layer == 1 ) {
+        LTDC_Layer[layer]->BFCR = (bfcr&~LTDC_LxBFCR_BF1_Msk)|(4<<LTDC_LxBFCR_BF1_Pos);
+    } else if ( layer == 2 ) {
+        LTDC_Layer[layer]->BFCR = (bfcr&~LTDC_LxBFCR_BF2_Msk)|(4<<LTDC_LxBFCR_BF2_Pos);
+    }
+
+}
+
 /*
  * @brief   LCD Set Color Key for layer
  */
