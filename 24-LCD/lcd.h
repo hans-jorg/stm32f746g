@@ -17,7 +17,10 @@
  *
  * @note    The 8 low order bits are 0 (Why?)
  */
-#define RGB(R,G,B)      ((0L)|((R)<<16|((G)<<8)|((B)<<0)))
+#define RGB(R,G,B)      ((uint32_t)((0L)|((R)<<16|((G)<<8)|((B)<<0))))
+#define RGB565(R,G,B)   ((uint16_t)((0L)|(((R)&0x1F)<<11)|(((G)&0x3F)<<5)|((((B)&0x1F)<<0)))
+#define RGB555(R,G,B)   ((uint16_t)((0L)|(((R)&0x1F)<<10)|(((G)&x01F)<<5)|((((B)&0x1F)<<0))))
+#define RGBA(R,G,B)     ((uint32_t)(((A)<<24)|((R)<<16|((G)<<8)|((B)<<0))))
 
 /*
  * @brief   LCD Set Pixel Format
@@ -59,7 +62,7 @@ void  LCD_SetBackgroundColor( uint32_t bg );
 void  LCD_SetColorKey(int layer,  uint32_t c );
 
 /**
- * @brief Framebuffer management
+ * @brief Layer management
  *
  *
  * @note  There are two types of framebuffers:
@@ -68,9 +71,16 @@ void  LCD_SetColorKey(int layer,  uint32_t c );
  *        * Partial size: Format, position and size must be specified
  */
 void  LCD_SetFullSizeFrameBuffer(int layer, void *area, int format);
+void  LCD_SetFrameBuffer(int layer, void *a, int f, int w, int h, int p, int hp, int vp );
 void  LCD_SetDefaultColor(int layer, uint32_t c );
 void  LCD_SetDefaultColor(int layer, uint32_t c );
 void  LCD_FillFrameBuffer(int layer, unsigned c );
+void  LCD_EnableLayer(int layer);
+void  LCD_DisableLayer(int layer);
+void  LCD_SwapLayers(void);
+void  LCD_ReloadLayerImmediately(int layer);
+void  LCD_ReloadLayerByVerticalBlanking(int layer);
+void  LCD_SetLayerPosition(int layer, int hp, int vp);
 
 void *LCD_GetLineAddress(int layer, int line);
 int   LCD_GetHeight(int layer);
@@ -82,7 +92,10 @@ int   LCD_GetFormat(int layer);
 int   LCD_GetPixelSize(int layer);
 
 int   LCD_GetMinimalFullFrameBufferSize(int format);
-//void  LCD_SetFrameBuffer(int layer, int format, void *area, int w, int h );
-//int   LCD_GetMinimalFrameBufferSize(int format);
+
+void LCD_DrawHorizontalLine(int layer, int x, int y, int size, unsigned color);
+void LCD_DrawVerticalLine(int layer, int x, int y, int size, unsigned color);
+void LCD_DrawBox(int layer, int x, int y, int sw, int sh, unsigned color, unsigned bordercolor);
+void LCD_DrawLine(int layer, int x, int y, int sw, int sh, unsigned color);
 #endif
 

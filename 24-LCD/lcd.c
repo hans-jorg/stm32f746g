@@ -96,7 +96,7 @@
  * @note    Extra Layer2 at 0 to make possible to use integer 1 and 2 to represent
  *          the layer. An extra benefit is that 0 can be used as an index too.
  */
-static LTDC_Layer_TypeDef *LTDC_Layer[3] = {LTDC_Layer2, LTDC_Layer1, LTDC_Layer2};
+static LTDC_Layer_TypeDef * const LTDC_Layer[3] = {LTDC_Layer2, LTDC_Layer1, LTDC_Layer2};
 /**
  * @brief   Characteristics of the LCD display
  *
@@ -173,11 +173,11 @@ const DisplayProperties_t *display = &dispRK043;
  */
 ///@{
 #define LCD_FREQ    (display->frequency)
-#define HSW         (2)
+#define HSW         (display->hsync)
 #define HAW         (display->width)
 #define HFP         (display->hfp)
 #define HBP         (display->hbp)
-#define VSW         (2)
+#define VSH         (display->vsync)
 #define VAH         (display->height)
 #define VBP         (display->vbp)
 #define VFP         (display->vfp)
@@ -582,9 +582,9 @@ void  LCD_TurnBacklightOff(void) {
 ///@}
 
 /**
- * @brief   Turn LCD Backlight On/Off
+ * @brief   Put LCD Operation/Standby
  *
- * @note    GPIOK Pin 3 controls the backlight
+ * @note    GPIOI Pin 12 controls normal operation/standby
  */
 
 ///@{
@@ -598,7 +598,7 @@ void  LCD_PutDisplayOperation(void) {
 
 }
 
-void  LCD_LCD_PutDisplayStandBy(void) {
+void  LCD_PutDisplayStandBy(void) {
 
 #ifdef LCD_USEGPIO
     GPIO_Clear(GPIOI,LCD_NORMALSTANDBY_MASK);
@@ -614,7 +614,7 @@ void  LCD_LCD_PutDisplayStandBy(void) {
 /**
  * @brief   Enable/Disable LCD Controler
  *
- * @note    GPIOK Pin 3 controls the backlight
+ * @note    Disable LTDC controller
  */
 
 ///@{
@@ -650,7 +650,7 @@ void  LCD_On(void) {
 void  LCD_Off(void) {
 
     LCD_DisableController();
-    LCD_LCD_PutDisplayStandBy();
+    LCD_PutDisplayStandBy();
     LCD_TurnBacklightOff();
 }
 ///@}
@@ -770,14 +770,14 @@ void LCD_Init(void) {
     LTDC->GCR =   (LTDC->GCR&~(LTDC_GCR_DEPOL|LTDC_GCR_HSPOL|LTDC_GCR_VSPOL|LTDC_GCR_PCPOL))
                  |(POL);
     // Configure LCD geometry
-    LTDC->SSCR =  (HSW-1)<<LTDC_SSCR_HSW_Pos
-                 |(VSW-1)<<LTDC_SSCR_VSH_Pos;
-    LTDC->BPCR =  (HSW+HBP-1)<<LTDC_BPCR_AHBP_Pos
-                 |(VSW+VBP-1)<<LTDC_BPCR_AVBP_Pos;
-    LTDC->AWCR =  (HSW+HBP+HAW-1)<<LTDC_AWCR_AAW_Pos
-                 |(VSW+VBP+VAH-1)<<LTDC_AWCR_AAH_Pos;
-    LTDC->TWCR  = (HSW+HBP+HAW+HFP-1)<<LTDC_TWCR_TOTALW_Pos
-                 |(VSW+VBP+VAH+VFP-1)<<LTDC_TWCR_TOTALH_Pos;
+    LTDC->SSCR =  ((HSW-1)<<LTDC_SSCR_HSW_Pos)
+                 |((VSH-1)<<LTDC_SSCR_VSH_Pos);
+    LTDC->BPCR =  ((HSW+HBP-1)<<LTDC_BPCR_AHBP_Pos)
+                 |((VSH+VBP-1)<<LTDC_BPCR_AVBP_Pos);
+    LTDC->AWCR =  ((HSW+HBP+HAW-1)<<LTDC_AWCR_AAW_Pos)
+                 |((VSH+VBP+VAH-1)<<LTDC_AWCR_AAH_Pos);
+    LTDC->TWCR  = ((HSW+HBP+HAW+HFP-1)<<LTDC_TWCR_TOTALW_Pos)
+                 |((VSH+VBP+VAH+VFP-1)<<LTDC_TWCR_TOTALH_Pos);
 
     // Set background color
     LTDC->BCCR = BACKGROUND_COLOR;
@@ -804,6 +804,61 @@ LCD_SetBackgroundColor( uint32_t bgcolor ) {
 
 
 //////////////////////////// LAYER routines ////////////////////////////////////////////////////////
+
+
+
+/**
+ * @brief   Enable/Disable Layer
+ *
+ * @note
+ */
+///@{
+void  LCD_EnableLayer(int layer) {
+
+    LTDC_Layer[layer]->CR |= LTDC_LxCR_LEN;
+    // Reload parameters
+    LTDC->SRCR |= LTDC_SRCR_IMR;
+}
+
+
+void  LCD_DisableLayer(int layer) {
+
+    LTDC_Layer[layer]->CR &= ~LTDC_LxCR_LEN;
+    // Reload parameters
+    LTDC->SRCR |= LTDC_SRCR_IMR;
+}
+
+void  LCD_SwapLayers(void) {
+
+    LTDC_Layer[0]->CR ^= LTDC_LxCR_LEN;
+    LTDC_Layer[1]->CR ^= LTDC_LxCR_LEN;
+    // Reload parameters
+    LTDC->SRCR |= LTDC_SRCR_IMR;
+}
+
+
+///@}
+
+/**
+ * @brief   Enable/Disable Layer
+ *
+ * @note
+ */
+void  LCD_ReloadLayerImmediately(int layer) {
+
+    LTDC->SRCR |= LTDC_SRCR_IMR;
+}
+
+/**
+ * @brief   Enable/Disable Layer
+ *
+ * @note
+ */
+void  LCD_ReloadLayerByVerticalBlanking(int layer) {
+
+    LTDC->SRCR |= LTDC_SRCR_VBR;
+}
+
 
 /*
  * @brief   LCD Set Default Color for layer
@@ -880,27 +935,72 @@ int ps = pixelsize[format];
 
 void
 LCD_SetFullSizeFrameBuffer(int layer, void *area, int format) {
-LTDC_Layer_TypeDef *p = LTDC_Layer[layer];
-uint32_t ps,w,h;
+LTDC_Layer_TypeDef *const p = LTDC_Layer[layer];
+uint32_t ps,w,h,ws,hs,pitch,dw,dh;
 
     ps        = pixelsize[format];
     h         = display->height;
     w         = display->width;
     p->PFCR   = format;
+    pitch     = display->pitch[ps];
     p->CFBAR  = (uint32_t) area;
-    p->CFBLNR = display->height;
-    p->CFBLR  = (display->pitch[ps]<<LTDC_LxCFBLR_CFBP_Pos)
-               |((display->width*ps+3)<<LTDC_LxCFBLR_CFBLL_Pos);
-    p->WHPCR  = ((HSW+HBP+w-1)<LTDC_LxWHPCR_WHSPPOS_Pos)
-               |((0)<<LTDC_LxWHPCR_WHSTPOS_Pos);
-    p->WVPCR  = ((VSW+VBP+h-1)<LTDC_LxWVPCR_WVSPPOS_Pos)
-               |((0)<<LTDC_LxWVPCR_WVSTPOS_Pos);
+    p->CFBLR  = (pitch<<LTDC_LxCFBLR_CFBP_Pos) | ((w*ps+3)<<LTDC_LxCFBLR_CFBLL_Pos);
+    p->CFBLNR = (h<<LTDC_LxCFBLNR_CFBLNBR_Pos);
 
-    //////////////////////////////////////////////
+    dw        = (LTDC->BPCR&LTDC_BPCR_AHBP_Msk)>>LTDC_BPCR_AHBP_Pos;
+    ws        = w+dw;
+    dh        = (LTDC->BPCR&LTDC_BPCR_AVBP_Msk)>>LTDC_BPCR_AVBP_Pos;
+    hs        = h+dh;
+    p->WHPCR  = ((ws)<<LTDC_LxWHPCR_WHSPPOS_Pos)
+               |((dw+1)<<LTDC_LxWHPCR_WHSTPOS_Pos);
+    p->WVPCR  = ((hs)<<LTDC_LxWVPCR_WVSPPOS_Pos)
+               |((dh+1)<<LTDC_LxWVPCR_WVSTPOS_Pos);
 
+    // Enable layer, effective immediately
+    LCD_EnableLayer(layer);
+    LTDC->SRCR |= LTDC_SRCR_IMR;
+}
 
-    // Enable layer
-    p->CR |= LTDC_LxCR_LEN;
+/*
+ * @brief   LCD Set Frame Buffer for layer
+ */
+
+void
+LCD_SetFrameBuffer(int layer, void *a, int f, int x, int y, int w, int h, int pi ) {
+LTDC_Layer_TypeDef *const p = LTDC_Layer[layer];
+uint32_t ps,uf,uw,uh,pitch,dw,dh,hmax,wmax;
+
+    hmax      = display->height;
+    wmax      = display->width;
+    ps        = pixelsize[f];
+    pitch     = pi;
+    // Avoid extrapolation
+    if ( (x+w) > wmax )
+        w = (wmax-x)-1;
+    if ( (y+h) > hmax )
+        h = (hmax-y)-1;
+
+    // Configure dimensions
+    uh        = h;
+    uw        = w;
+    p->PFCR   = f;
+    p->CFBAR  = (uint32_t) a;
+    p->CFBLR  = (pitch<<LTDC_LxCFBLR_CFBP_Pos) | ((uw*ps+3)<<LTDC_LxCFBLR_CFBLL_Pos);
+    p->CFBLNR = (uh<<LTDC_LxCFBLNR_CFBLNBR_Pos);
+
+    // Get initial shift
+    dw        = (LTDC->BPCR&LTDC_BPCR_AHBP_Msk)>>LTDC_BPCR_AHBP_Pos;
+    dh        = (LTDC->BPCR&LTDC_BPCR_AVBP_Msk)>>LTDC_BPCR_AVBP_Pos;
+
+    // Configure start and stop position
+    p->WHPCR  = ((x+uw+dw)<<LTDC_LxWHPCR_WHSPPOS_Pos)
+               |((x+dw+1)<<LTDC_LxWHPCR_WHSTPOS_Pos);
+    p->WVPCR  = ((y+uh+dh)<<LTDC_LxWVPCR_WVSPPOS_Pos)
+               |((y+dh+1)<<LTDC_LxWVPCR_WVSTPOS_Pos);
+
+    // Enable layer, effective immediately
+    LCD_EnableLayer(layer);
+    LTDC->SRCR |= LTDC_SRCR_IMR;
 }
 
 /**
@@ -967,6 +1067,8 @@ LTDC_Layer_TypeDef *p = LTDC_Layer[layer];
  *
  * @note    fill a memory area with a 1 byte value
  *
+ * @note    n = size in bytes!!!
+ *
  */
 static void fill1( void *area, int n, unsigned c) {
 uint8_t uc;
@@ -1000,6 +1102,8 @@ uint32_t *q;
  * @brief   fill2
  *
  * @note    Fill a memory area with a 16-bit value
+ *
+ * @note    n = size in bytes!!!
  *
  */
 static void fill2( void *area, int n, unsigned c) {
@@ -1037,6 +1141,8 @@ uint32_t *q;
  * @brief   fill3
  *
  * @note    Fill the frame buffer with a 3-byte value
+ *
+ * @note    n = size in bytes!!!
  *
  * @note    Memory organization
  *            word  | Pixel
@@ -1084,6 +1190,9 @@ uint32_t *q;
  * @brief   fill4
  *
  * @note    Fill the frame buffer with a 4-byte value
+ *
+ * @note    n = size in bytes!!!
+ *
  */
 
 static void fill4( void *area, int n, unsigned c) {
@@ -1125,7 +1234,7 @@ void
 LCD_FillFrameBuffer(int layer, unsigned color ) {
 LTDC_Layer_TypeDef *p = LTDC_Layer[layer];
 int  ps;
-char *area;
+char *area,*lineaddr;
 int  w,h,pitch;
 int i;
 
@@ -1142,23 +1251,366 @@ int i;
         break;
     case 2:
         for(i=0;i<h;i++) {
-            area = (char *) LCD_GetLineAddress(layer,i);
-            fill2(area,pitch,color);
+            lineaddr = (char *) LCD_GetLineAddress(layer,i);
+            fill2(lineaddr,pitch,color);
         }
         break;
     case 3:
         for(i=0;i<h;i++) {
-            area = (char *) LCD_GetLineAddress(layer,i);
-            fill3(area,pitch,color);
+            lineaddr = (char *) LCD_GetLineAddress(layer,i);
+            fill3(lineaddr,pitch,color);
         }
         break;
     case 4:
         for(i=0;i<h;i++) {
-            area = (char *) LCD_GetLineAddress(layer,i);
-            fill4(area,pitch,color);
+            lineaddr = (char *) LCD_GetLineAddress(layer,i);
+            fill4(lineaddr,pitch,color);
         }
         break;
     default:
+        break;
+    }
+}
+
+
+//////////////////////////// Drawing routines /////////////////////////////////////////////////////
+
+
+
+
+/*
+ * @brief   LCD_DrawHorizontalLine
+ *
+ * @note    Draw an horizontal line from point (x,y) with size 'size'
+ */
+void
+LCD_DrawHorizontalLine(int layer, int x, int y, int size, unsigned color) {
+int  ps,w,i;
+char *lineaddr;
+char *q;
+uint8_t c1,c2,c3,c4;
+
+    ps     = LCD_GetPixelSize(layer);
+    w      = LCD_GetWidth(layer);
+
+    if( (x+size) > w )
+        size = w-x;
+
+    lineaddr = (char *) LCD_GetLineAddress(layer,y);
+    switch(ps) {
+    case 1:
+        q = lineaddr + x;
+        c1 = color&0xFF;
+        for(i=0;i<size;i++) {
+            *q++ = c1;
+        }
+        break;
+    case 2:
+        q = lineaddr + x*2;
+        c1 = color&0xFF;
+        c2 = (color>>8)&0xFF;
+        for(i=0;i<size;i++) {
+            *q++ = c1;
+            *q++ = c2;
+        }
+        break;
+    case 3:
+        q = lineaddr + x*3;
+        c1 = color&0xFF;
+        c2 = (color>>8)&0xFF;
+        c3 = (color>>16)&0xFF;
+        for(i=0;i<size;i++) {
+            *q++ = c1;
+            *q++ = c2;
+            *q++ = c3;
+        }
+        break;
+    case 4:
+        q = lineaddr + x*4;
+        c1 = color&0xFF;
+        c2 = (color>>8)&0xFF;
+        c3 = (color>>16)&0xFF;
+        c4 = (color>>24)&0xFF;
+        for(i=0;i<size;i++) {
+            *q++ = c1;
+            *q++ = c2;
+            *q++ = c3;
+            *q++ = c4;
+        }
+        break;
+    }
+}
+
+
+/*
+ * @brief   LCD_DrawVerticalLine
+ *
+ * @note    Draw an vertical line from point (x,y) with size 'size'
+ */
+void
+LCD_DrawVerticalLine(int layer, int x, int y, int size, unsigned color) {
+int  ps,w,h,i;
+char *lineaddr;
+char *q;
+uint8_t c1,c2,c3,c4;
+
+    ps     = LCD_GetPixelSize(layer);
+    w      = LCD_GetWidth(layer);
+    h      = LCD_GetHeight(layer);
+
+    if( (y+size) > h )
+        size = h-y;
+
+    switch(ps) {
+    case 1:
+        c1 = color&0xFF;
+        for(i=0;i<size;i++) {
+            lineaddr = (char *) LCD_GetLineAddress(layer,y);
+            q = lineaddr + x;
+            *q = c1;
+            y++;
+        }
+        break;
+    case 2:
+        q = lineaddr + x*2;
+        c1 = color&0xFF;
+        c2 = (color>>8)&0xFF;
+        for(i=0;i<size;i++) {
+            lineaddr = (char *) LCD_GetLineAddress(layer,y);
+            q = lineaddr + 2*x;
+            *q++ = c1;
+            *q++ = c2;
+            y++;
+        }
+        break;
+    case 3:
+        q = lineaddr + x*3;
+        c1 = color&0xFF;
+        c2 = (color>>8)&0xFF;
+        c3 = (color>>16)&0xFF;
+        for(i=0;i<size;i++) {
+            lineaddr = (char *) LCD_GetLineAddress(layer,y);
+            q = lineaddr + 3*x;
+            *q++ = c1;
+            *q++ = c2;
+            *q++ = c3;
+            y++;
+        }
+        break;
+    case 4:
+        c1 = color&0xFF;
+        c2 = (color>>8)&0xFF;
+        c3 = (color>>16)&0xFF;
+        c4 = (color>>24)&0xFF;
+        for(i=0;i<size;i++) {
+            lineaddr = (char *) LCD_GetLineAddress(layer,y);
+            q = lineaddr + 4*x;
+            *q++ = c1;
+            *q++ = c2;
+            *q++ = c3;
+            *q++ = c4;
+            y++;
+        }
+        break;
+    }
+}
+
+/*
+ * @brief   LCD_DrawBox
+ *
+ * @note    Draw an horizontal line from point (x,y) with size 'size'
+ */
+void
+LCD_DrawBox(int layer, int x, int y, int sizew, int sizeh, unsigned color, unsigned bordercolor) {
+int  ps,w,h,i;
+char *lineaddr;
+char *q;
+uint8_t c1,c2,c3,c4;
+
+    ps     = LCD_GetPixelSize(layer);
+    w      = LCD_GetWidth(layer);
+    h      = LCD_GetHeight(layer);
+
+    if( (x+sizew) > w )
+        sizew = w-x;
+    if( (y+sizeh) > h )
+        sizeh = h-y;
+
+    if( sizew <= 2 || sizeh <= 2 )
+        return;
+
+    LCD_DrawHorizontalLine(layer,x,y,sizew,bordercolor);
+    LCD_DrawHorizontalLine(layer,x,y+sizeh,sizew,bordercolor);
+    LCD_DrawVerticalLine(layer,x,y,sizeh,bordercolor);
+    LCD_DrawVerticalLine(layer,x+sizew,y,sizeh,bordercolor);
+    sizew -= 1;
+    sizeh -= 1;
+    x++;
+    y++;
+    for(i=0;i<sizeh;i++) {
+        q = LCD_GetLineAddress(layer,y+i);
+        q += ps*x;
+        switch(ps) {
+        case 1:
+            fill1(q,sizew*ps,color);
+            break;
+        case 2:
+            fill2(q,sizew*ps,color);
+            break;
+        case 3:
+            fill3(q,sizew*ps,color);
+            break;
+        case 4:
+            fill4(q,sizew*ps,color);
+            break;
+        }
+    }
+}
+
+/*
+ * @brief Mark point
+ */
+static void plot(char *p, int ps, unsigned color ) {
+
+    switch(ps) {
+    case 4: *p++ = (color>>24)&0xFF;
+    case 3: *p++ = (color>>16)&0xFF;
+    case 2: *p++ = (color>>8)&0xFF;
+    case 1: *p++ = color&0xFF;
+    }
+}
+/*
+ * @brief   LCD_DrawLine
+ *
+ * @note    Draw an vertical line from point (x,y) with size 'size'
+ */
+
+#define ABS(X)  ((X)>0?(X):-(X))
+
+void
+LCD_DrawLine(int layer, int x, int y, int dx, int dy, unsigned color) {
+enum   { Q0=0, Q1=1, Q2=5, Q3=4, Q4=6, Q5= 7, Q6=3, Q7=2 } octantcode;
+int xi,yi;
+int x1,x2,y1,y2;
+int key;
+int eps;
+int ps,w,h,pitch;
+char *lineaddr;
+
+    ps       = LCD_GetPixelSize(layer);
+    w        = LCD_GetWidth(layer);
+    h        = LCD_GetHeight(layer);
+    pitch    = LCD_GetPitch(layer);
+    lineaddr = (char *) LCD_GetLineAddress(layer,y);
+
+    if( (x+dx) > w )
+        dx = w-x;
+    if( (y+dy) > h )
+        dy = h-y;
+
+    // Build oct value setting bits according octant
+    key = 0;
+    // find quadrant first
+    if( dx < 0 ) key |= 4;
+    if( dy < 0 ) key |= 2;
+    // find octant using rules according each quadrant
+    if( ABS(dy) > ABS(dx) ) key |= 1;
+    eps = 0;
+    x1 = x;
+    y1 = y;
+    x2 = x+dx;
+    y2 = y+dy;
+    xi = x1;
+    yi = y1;
+    lineaddr = (char *) LCD_GetLineAddress(layer,yi);
+    switch(key){
+    case Q0: // 1st octant
+        for(xi=x; xi<=x2;xi++) {
+            plot(lineaddr+xi*ps,ps,color);
+            eps += dy;
+            if( (eps<<1) >= dx ) {
+                yi++;
+                eps -= dx;
+                lineaddr += pitch;
+            }
+        }
+        break;
+    case Q1: // 2nd octant
+        for(yi=y1; yi<=y2;yi++) {
+            plot(lineaddr+xi*ps,ps,color);
+            eps += dx;
+            if( (eps<<1) >= dy ) {
+                xi++;
+                eps -= dy;
+            }
+            lineaddr += pitch;
+        }
+        break;
+    case Q2: // 3rd octant
+        for(yi=y1; yi<=y2;yi++) {
+            plot(lineaddr+xi*ps,ps,color);
+            eps -= dx;
+            if( (eps<<1) >= dy ) {
+                xi--;
+                eps -= dy;
+            }
+            lineaddr += pitch;
+        }
+        break;
+    case Q3: // 4th octant
+        for(xi=x; xi>=x2;xi--) {
+            plot(lineaddr+xi*ps,ps,color);
+            eps += dy;
+            if( (eps<<1) >= -dx ) {
+                yi++;
+                eps += dx;
+                lineaddr += pitch;
+            }
+        }
+        break;
+    case Q4: // 5th octant
+        for(xi=x; xi>=x2;xi--) {
+            plot(lineaddr+xi*ps,ps,color);
+            eps -= dy;
+            if( (eps<<1) >= -dx ) {
+                yi--;
+                eps += dx;
+                lineaddr -= pitch;
+            }
+        }
+        break;
+    case Q5: // 6th octant
+        for(yi=y1; yi>=y2;yi--) {
+            plot(lineaddr+xi*ps,ps,color);
+            eps -= dx;
+            if( (eps<<1) >= -dy ) {
+                xi--;
+                eps += dy;
+            }
+            lineaddr -= pitch;
+        }
+        break;
+    case Q6: // 7th octant
+        for(yi=y1; yi>=y2;yi--) {
+            plot(lineaddr+xi*ps,ps,color);
+            eps += dx;
+            if( (eps<<1) >= -dy ) {
+                xi++;
+                eps += dy;
+            }
+            lineaddr -= pitch;
+        }
+        break;
+    case Q7: // 8th octant
+        for(xi=x; xi<=x2;xi++) {
+            plot(lineaddr+xi*ps,ps,color);
+            eps -= dy;
+            if( (eps<<1) >= dx ) {
+                yi--;
+                eps -= dx;
+                lineaddr -= pitch;
+            }
+        }
         break;
     }
 }

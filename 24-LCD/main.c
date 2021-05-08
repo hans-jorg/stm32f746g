@@ -50,6 +50,8 @@ void ms_delay(volatile int ms) {
  */
 int verbose = 1;
 
+#define DO_NOT_STOP
+
 /*
  * @brief   prints a message and waits for ENTER to continue
  */
@@ -59,7 +61,12 @@ int c;
     if( ! verbose )
         return;
     fputs(s,stdout);
+#ifdef DO_NOT_STOP
+    ms_delay(100);
+    putchar('\n');
+#else
     while( (c=getchar())!='\n' ) {}
+#endif
 }
 
 
@@ -73,6 +80,62 @@ int c;
         puts(s);
 }
 
+void printlayerinfo( int layer ) {
+LTDC_Layer_TypeDef *p;
+
+    if( layer == 1 )       p = LTDC_Layer1;
+    else if ( layer == 2 ) p = LTDC_Layer2;
+    else return;
+
+    printf("Info about layer at address %p\n",p);
+    printf("CR       = %08X\n",p->CR);
+    printf("WHPCR    = %08X\n",p->WHPCR);
+    printf("WVPCR    = %08X\n",p->WVPCR);
+    printf("CKCR     = %08X\n",p->CKCR);
+    printf("PFCR     = %08X\n",p->PFCR);
+    printf("CACR     = %08X\n",p->CACR);
+    printf("DCCR     = %08X\n",p->DCCR);
+    printf("BFCR     = %08X\n",p->BFCR);
+    printf("CFBAR    = %08X\n",p->CFBAR);
+    printf("CFBLR    = %08X\n",p->CFBLR);
+    printf("CFBLNR   = %08X\n",p->CFBLNR);
+    printf("CLUTWR   = %08X\n",p->CLUTWR);
+
+}
+
+void printlayercontents(int layer) {
+LTDC_Layer_TypeDef *p;
+int  ps;
+char *area,*lineaddr;
+int  w,h,pitch;
+int i,j;
+char *q;
+
+    if( layer == 1 )       p = LTDC_Layer1;
+    else if ( layer == 2 ) p = LTDC_Layer2;
+    else return;
+
+    ps     = LCD_GetPixelSize(layer);
+    area   = (char *) LCD_GetFrameBufferAddress(layer);
+    w      = LCD_GetWidth(layer);
+    h      = LCD_GetHeight(layer);
+    pitch  = LCD_GetPitch(layer);
+
+    for(i=0;i<h;i+=100) {
+        lineaddr = (char *) LCD_GetLineAddress(layer,i);
+        printf("%p:",lineaddr);
+        for(j=0;j<8;j++)
+            printf("%02X",lineaddr[j]&0xFF);
+        putchar(' ');
+        for(j=pitch-8;j<pitch;j++)
+            printf("%02X",lineaddr[j]&0xFF);
+
+        putchar('\n');
+
+    }
+
+}
+
 
 /**
  * @brief   main
@@ -82,9 +145,11 @@ int c;
  * @note    Really a bad idea to blink LED
  */
 
+
 int main(void) {
 int fbsize;
-void *fbarea;
+void *fbarea1;
+void *fbarea2;
 int format = LCD_FORMAT_RGB888;
 
     message("Initializing LED");
@@ -112,17 +177,21 @@ int format = LCD_FORMAT_RGB888;
 
     message("Reading from SDRAM");
     uint32_t r = *((uint32_t *) 0xc0000000);
-    printf("Read %0x\n",r);
+    printf("Read 0x%0x\n",r);
 
 
     message("Initializing buddy allocator");
-    Buddy_Init((char*) SDRAM_ADDRESS,SDRAM_SIZE,8192);
+    Buddy_Init((char*) SDRAM_ADDRESS,SDRAM_SIZE,4096);
 
     messagewithconfirm("Press ENTER to enable controller");
     LCD_EnableController();
 
     messagewithconfirm("Press ENTER to turn ON backlight");
     LCD_TurnBacklightOn();
+
+
+    messagewithconfirm("Press ENTER to enter in standby");
+    LCD_PutDisplayStandBy();
 
     messagewithconfirm("Press ENTER to enter normal operation");
     LCD_PutDisplayOperation();
@@ -131,42 +200,119 @@ int format = LCD_FORMAT_RGB888;
     fbsize = LCD_GetMinimalFullFrameBufferSize(format);
     printf("Minimal size is %d\n",fbsize);
 
-    messagewithconfirm("Press ENTER to allocate area");
-    fbarea = Buddy_Alloc(fbsize);
-    printf("Allocated at address %p\n",fbarea);
+    messagewithconfirm("Press ENTER to allocate area for frame buffer 1");
+    fbarea1 = Buddy_Alloc(fbsize);
+    printf("Allocated at address %p\n",fbarea1);
 
     messagewithconfirm("Press ENTER to set background color");
     LCD_SetBackgroundColor(RGB(255,0,255));
 
-    messagewithconfirm("Press ENTER to set the frame buffer to layer 1");
-    LCD_SetFullSizeFrameBuffer(1, fbarea, format);
+    messagewithconfirm("Press ENTER to set the frame buffer of layer 1");
+    LCD_SetFullSizeFrameBuffer(1, fbarea1, format);
+    LCD_FillFrameBuffer(1,RGB(0,255,255));
+    printlayerinfo(1);
+
+    messagewithconfirm("Press ENTER to enable it");
+    LCD_EnableLayer(1);
+    printlayerinfo(1);
+
+#define H2    48
+#define W2    32
+#define PS2   3
+#define P2    (((((W2)*PS2+3)+63)/64)*64)
+    messagewithconfirm("Press ENTER to allocate area for frame buffer 2");
+    fbarea2 = Buddy_Alloc(P2*H2);
+    printf("Allocated %d bytes at address %p\n",P2*H2,fbarea2);
+
+    messagewithconfirm("Press ENTER to set the frame buffer of layer 2");
+    int w2 = W2;
+    int h2 = H2;
+    int p2 = P2;
+    int x = 96;
+    int y = 64;
+    LCD_SetFrameBuffer(2, fbarea2, LCD_FORMAT_RGB888, x, y, w2, h2, p2 );
+    LCD_FillFrameBuffer(2,RGB(255,255,0));
+    printlayerinfo(2);
+    printlayercontents(2);
+
+
+    messagewithconfirm("Press ENTER to come back to layer 1");
+    LCD_DisableLayer(2);
+    LCD_EnableLayer(1);
 
     /*
-     * Blink LCD
+     * Show some screens
      */
 
 
     for (;;) {
+        messagewithconfirm("Press ENTER to make layer 1 all GRAY");
+        LCD_FillFrameBuffer(1,RGB(127,127,127));
+        LCD_ReloadLayerByVerticalBlanking(1);
+        printlayerinfo(1);
+        printlayercontents(1);
+
+        messagewithconfirm("Press ENTER to make layer 1 all WHITE");
+        LCD_FillFrameBuffer(1,RGB(255,255,255));
+        LCD_ReloadLayerByVerticalBlanking(1);
+        printlayerinfo(1);
+        printlayercontents(1);
+
+        messagewithconfirm("Press ENTER to make layer 1 all BLACK");
+        LCD_FillFrameBuffer(1,RGB(0,0,0));
+        LCD_ReloadLayerByVerticalBlanking(1);
+        printlayercontents(1);
+
         messagewithconfirm("Press ENTER to make layer 1 all RED");
         LCD_FillFrameBuffer(1,RGB(255,0,0));
+        LCD_ReloadLayerByVerticalBlanking(1);
+        printlayercontents(1);
 
         messagewithconfirm("Press ENTER to make layer 1 all GREEN");
         LCD_FillFrameBuffer(1,RGB(0,255,0));
+        LCD_ReloadLayerByVerticalBlanking(1);
 
         messagewithconfirm("Press ENTER to make layer 1 all BLUE");
         LCD_FillFrameBuffer(1,RGB(0,0,255));
+        LCD_ReloadLayerByVerticalBlanking(1);
 
-        messagewithconfirm("Press ENTER to make layer 1 all YELLOW?");
+        messagewithconfirm("Press ENTER to make layer 1 all YELLOW");
         LCD_FillFrameBuffer(1,RGB(255,255,0));
+        LCD_ReloadLayerByVerticalBlanking(1);
 
-        messagewithconfirm("Press ENTER to make layer 1 all YELLOW?");
-        LCD_FillFrameBuffer(1,RGB(255,255,0));
-
-        messagewithconfirm("Press ENTER to make layer 1 all MAGENTA?");
+        messagewithconfirm("Press ENTER to make layer 1 all MAGENTA");
         LCD_FillFrameBuffer(1,RGB(255,0,255));
+        LCD_ReloadLayerByVerticalBlanking(1);
 
-        messagewithconfirm("Press ENTER to make layer 1 all MAGENTA?");
+        messagewithconfirm("Press ENTER to make layer 1 all CYAN");
         LCD_FillFrameBuffer(1,RGB(0,255,255));
+        LCD_ReloadLayerByVerticalBlanking(1);
+
+        messagewithconfirm("Press ENTER to draw horizontal layer in BLACK");
+        LCD_DrawHorizontalLine(1,30,60,30,RGB(0,0,0));
+        LCD_ReloadLayerByVerticalBlanking(1);
+
+        messagewithconfirm("Press ENTER to draw vertical layer in BLACK");
+        LCD_DrawVerticalLine(1,30,60,60,RGB(0,0,0));
+        LCD_ReloadLayerByVerticalBlanking(1);
+
+        printlayerinfo(2);
+
+        messagewithconfirm("Press ENTER to swap layers");
+        LCD_SwapLayers();
+        LCD_ReloadLayerByVerticalBlanking(1);
+
+        messagewithconfirm("Press ENTER to swap layers again");
+        LCD_SwapLayers();
+        LCD_ReloadLayerByVerticalBlanking(1);
+
+        messagewithconfirm("Press ENTER to draw a box in RED");
+        LCD_DrawBox(1,120,80,40,60,RGB(255,0,0),RGB(0,0,0));
+        LCD_ReloadLayerByVerticalBlanking(1);
+
+        messagewithconfirm("Press ENTER to draw a inclined line in RED");
+        LCD_DrawLine(1,120,80,-40,-60,RGB(0,0,0));
+        LCD_ReloadLayerByVerticalBlanking(1);
 
     }
 }

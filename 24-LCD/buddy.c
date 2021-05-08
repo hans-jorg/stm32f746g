@@ -60,7 +60,7 @@
  *
  *  @note   It limits the ratio POLL_SIZE/POLL_MINSIZE
  */
-#define  MAXRATIO   1024
+#define  MAXRATIO   2048
 
 #define  MAPSIZEMAX   (MAXRATIO*2)
 
