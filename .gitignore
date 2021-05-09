@@ -12,7 +12,6 @@ gcc/
 html/
 utils/
 tmp/
-X*/
 build/
 Docs/
 Utils/

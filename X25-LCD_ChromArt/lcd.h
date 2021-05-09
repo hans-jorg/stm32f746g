@@ -81,7 +81,6 @@ void  LCD_SwapLayers(void);
 void  LCD_ReloadLayerImmediately(int layer);
 void  LCD_ReloadLayerByVerticalBlanking(int layer);
 void  LCD_SetLayerPosition(int layer, int hp, int vp);
-void  LCD_SetLayerOpacity(int opacity);
 
 void *LCD_GetLineAddress(int layer, int line);
 int   LCD_GetHeight(int layer);
