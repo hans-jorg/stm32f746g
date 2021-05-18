@@ -15,12 +15,21 @@
  *
  * @note    The order is reversed!!!
  *
- * @note    The 8 low order bits are 0 (Why?)
+ * @note    The 8 low order bits are 0
  */
-#define RGB(R,G,B)      ((uint32_t)((0L)|((R)<<16|((G)<<8)|((B)<<0))))
-#define RGB565(R,G,B)   ((uint16_t)((0L)|(((R)&0x1F)<<11)|(((G)&0x3F)<<5)|((((B)&0x1F)<<0)))
-#define RGB555(R,G,B)   ((uint16_t)((0L)|(((R)&0x1F)<<10)|(((G)&x01F)<<5)|((((B)&0x1F)<<0))))
-#define RGBA(R,G,B)     ((uint32_t)(((A)<<24)|((R)<<16|((G)<<8)|((B)<<0))))
+#define RGB(R,G,B)     ( (((uint32_t) (R))<<16)         \
+                        |(((uint32_t) (G))<<8)          \
+                        |(((uint32_t) (B))<<0) )
+#define RGB565(R,G,B)  ( (((uint16_t)((R)&0x1F))<<8)    \
+                        |(((uint16_t)((G)&0x3F))<<3)    \
+                        |(((uint16_t)((B)&0x1F))>>3) )
+#define RGB555(R,G,B)  ( (((uint16_t)((R)&0x1F))<<7)    \
+                        |(((uint16_t)((G)&0x1F))<<3)    \
+                        |(((uint16_t)((B)&0x1F))>>3) )
+#define RGBA(R,G,B)    ( (((uint32_t) (A))<<24)         \
+                        |(((uint32_t) (R))<<16)         \
+                        |(((uint32_t) (G))<<8)          \
+                        |(((uint32_t) (B))<<0) )
 
 /*
  * @brief   LCD Set Pixel Format
@@ -81,7 +90,7 @@ void  LCD_SwapLayers(void);
 void  LCD_ReloadLayerImmediately(int layer);
 void  LCD_ReloadLayerByVerticalBlanking(int layer);
 void  LCD_SetLayerPosition(int layer, int hp, int vp);
-void  LCD_SetLayerOpacity(int opacity);
+void  LCD_SetLayerOpacity(int layer, int opacity);
 
 void *LCD_GetLineAddress(int layer, int line);
 int   LCD_GetHeight(int layer);
