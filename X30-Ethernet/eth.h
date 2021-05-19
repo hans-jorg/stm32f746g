@@ -19,7 +19,13 @@
  */
 #define ETH_USE_INTERRUPTS
 
+/* *
+ * @brief  Periodic process
+ *
+ * @!note  Must be called every 1 ms
+ */
 
+//extern void ETH_PeriodicProcess(void);
 
 /**
  * @brief  Descriptor structure for ETH DMA Transfers
@@ -93,21 +99,58 @@ extern ETH_DMADescriptor *ETH_TXDescriptors;
 extern ETH_DMADescriptor *ETH_RXDescriptors;
 ///@}
 
+/**
+ * @brief Pointer to callback functions
+ */
+
+struct ETH_Callbacks_s {
+    void    (*FrameReceived)(unsigned);
+    void    (*FrameTransmitted)(unsigned);
+    void    (*ErrorDetected)(unsigned);
+};
+
+extern struct ETH_Callbacks_s ETH_Callbacks;
+
+
+/**
+ * @brief Parameter for ETH_RegisterCallback
+ */
+///@{
+#define ETH_CALLBACK_FRAMERECEIVED              1
+#define ETH_CALLBACK_FRAMETRANSMITTED           2
+#define ETH_CALLBACK_ERRORDETECTED              3
+///@}
 
 /**
  * @brief Clock flags used to enable/disable clock
  */
 ///@{
-#define ETH_CLOCK_PTP       0x0001
-#define ETH_CLOCK_MACRX     0x0002
-#define ETH_CLOCK_MACTX     0x0004
-#define ETH_CLOCK_MAC       0x0008
-#define ETH_CLOCK_ALL       0x000F
+#define ETH_CLOCK_PTP                           0x0001
+#define ETH_CLOCK_MACRX                         0x0002
+#define ETH_CLOCK_MACTX                         0x0004
+#define ETH_CLOCK_MAC                           0x0008
+#define ETH_CLOCK_ALL                           0x000F
 ///@}
 
+void ETH_Init(void);
 void ETH_EnableClock(uint32_t which);
 void ETH_DisableClock(uint32_t which);
-void ETH_Init(void);
+void ETH_InitializeDescriptorsTX(ETH_DMADescriptor *desc, int count, char *area);
+void ETH_InitializeDescriptorsRX(ETH_DMADescriptor *desc, int count, char *area);
+void ETH_Start(void);
+void ETH_Stop(void);
+int  ETH_TransmitFrame(unsigned size);
+void ETH_EnableTransmissionDMA(void);
+void ETH_DisableTransmissionDMA(void);
+void ETH_EnableReceptionDMA(void);
+void ETH_DisableReceptionDMA(void);
+void ETH_EnableTransmissionMAC(void);
+void ETH_DisableTransmissionMAC(void);
+void ETH_EnableReceptionMAC(void);
+void ETH_DisableReceptionMAC(void);
+void ETH_IRQHandler(void);
+
+void ETH_RegisterCallback(unsigned, void (*)(unsigned));
 
 #endif
 

@@ -25,6 +25,11 @@
  * @note    Uses extended descriptor format (include PTP info)
  */
 
+/**
+ * Function prototypes (forward referenced);
+ */
+static void ETH_FlushTXFIFO(void);
+
 
 
 /**
@@ -58,6 +63,10 @@ ETH_DMADescriptor *ETH_RXDescriptors = 0;
 static ETH_DMAFrameInfo  RXFrameInfo = {0};
 ///@}
 
+/**
+ * @brief   Callbacks
+ */
+struct ETH_Callbacks_s ETH_Callbacks = {0};
 
 /**
  * @brief   small simple delay routine
@@ -970,19 +979,35 @@ uint32_t media = 1;
 
 /**
  * @brief   ETH Start
+ *
+ * @note    ETH_Init must be successfully called before
  */
+void ETH_EnableTransmissionDMA(void);
+void ETH_DisableTransmissionDMA(void);
+void ETH_EnableReceptionDMA(void);
+void ETH_DisableReceptionDMA(void);
+void ETH_EnableTransmissionMAC(void);
+void ETH_DisableTransmissionMAC(void);
+void ETH_EnableReceptionMAC(void);
+void ETH_DisableReceptionMAC(void);
+
 
 void ETH_Start(void) {
 
-    // Start transmission
+    // Enable transmission
+    ETH_EnableTransmissionMAC();
 
     // Start reception
+    ETH_EnableReceptionMAC();
 
     // Flush FIFO
+    ETH_FlushTXFIFO();
 
     // Enable transmission DMA
+    ETH_EnableTransmissionDMA();
 
     // Enable reception DMA
+    ETH_EnableReceptionDMA();
 
 }
 
@@ -993,15 +1018,19 @@ void ETH_Start(void) {
 void ETH_Stop(void) {
 
     // Disable reception DMA
+    ETH_DisableReceptionDMA();
 
     // Disable transmission DMA
+    ETH_DisableTransmissionDMA();
 
     // Flush FIFO
+    ETH_FlushTXFIFO();
 
     // Stop transmission
+    ETH_DisableTransmissionDMA();
 
     // Stop reception
-
+    ETH_DisableReceptionDMA();
 }
 
 
@@ -1155,7 +1184,7 @@ ETH_DMADescriptor *desc;
  * @note    If not, set XXXX to point to the next buffer
  */
 static int
-ETH_CheckReceiving(void) {
+ETH_CheckReception(void) {
 ETH_DMADescriptor *desc;
 
     desc = ETH_RXDescriptors;
@@ -1193,14 +1222,14 @@ ETH_DMADescriptor *desc;
  * @brief   Flush TX FIFO
  *
  */
-static int
+static void
 ETH_FlushTXFIFO(void) {
 
     ETH->DMAOMR = ETH_DMAOMR_FTF;
 
     delay(ETH_DELAY_AFTERFLUSH);
 
-    return 0;
+    return;
 }
 
 
@@ -1284,23 +1313,49 @@ void ETH_IRQHandler(void) {
 
     // Check if a frame was received
     if( ETH->DMASR&ETH_DMASR_RS ) {
-        // XXX CALLBACK
+        if( ETH_Callbacks.FrameReceived ) ETH_Callbacks.FrameReceived(0);
         ETH->DMASR = ETH_DMASR_RS;
 
     }
     // Check if a frame was transmitted
     if( ETH->DMASR&ETH_DMASR_TS ) {
-        // XXX CALLBACK
+        if( ETH_Callbacks.FrameTransmitted ) ETH_Callbacks.FrameTransmitted(0);
         ETH->DMASR = ETH_DMASR_TS;
     }
 
     // Check error
     if( ETH->DMASR&ETH_DMASR_AIS ) {
-        // XXX CALLBACK
+        if( ETH_Callbacks.ErrorDetected ) ETH_Callbacks.ErrorDetected(0);
         ETH->DMASR = ETH_DMASR_AIS;
     }
 
     // Clear interrupt summary
     ETH->DMASR = ETH_DMASR_NIS;
+}
+
+
+
+///////////////// Register callback functions ////////////////////////////////////////////////////
+
+/**
+ * @brief   Register Callback functions
+ *
+ * @note    To unregister, set pointer to 0 or NULL
+ */
+void ETH_RegisterCallback(unsigned which, void (*pFunction)(unsigned) ) {
+
+    switch(which) {
+    case ETH_CALLBACK_FRAMERECEIVED:
+        ETH_Callbacks.FrameReceived = pFunction;
+        break;
+    case ETH_CALLBACK_FRAMETRANSMITTED:
+        ETH_Callbacks.FrameTransmitted = pFunction;
+        break;
+    case ETH_CALLBACK_ERRORDETECTED:
+        ETH_Callbacks.ErrorDetected = pFunction;
+        break;
+    }
+
+    return;
 }
 
