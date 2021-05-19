@@ -48,34 +48,37 @@ Recommended additional software are:
 Projects
 --------
 
- # |  Project            |  Description                         | Status
----|---------------------|--------------------------------------|------------
-01 | Blinker-Simple      | A very simple LED blinker            | OK
-02 | Blinker-GPIO-HAL    | Simple blinker with a GPIO HAL       | OK 
-03 | Blinker-LED-HAL     | Simple blinker with a LED HAL        | OK 
-04 | Blinker-LED-HAL-V2  | Simple blinker with a better LED HAL | OK 
-05 | Blinker-LED-GPIO-HAL| Simple blinker with a LED/GPIO HAL   | OK 
-06 | Blinker-SysTick     | Simple blinker using SysTick         | OK 
-07 | Blinker-200MHz      | Changing the CPU clock frequency     | OK
-08 | Button              | Reading button status                | OK
-09 | UART-Polling        | UART interface with polling          | OK
-10 | UART-Interrupts     | UART interface with interrupts       | OK
-11 | Infos               | Show MCU Info                        | OK
-12 | Ministdio           | A minimal stdio (printf)             | OK
-13 | ----                | -----                                | -
-14 | Newlib              | Using newlib (already in ARM GNU C)  | OK
-15 | TimeTriggered-v1    | Pont's time triggered system (old)   | OK 
-16 | TimeTriggered-v2    | Pont's time triggered system (new)   | OK
-17 | ucos2               | Using uC/OS-II                       | OK 
-18 | ----                | ----                                 | -
-19 | ----                | ----                                 | -
-20 | ----                | ----                                 | -
-21 | ----                | ----                                 | -
-22 | ExternalRAM         | External RAM                         | OK
-23 | Buddy               | Using buddy allocator on external RAM| OK
-24 | LCD                 | Using the on board LCD               | ?
-25 | MicroSD             | Using the on board MicroSD           | ?
-26 | Flash               | Using the on board flash memory      | ?
+|  #  |  Project            |  Description                         | Status
+|-----|---------------------|--------------------------------------|------------
+| 01  | Blinker-Simple      | A very simple LED blinker            | OK
+| 02  | Blinker-GPIO-HAL    | Simple blinker with a GPIO HAL       | OK 
+| 03  | Blinker-LED-HAL     | Simple blinker with a LED HAL        | OK 
+| 04  | Blinker-LED-HAL-V2  | Simple blinker with a better LED HAL | OK 
+| 05  | Blinker-LED-GPIO-HAL| Simple blinker with a LED/GPIO HAL   | OK 
+| 06  | Blinker-SysTick     | Simple blinker using SysTick         | OK 
+| 07  | Blinker-200MHz      | Changing the CPU clock frequency     | OK
+| 08  | Button              | Reading button status                | OK
+| 09  | UART-Polling        | UART interface with polling          | OK
+| 10  | UART-Interrupts     | UART interface with interrupts       | OK
+| 11  | Infos               | Show MCU Info                        | OK
+| 12  | Ministdio           | A minimal stdio (printf)             | OK
+| 13  | ----                | -----                                | -
+| 14  | Newlib              | Using newlib (already in ARM GNU C)  | OK
+| 15  | TimeTriggered-v1    | Pont's time triggered system (old)   | OK 
+| 16  | TimeTriggered-v2    | Pont's time triggered system (new)   | OK
+| 17  | ucos2               | Using uC/OS-II                       | OK 
+| 18  | ----                | ----                                 | -
+| 19  | ----                | ----                                 | -
+| 20  | ----                | ----                                 | -
+| 21  | ----                | ----                                 | -
+| 22  | ExternalRAM         | External RAM                         | OK
+| 23  | Buddy               | Using buddy allocator on external RAM| OK
+| 24  | LCD                 | Using the on board LCD               | OK
+| X25 | LCD-ChromeArt       | Using DMA2D to manipulate display    | ?
+| X27 | Touch               | Getting touch information (I2C)      | ?
+| X28 | MicroSD             | Using the on board MicroSD           | ?
+| X29 | Flash               | Using the on board flash memory      | ?
+| X30 | Ethernet            | Using the on board Ethernet and lwIP | ?
 
 
 
