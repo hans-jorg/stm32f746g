@@ -69,6 +69,96 @@ static ETH_DMAFrameInfo  RXFrameInfo = {0};
 struct ETH_Callbacks_s ETH_Callbacks = {0};
 
 /**
+ * @brief   Defines for configure PHY
+ *
+ * @note LAN8742 PHY register description
+ *
+ *   |   #  |        | Description                                     |  Group           |
+ *   |------|--------|-------------------------------------------------|------------------|
+ *   |   0  | BCR    | Basic Control Register                          | Basic            |
+ *   |   1  | BSR    | Basic Status Register                           | Basic            |
+ *   |   2  | ID1R   | PHY Identifier 1 Register                       | Extended         |
+ *   |   3  | ID2R   | PHY Identifier 2 Register                       | Extended         |
+ *   |   4  | ANAR   | Auto Negotiation Advertisement Register         | Extended         |
+ *   |   5  | ANLPR  | Auto Negotiation Link Partner Ability Register  | Extended         |
+ *   |   6  | ANEPR  | Auto Negotiation Expansion Register             | Extended         |
+ *   |   7  | ANNPTXR| Auto Negotiation Next Page TX Register          | Extended         |
+ *   |   8  | ANNPRXR| Auto Negotiation Next Page RX Register          | Extended         |
+ *   |  13  | MMDACR | MMD Access Control Register                     | Extended         |
+ *   |  14  | MMADR  | MMD Access Address/Data Register                | Extended         |
+ *   |  16  | EDPDR  | EDPD NLP/Crossover TimeRegister                 | Vendor-specific  |
+ *   |  17  | MCSR   | Mode Control/Status Register                    | Vendor-specific  |
+ *   |  18  | SMR    | Special Modes Register                          | Vendor-specific  |
+ *   |  24  | TDRPDR | TDR Patterns/Delay Control Register             | Vendor-specific  |
+ *   |  25  | TDCSR  | TDR Control/Status Register                     | Vendor-specific  |
+ *   |  26  | SECR   | Symbol Error Counter Register                   | Vendor-specific  |
+ *   |  27  | SCSIR  | Special Control/Status Indications Register     | Vendor-specific  |
+ *   |  28  | CLR    | Cable Length Register                           | Vendor-specific  |
+ *   |  29  | ISFR   | Interrupt Source Flag Register                  | Vendor-specific  |
+ *   |  30  | IMR    | Interrupt Mask Register                         | Vendor-specific  |
+ *   |  31  | SCSR   | PHY Special Control/Status Register             | Vendor-specific  |
+ */
+
+
+
+/** PHY */
+#define ETH_PHY_ADDRESS                 1
+
+/** Registers */
+///@{
+#define ETH_PHY_BCR                             (0)
+#define ETH_PHY_BSR                             (1)
+#define ETH_PHY_ISFR                           (29)
+///@}
+
+
+/** Delays */
+///@{
+#define ETH_DELAY_AFTERRESET                1000
+#define ETH_DELAY_AFTERAUTONEGOCIATION      1000
+#define ETH_DELAY_AFTERCONFIG               1000
+#define ETH_DELAY_BETWEENTESTS              1000
+
+#define ETH_RETRIES_LINK                    1000
+///@}
+
+
+/** Fields of BCR Register */
+///@{
+#define ETH_PHY_BCR_RESET                       (uint16_t) (0x8000)
+#define ETH_PHY_BCR_LOOPBACK                    (uint16_t) (0x4000)
+#define ETH_PHY_BCR_SPEED100MHz                 (uint16_t) (0x2000)
+#define ETH_PHY_BCR_AUTONEGOCIATION             (uint16_t) (0x1000)
+#define ETH_PHY_BCR_POWERDOWN                   (uint16_t) (0x0800)
+///@}
+
+/* Fields of BSR Register */
+///@{
+#define ETH_PHY_BSR_100BASET_FULLDUPLEX         (uint16_t) (0x4000)
+#define ETH_PHY_BSR_100BASET_HALFDUPLEX         (uint16_t) (0x2000)
+#define ETH_PHY_BSR_10BASET_FULLDUPLEX          (uint16_t) (0x1000)
+#define ETH_PHY_BSR_10BASET_HALFDUPLEX          (uint16_t) (0x0800)
+#define ETH_PHY_BSR_AUTONEGOCIATIONCOMPLETED    (uint16_t) (0x0020)
+#define ETH_PHY_BSR_LINKUP                      (uint16_t) (0x0004)
+///@}
+
+/* Fields of ISFR Register */
+///@{
+#define ETH_PHY_ISFR_INT8                       (uint16_t) (0x0100)
+#define ETH_PHY_ISFR_INT7                       (uint16_t) (0x0080)
+#define ETH_PHY_ISFR_INT6                       (uint16_t) (0x0040)
+#define ETH_PHY_ISFR_INT5                       (uint16_t) (0x0020)
+#define ETH_PHY_ISFR_INT4                       (uint16_t) (0x0010)
+#define ETH_PHY_ISFR_INT3                       (uint16_t) (0x0008)
+#define ETH_PHY_ISFR_INT2                       (uint16_t) (0x0004)
+#define ETH_PHY_ISFR_INT1                       (uint16_t) (0x0002)
+///@}
+
+
+
+
+
+/**
  * @brief   small simple delay routine
  */
 
@@ -80,6 +170,23 @@ volatile int c = count;
 }
 
 
+
+/**
+ * @brief   Get Mac Address as a vector of bytes
+ *
+ * @note    Least significant byte first
+ */
+void
+ETH_GetMACAddress(uint8_t macaddr[6]) {
+
+    macaddr[0] = (eth_macaddress>>0)&0xFF;
+    macaddr[1] = (eth_macaddress>>8)&0xFF;
+    macaddr[2] = (eth_macaddress>>16)&0xFF;
+    macaddr[3] = (eth_macaddress>>24)&0xFF;
+    macaddr[4] = (eth_macaddress>>32)&0xFF;
+    macaddr[5] = (eth_macaddress>>40)&0xFF;
+
+}
 
 ////////////////////////////////// Pin management //////////////////////////////////////////////////
 
@@ -199,7 +306,6 @@ uint32_t mAND,mOR; // Mask
             |(ETH_OTYPE<<GPIO_OTYPER_OT7_Pos);
     GPIOA->OTYPER  = (GPIOD->OTYPER&~mAND)|mOR;
 
-    // TODO
     // Configure pins in GPIOC
     // 1/MDC  4/RXD0  5/RXD1
 
@@ -344,60 +450,6 @@ void ETH_DisableClock(uint32_t which) {
 
 ///////////////////////////// PHY management ///////////////////////////////////////////////////////
 
-/**
- *  @note LAN8742 PHY register description
- *
- *   |   #  |        | Description                                     |  Group           |
- *   |------|--------|-------------------------------------------------|------------------|
- *   |   0  | BCR    | Basic Control Register                          | Basic            |
- *   |   1  | BSR    | Basic Status Register                           | Basic            |
- *   |   2  | ID1R   | PHY Identifier 1 Register                       | Extended         |
- *   |   3  | ID2R   | PHY Identifier 2 Register                       | Extended         |
- *   |   4  | ANAR   | Auto Negotiation Advertisement Register         | Extended         |
- *   |   5  | ANLPR  | Auto Negotiation Link Partner Ability Register  | Extended         |
- *   |   6  | ANEPR  | Auto Negotiation Expansion Register             | Extended         |
- *   |   7  | ANNPTXR| Auto Negotiation Next Page TX Register          | Extended         |
- *   |   8  | ANNPRXR| Auto Negotiation Next Page RX Register          | Extended         |
- *   |  13  | MMDACR | MMD Access Control Register                     | Extended         |
- *   |  14  | MMADR  | MMD Access Address/Data Register                | Extended         |
- *   |  16  | EDPDR  | EDPD NLP/Crossover TimeRegister                 | Vendor-specific  |
- *   |  17  | MCSR   | Mode Control/Status Register                    | Vendor-specific  |
- *   |  18  | SMR    | Special Modes Register                          | Vendor-specific  |
- *   |  24  | TDRPDR | TDR Patterns/Delay Control Register             | Vendor-specific  |
- *   |  25  | TDCSR  | TDR Control/Status Register                     | Vendor-specific  |
- *   |  26  | SECR   | Symbol Error Counter Register                   | Vendor-specific  |
- *   |  27  | SCSIR  | Special Control/Status Indications Register     | Vendor-specific  |
- *   |  28  | CLR    | Cable Length Register                           | Vendor-specific  |
- *   |  29  | ISFR   | Interrupt Source Flag Register                  | Vendor-specific  |
- *   |  30  | IMR    | Interrupt Mask Register                         | Vendor-specific  |
- *   |  31  | SCSR   | PHY Special Control/Status Register             | Vendor-specific  |
- */
-
-
-
-/* PHY */
-#define ETH_PHY_ADDRESS                 1
-
-
-/* Registers */
-#define ETH_PHY_BCR                             (0)
-#define ETH_PHY_BSR                             (1)
-
-/* Fields of BCR Register */
-#define ETH_PHY_BCR_RESET                       (uint16_t) (0x8000)
-#define ETH_PHY_BCR_LOOPBACK                    (uint16_t) (0x4000)
-#define ETH_PHY_BCR_SPEED100MHz                 (uint16_t) (0x2000)
-#define ETH_PHY_BCR_AUTONEGOCIATION             (uint16_t) (0x1000)
-#define ETH_PHY_BCR_POWERDOWN                   (uint16_t) (0x0800)
-
-/* Fields of BSR Register */
-#define ETH_PHY_BSR_100BASET_FULLDUPLEX         (uint16_t) (0x4000)
-#define ETH_PHY_BSR_100BASET_HALFDUPLEX         (uint16_t) (0x2000)
-#define ETH_PHY_BSR_10BASET_FULLDUPLEX          (uint16_t) (0x1000)
-#define ETH_PHY_BSR_10BASET_HALFDUPLEX          (uint16_t) (0x0800)
-#define ETH_PHY_BSR_AUTONEGOCIATIONCOMPLETED    (uint16_t) (0x0020)
-#define ETH_PHY_BSR_LINKUP                      (uint16_t) (0x0004)
-
 
 /**
  * @brief  ETH_WritePHYRegister
@@ -480,12 +532,6 @@ uint32_t macmiiar = ETH->MACMIIAR;
  * @note   PHY is Microchip LAN
  */
 
-#define ETH_DELAY_AFTERRESET                1000
-#define ETH_DELAY_AFTERAUTONEGOCIATION      1000
-#define ETH_DELAY_AFTERCONFIG               1000
-#define ETH_DELAY_BETWEENTESTS              1000
-
-#define ETH_RETRIES_LINK                    1000
 
 
 static int ETH_ConfigurePHY(void) {
@@ -549,7 +595,11 @@ int retries;
         delay(ETH_DELAY_AFTERCONFIG);
 
     }
-    //ETH_ReadPHYRegister(ETH_PHY_BCR,&value);
+    // Enable interrupt on link status
+    ETH_ReadPHYRegister(ETH_PHY_ISFR,&value);
+    value |= ETH_PHY_ISFR_INT4;
+    ETH_WritePHYRegister(ETH_PHY_ISFR,value);
+
 
     return 0;
 }

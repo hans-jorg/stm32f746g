@@ -149,6 +149,7 @@ void ETH_DisableTransmissionMAC(void);
 void ETH_EnableReceptionMAC(void);
 void ETH_DisableReceptionMAC(void);
 void ETH_IRQHandler(void);
+void ETH_GetMACAddress(uint8_t macaddr[6]);
 
 void ETH_RegisterCallback(unsigned, void (*)(unsigned));
 

@@ -93,9 +93,7 @@ SRCFILES=${wildcard *.c}
 #
 # Flags specific for project (C, ASM and LD)
 #
-PROJCFLAGS= -I ./lwip/src/include/ -I .
-PROJAFLAGS=
-PROJLDFLAGS=
+
 
 #
 # Include the common make definitions.
@@ -334,13 +332,65 @@ OPENOCDFLASHSCRIPT=${OBJDIR}/flash.ocd
 # Additional libraries like RTOS
 #
 #
+LWIP=lwip
+LWIP_SRC=${LWIP}/lwip/src
+LWIP_CONTRIB=${LWIP}/contrib/stm32f746-ml
 
-EXTSRCFILES=
-EXTOBJFILES=
+LWIP_COREFILES= \
+                def.c                   \
+                init.c                  \
+                timeouts.c              \
+                mem.c                   \
+                memp.c                  \
+                netif.c                 \
+                pbuf.c                  \
+                stats.c                 \
+                tcp.c                   \
+                tcp_out.c               \
+                tcp_in.c                \
+                ip.c                    \
+                udp.c                   \
+                ipv4/icmp.c             \
+                ipv4/ip4.c              \
+                ipv4/ip4_addr.c         \
+                ipv4/ip4_frag.c         \
+                ipv4/dhcp.c
+
+LWIP_NETIFFILES=etharp.c ethernet.c
+
+LWIP_PORTFILES=ethernetif.c
+
+LWIP_APPSFILES=httpd.c fs.c
+
+LWIP_SRCFILES=  \
+                $(addprefix ${LWIP_SRC}/apps/,${LWIP_APPSFILES})    \
+                $(addprefix ${LWIP_SRC}/core/,${LWIP_COREFILES})    \
+                $(addprefix ${LWIP_SRC}/api/,${LWIP_APIFILES})      \
+                $(addprefix ${LWIP_SRC}/netif/,${LWIP_NETIFFILES})   \
+                $(addprefix ${LWIP_CONTRIB}/,${LWIP_PORTFILES})     \
+
+LWIP_OBJFILES=$(addprefix  ${OBJDIR}/,$(notdir $(LWIP_SRCFILES:%.c=%.o)))
+
+LWIP_CFLAGS= -I ${LWIP_SRC}/include/ -I ${LWIP_CONTRIB} -I .
+LWIP_AFLAGS=
+LWIP_LDFLAGS=
+
+
+VPATH=   ${LWIP_SRC}/apps/http/     \
+        :${LWIP_SRC}/core/          \
+        :${LWIP_SRC}/core/ipv4/     \
+        :${LWIP_SRC}/api/           \
+        :${LWIP_SRC}/netif/         \
+        :${LWIP_CONTRIB}/
+#
+# External libraries
+#
+EXTSRCFILES=${LWIP_SRCFILES}
+EXTOBJFILES=${LWIP_OBJFILES}
 EXTINCLUDEPATH=
-EXTCFLAGS=
-EXTAFLAGS=
-EXTLDFLAGS=
+EXTCFLAGS=${LWIP_CFLAGS}
+EXTAFLAGS=${LWIP_AFLAGS}
+EXTLDFLAGS=${LWIP_LDFLAGS}
 
 ###############################################################################
 # Commands                                                                    #
@@ -470,7 +520,7 @@ LIBM:=${shell ${CC} ${CPUFLAGS} ${FPUFLAGS} -print-file-name=libm.a}
 #
 # Object files
 #
-OBJFILES=${addprefix ${OBJDIR}/,${SRCFILES:.c=.o}}
+OBJFILES=$(addprefix ${OBJDIR}/,${SRCFILES:.c=.o})
 
 #
 #
@@ -480,8 +530,8 @@ AFLAGS= ${CPUFLAGS}                             \
 	    ${FPUFLAGS}                             \
 	    ${PROJAFLAGS}                           \
 	    ${EXTAFLAGS}                            \
-	    ${addprefix -I ,${INCLUDEPATH}}         \
-	    ${addprefix -I ,${EXTINCLUDEPATH}}      \
+	    $(addprefix -I ,${INCLUDEPATH})         \
+	    $(addprefix -I ,${EXTINCLUDEPATH})      \
 	    ${ASECTIONS}                            \
 
 
@@ -493,8 +543,8 @@ CFLAGS= ${CPUFLAGS}                             \
 	    ${DEBUGCFLAGS}                          \
 	    ${PROJCFLAGS}                           \
 	    ${EXTCFLAGS}                            \
-	    ${addprefix -I ,${INCLUDEPATH}}         \
-	    ${addprefix -I ,${EXTINCLUDEPATH}}      \
+	    $(addprefix -I ,${INCLUDEPATH})         \
+	    $(addprefix -I ,${EXTINCLUDEPATH})      \
 	    -D${PARTCLASS}                          \
 	    -DPART_${PART}                          \
 	    ${CSECTIONS}                            \
@@ -634,9 +684,9 @@ ${OBJDIR}/${PROGNAME}.axf:  ${OBJFILES} ${EXTOBJFILES}
 	        ${FPUFLAGS}                                                 \
 	        ${LIBFLAGS}                                                 \
 	        -Wl,--print-memory-usage                                    \
-	        ${addprefix -Wl${COMMA},${LDFLAGS} }                        \
-	        ${addprefix -Wl${COMMA},${PROJLDFLAGS} }                    \
-	        ${addprefix -Wl${COMMA},${EXTLDFLAGS} }                     \
+	        $(addprefix -Wl${COMMA},${LDFLAGS} )                        \
+	        $(addprefix -Wl${COMMA},${PROJLDFLAGS} )                    \
+	        $(addprefix -Wl${COMMA},${EXTLDFLAGS} )                     \
 	        -o ${@} ${OBJFILES}  ${EXTOBJFILES}                         \
 	        '${LIBM}' '${LIBC}' '${LIBGCC}'
 
@@ -846,7 +896,8 @@ cproto:
 # generates a call graph
 #
 cflow:
-	(cflow ${CFLOWFLAGS} -D${PART} ${addprefix -I ,${INCLUDEPATH}} ${SRCFILES} 2>&1} | egrep -v "^cflow"
+	(cflow ${CFLOWFLAGS} -D${PART} $(addprefix -I ,${INCLUDEPATH}) ${SRCFILES} 2>&1) | \
+	     egrep -v "^cflow"
 
 
 #
@@ -862,5 +913,5 @@ FORCE:
 #
 # Dependencies
 #
--include ${OBJFILES:%.o=%.d}
+-include $(OBJFILES:%.o=%.d)
 
