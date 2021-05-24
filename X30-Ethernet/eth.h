@@ -91,6 +91,11 @@ typedef struct {
 ///@}
 
 
+
+/**
+ * lwIP examples requires this definition
+ */
+#define ETHERNET_MTU   ETH_MAX_ETH_PAYLOAD
 /**
  * @brief   RX and TX descriptors
  */

@@ -360,7 +360,7 @@ LWIP_NETIFFILES=etharp.c ethernet.c
 
 LWIP_PORTFILES=ethernetif.c
 
-LWIP_APPSFILES=httpd.c fs.c
+#LWIP_APPSFILES=httpd.c fs.c
 
 LWIP_SRCFILES=  \
                 $(addprefix ${LWIP_SRC}/apps/,${LWIP_APPSFILES})    \
@@ -376,12 +376,12 @@ LWIP_AFLAGS=
 LWIP_LDFLAGS=
 
 
-VPATH=   ${LWIP_SRC}/apps/http/     \
-        :${LWIP_SRC}/core/          \
-        :${LWIP_SRC}/core/ipv4/     \
-        :${LWIP_SRC}/api/           \
-        :${LWIP_SRC}/netif/         \
-        :${LWIP_CONTRIB}/
+VPATH=           ${LWIP_SRC}/apps/http/     \
+                :${LWIP_SRC}/core/          \
+                :${LWIP_SRC}/core/ipv4/     \
+                :${LWIP_SRC}/api/           \
+                :${LWIP_SRC}/netif/         \
+                :${LWIP_CONTRIB}/
 #
 # External libraries
 #
