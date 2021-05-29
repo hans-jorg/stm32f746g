@@ -55,9 +55,6 @@ struct ethernetif {
   struct eth_addr *ethaddr;
 };
 
-/* Forward declarations. */
-static void  ethernetif_input(struct netif *netif);
-
 /**
  * @brief low_level_init
  *
@@ -240,7 +237,7 @@ u16_t len;
  *
  * @param netif the lwip network interface structure for this ethernetif
  */
-static void
+void
 ethernetif_input(struct netif *netif) {
 struct ethernetif *ethernetif;
 struct eth_hdr *ethhdr;
@@ -323,5 +320,6 @@ struct ethernetif *ethernetif;
 
   return ERR_OK;
 }
+
 
 

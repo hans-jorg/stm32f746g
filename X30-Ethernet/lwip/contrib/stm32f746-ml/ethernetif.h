@@ -12,6 +12,8 @@ void        ethernetif_set_link(void const *argument);
 void        ethernetif_update_config(struct netif *netif);
 void        ethernetif_callback_conn_changed(struct netif *netif);
 
+
+void        ethernetif_input(struct netif *netif);
 /**
  * @brief   Counter used to check timeouts
  *

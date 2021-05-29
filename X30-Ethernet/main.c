@@ -17,6 +17,7 @@
 #include <stdint.h>
 #include <stdarg.h>
 #include <string.h>
+#include <ctype.h>
 
 #include "stm32f746xx.h"
 #include "system_stm32f746.h"
@@ -30,12 +31,21 @@
 #include "lwip/dhcp.h"
 #include "lwip/etharp.h"
 #include "lwip/timeouts.h"
+#include "lwip/tcp.h"
 #include "lwip/prot/ethernet.h"
-#include "lwip/apps/httpd.h"
+#include "lwip/apps/tftp_server.h"
 #include "ethernetif.h"
 
+/**
+ * @brief IP_PORT
+ *
+ * @note  Port number where the server listens
+ */
+#define IP_PORT              8080
 
 
+
+////////////////// Timing Functions  /////////////////////////////////////////////////////////////
 
 static volatile uint32_t tick_ms = 0;
 static volatile uint32_t delay_ms = 0;
@@ -74,29 +84,21 @@ void Delay(uint32_t delay) {
 
 }
 
+
 /**
- * @brief message
+ * @brief   STOP
  *
- * @note  There are two versions. One using the standard library vprintf function and
- *        another, using a macro with variable number of arguments
- *
- * @note  Macros requires at least two arguments. Particularly, the message must have a specifier.
- *        Dismissed!!!!
+ * @note    called when an error occurs
  */
-int verbose = 1;
+void STOP(int code) {
+static int static_code;
 
-void message(char *msg,...) {
-
-    va_list args;
-
-    va_start(args,msg);
-
-    if( verbose ) {
-        vprintf(msg,args);
-    }
-    va_end(args);
+    static_code = code;
+    while (1) {}
 }
 
+
+////////////////// Auxiliary Functions  ///////////////////////////////////////////////////////////
 
 /**
  * @brief convertbyte to string
@@ -142,8 +144,116 @@ char *p = s;
     return 0;
 }
 
+/**
+ * @brief   int2str
+ *
+  * @brief  Convert an integer to a string, avoiding string overflow
+ *
+ * @note    When an overflow is detected, the field is filled with astarisks
+ *
+ * @note    len must account for the null terminator
+ */
+int
+int2str(int n, char *s, int len) {
+unsigned x;
+unsigned p10,p10ant;
+int e10 = 1;
+
+    if( n < 0 )
+        x = (unsigned) (-n);
+    else
+        x = n;
+
+    p10 = p10ant = 1;
+    e10 = 0;
+    while( (p10 < x) && (p10ant <= p10) ) {
+        p10ant = p10;
+        p10 *= 10;
+        e10++;
+    }
+    if( e10 > len ) {
+        char *q = s+len-1;
+        while( s < q ) *s++ = '*';
+        *s = 0;
+        return -1;
+    }
+    p10 = p10ant;
+    while( p10 > 1 ) {
+        int d = 0;
+        while( x >= p10 ) {
+            x -= p10;
+            d++;
+        }
+        *s++ = (d+'0');
+        p10 /= 10;
+    }
+    *s++ = x+'0';
+    *s = 0;
+    return 0;
+}
+
+/**
+ * @brief   hexdump
+ *
+ * @note    print a memory dump
+ */
+static int
+hexdump(void *area, int size, unsigned addr) {
+unsigned offset;
+unsigned a = addr;
+unsigned char *c;
+int i;
+
+    for(offset=0; offset<size; offset+=16) {
+        printf("%04X ",a);
+        c = ((unsigned char *) area) + offset;
+        for(i=0;i<16;i++) {
+            if( i == 8 )
+                printf("  ");
+            printf("%02X",c[i]);
+        }
+        printf("  ");
+        for(i=0;i<16;i++) {
+            if( i == 8 )
+                printf(" ");
+            if( isprint(c[i])) {
+                putchar(c[i]);
+            } else {
+                putchar('.');
+            }
+        }
+        putchar('\n');
+        a += 16;
+    }
+    return 0;
+}
 
 
+/**
+ * @brief message
+ *
+ * @note  This version uses the standard library vprintf function.
+ *
+ *
+ * @note  Another version using a macro with variable number of arguments was tried. But
+ *        such macros must have at least two arguments. Dismissed!!!!
+ */
+int verbose = 1;
+
+void message(char *msg,...) {
+
+    va_list args;
+
+    va_start(args,msg);
+
+    if( verbose ) {
+        vprintf(msg,args);
+    }
+    va_end(args);
+}
+
+
+///////////////////// LWIP Functions //////////////////////////////////////////////////////////////
 
 /**
  * @brief mynetif_input
@@ -241,22 +351,87 @@ void mynetif_link_callback(struct netif *netif) {
 
 }
 
+///////////////////// TFTP Functions //////////////////////////////////////////////////////////////
+
+
+#define ONLY_FILE  ((void *) 1)
+static void*
+tftp_open(const char* fname, const char* mode, u8_t is_write) {
+
+  if (is_write) {
+    return NULL; // not yet
+  } else {
+    return ONLY_FILE;
+  }
+}
+
+static void
+tftp_close(void* handle) {
+  return;
+}
+
+static int counter = 0;
+
+static int
+tftp_read(void* handle, void* buf, int len) {
+int rc;
+
+    if( handle != ONLY_FILE )
+        return -1;
+
+    rc = int2str(counter,buf,len);
+    return rc;
+}
+
+static int
+tftp_write(void* handle, struct pbuf* p) {
+
+    while (p != NULL) {
+        hexdump(p->payload,p->len,0);
+        p = p->next;
+    }
+    return 0;
+}
+
+static const struct tftp_context
+tftp_config = {
+  tftp_open,
+  tftp_close,
+  tftp_read,
+  tftp_write
+};
+
+
+///////////////////// Main Function ///////////////////////////////////////////////////////////////
 
 /**
  * brief network interface configuration
  */
 static struct netif     netif;
+
+// Generate an 32-bit integer with network order of a network address or mask
+#if BYTE_ORDER == LITTLE_ENDIAN
+#define IPV4(A,B,C,D) (((u32_t)(D)<<24)|((u32_t)(C)<<16)|((u32_t)(B)<<8)|((u32_t)(A)<<0))
+#else
+#define IPV4(A,B,C,D) (((u32_t)(A)<<24)|((u32_t)(B)<<16)|((u32_t)(C)<<8)|((u32_t)(D)<<0))
+#endif
+
+#if LWIP_DHCP
 static ip4_addr_t       ipaddr;
 static ip4_addr_t       netmask;
 static ip4_addr_t       gateway;
-
+#else
+static ip4_addr_t       ipaddr    = { IPV4(192,168,0,198) };
+static ip4_addr_t       netmask   = { IPV4(192,168,0,1)   };
+static ip4_addr_t       gateway   = { IPV4(255,255,255,0) };
+#endif
 /**
  * @brief   main
  *
  * @note    Initializes GPIO and SDRAM, blinks LED and test SDRAM access
  */
 int main(void) {
-
+err_t rc;
 
     message("Starting.at %ld KHz...\n",SystemCoreClock/1000);
 
@@ -275,9 +450,11 @@ int main(void) {
     lwip_init();
 
     message("Initializing interface\n");
+#if LWIP_DHCP
     ipaddr.addr  = 0;
     netmask.addr = 0;
     gateway.addr = 0;
+#endif
     netif_add(&netif, &ipaddr, &netmask, &gateway, NULL, mynetif_init, mynetif_input);
     netif.name[0] = 'l';
     netif.name[1] = 'n';
@@ -293,9 +470,11 @@ int main(void) {
     netif_set_link_callback(&netif,mynetif_link_callback);
 
 
+#if LWIP_DHCP
     message("Starting DHCP\n");
     dhcp_start(&netif);
     Delay(100);
+#endif
 
     if( verbose ) {
         if( ip4_addr_isany_val(ipaddr) ) {
@@ -309,8 +488,8 @@ int main(void) {
         }
     }
 
-//    message("Starting HTTP server\n");
-//    httpd_init();
+    message("Starting TFTP server\n");
+    tftp_init(&tftp_config);
 
 
     /* Check for received frames, feed them to lwIP */
@@ -326,6 +505,28 @@ int main(void) {
     }
 #endif
 
+    // Creating a Protocol Control Block (PCB)
+    struct tcp_pcb *pcb = tcp_new();
+    if( pcb == NULL ) {
+        STOP(1);
+    }
+
+    // Binding the PCB to a port number
+    rc = tcp_bind(pcb,&ipaddr,IP_PORT);
+    if( rc != ERR_OK ) {
+        STOP(2);
+    }
+
+    // Configure listening
+    pcb = tcp_listen(pcb);
+    if( pcb == NULL ) {
+        STOP(3);
+    }
+
+    // Start listening
+   // tcp_accept(pcb,tcpecho_accept_callback);
+
+
     // Entering Main loop
     while(1) {
         /* Check link state, e.g. via MDIO communication with PHY */
@@ -336,6 +537,14 @@ int main(void) {
                 netif_set_link_down(&netif);
             }
         //}
+
+        // Check input
+        //ethernetif_input(&netif);
+
+        // Check timers
         sys_check_timeouts();
+
+        netif_poll(&netif);
+
     }
 }

@@ -350,24 +350,29 @@ LWIP_COREFILES= \
                 tcp_in.c                \
                 ip.c                    \
                 udp.c                   \
+                raw.c                   \
                 ipv4/icmp.c             \
                 ipv4/ip4.c              \
                 ipv4/ip4_addr.c         \
                 ipv4/ip4_frag.c         \
                 ipv4/dhcp.c
 
+# If using dns
+#LWIP_COREFILES+= dns.c
 LWIP_NETIFFILES=etharp.c ethernet.c
 
 LWIP_PORTFILES=ethernetif.c
 
 #LWIP_APPSFILES=httpd.c fs.c
+LWIP_APPFILES=tftp/tftp_server.c
 
 LWIP_SRCFILES=  \
-                $(addprefix ${LWIP_SRC}/apps/,${LWIP_APPSFILES})    \
+                $(addprefix ${LWIP_SRC}/apps/,${LWIP_APPFILES})    \
                 $(addprefix ${LWIP_SRC}/core/,${LWIP_COREFILES})    \
                 $(addprefix ${LWIP_SRC}/api/,${LWIP_APIFILES})      \
                 $(addprefix ${LWIP_SRC}/netif/,${LWIP_NETIFFILES})   \
                 $(addprefix ${LWIP_CONTRIB}/,${LWIP_PORTFILES})     \
+
 
 LWIP_OBJFILES=$(addprefix  ${OBJDIR}/,$(notdir $(LWIP_SRCFILES:%.c=%.o)))
 
@@ -376,7 +381,7 @@ LWIP_AFLAGS=
 LWIP_LDFLAGS=
 
 
-VPATH=           ${LWIP_SRC}/apps/http/     \
+VPATH=           ${LWIP_SRC}/apps/tftp/     \
                 :${LWIP_SRC}/core/          \
                 :${LWIP_SRC}/core/ipv4/     \
                 :${LWIP_SRC}/api/           \
