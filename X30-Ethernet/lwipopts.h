@@ -1,32 +1,35 @@
 #ifndef LWIPOPTS_H
 #define LWIPOPTS_H
 
-
 /*----- WITH_RTOS disabled (Since FREERTOS is not set) -----*/
 #define WITH_RTOS 0
 /*----- CHECKSUM_BY_HARDWARE enabled -----*/
-#define CHECKSUM_BY_HARDWARE 1
+#define CHECKSUM_BY_HARDWARE    1
 // Needed for netif_poll
-#define LWIP_NETIF_LOOPBACK  1
+#define LWIP_NETIF_LOOPBACK     1
 
 /* Added for project */
-#define LWIP_IPV4 1
-#define LWIP_ARP  1
-#define LWIP_RAW  1
-#define LWIP_UDP  1
-//#define LWIP_TCP  1
-//#define LWIP_DNS  1
+#define LWIP_IPV4               1
+#define LWIP_ARP                1
+#define LWIP_RAW                1
+#define LWIP_UDP                1
+#define LWIP_ICMP               1
+
+//#define LWIP_TCP              1
+//#define LWIP_DNS              1
+
+
 /*----- Value in opt.h for MEMP_NUM_SYS_TIMEOUT: (LWIP_TCP + IP_REASSEMBLY + LWIP_ARP + (2*LWIP_DHCP) + LWIP_AUTOIP + LWIP_IGMP + LWIP_DNS + (PPP_SUPPORT*6*MEMP_NUM_PPP_PCB) + (LWIP_IPV6 ? (1 + LWIP_IPV6_REASS + LWIP_IPV6_MLD) : 0)) -*/
 //#define MEMP_NUM_SYS_TIMEOUT 10
 
-#define LWIP_CALLBACK_API  1
+#define LWIP_CALLBACK_API       1
 
 /*-----------------------------------------------------------------------------*/
 /* LwIP Stack Parameters (modified compared to initialization value in opt.h) -*/
 /*----- Value in opt.h for LWIP_DHCP: 0 -----*/
-#ifdef USE_DCHP
 #define LWIP_DHCP 1
-#endif
+
+////
 /*----- Value in opt.h for NO_SYS: 0 -----*/
 #define NO_SYS 1
 /*----- Value in opt.h for SYS_LIGHTWEIGHT_PROT: 1 -----*/

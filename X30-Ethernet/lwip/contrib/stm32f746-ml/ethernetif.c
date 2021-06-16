@@ -6,10 +6,7 @@
  */
 
 /*
- * This file is a skeleton for developing Ethernet network interface
- * drivers for lwIP. Add code to the low_level functions and do a
- * search-and-replace for the word "ethernetif" to replace it with
- * something that better describes your network interface.
+ * TODO: Replace ethernetif by ethernetif
  */
 
 #include "lwip/opt.h"
@@ -26,33 +23,47 @@
 #include "ethernetif.h"
 #include "eth.h"
 
-/* Define those to better describe your network interface. */
-#define IFNAME0 'e'
-#define IFNAME1 't'
+
+////////
+u32_t sys_jiffies(void);
+u32_t sys_now(void);
+err_t ethernetif_init(struct netif *netif);
+err_t  ethernetif_input(struct netif *netif);
+void  ethernetif_set_link(struct netif *netif);
+
+
+static void low_level_init(struct netif *netif);
+static err_t low_level_output(struct netif *netif, struct pbuf *p);
+static struct pbuf * low_level_input(struct netif *netif);
+
+#if !LWIP_ARP
+static err_t low_level_output_arp_off(struct netif *netif, struct pbuf *q, const ip4_addr_t *ipaddr);
+#endif /* LWIP_ARP */
+
+
+#if LWIP_NETIF_LINK_CALLBACK
+void ethernetif_update_config(struct netif *netif);
+void ethernetif_notify_conn_changed(struct netif *netif) __attribute__((weak));
+#endif /* LWIP_NETIF_LINK_CALLBACK */
+
+///////
 
 /**
  * @brief   Counter used to check timeouts
  *
  * @note    Incremented every 1 ms
- *
  * @note    Overruns after 49 days!!!
  */
+///@{
 u32_t sys_counter = 0;
-
-u32_t       sys_now(void) {
-    return sys_counter;
-}
-
-
+///@}
 
 /**
- * Helper struct to hold private data used to operate your ethernet interface.
- * Keeping the ethernet address of the MAC in this struct is not necessary
- * as it is already kept in the struct netif.
- * But this is only an example, anyway...
+ * @brief   expanded netif struc
+ * 
  */
 struct ethernetif {
-  struct eth_addr *ethaddr;
+      struct eth_addr *ethaddr;
 };
 
 /**
@@ -237,7 +248,7 @@ u16_t len;
  *
  * @param netif the lwip network interface structure for this ethernetif
  */
-void
+err_t
 ethernetif_input(struct netif *netif) {
 struct ethernetif *ethernetif;
 struct eth_hdr *ethhdr;
@@ -256,6 +267,7 @@ struct pbuf *p;
           p = NULL;
         }
     }
+    return ERR_OK;
 }
 
 /**

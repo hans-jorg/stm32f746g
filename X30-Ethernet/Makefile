@@ -361,7 +361,7 @@ LWIP_COREFILES= \
 #LWIP_COREFILES+= dns.c
 LWIP_NETIFFILES=etharp.c ethernet.c
 
-LWIP_PORTFILES=ethernetif.c
+LWIP_PORTFILES=ethernetif.c arch/sys_arch.c
 
 #LWIP_APPSFILES=httpd.c fs.c
 LWIP_APPFILES=tftp/tftp_server.c
@@ -386,7 +386,8 @@ VPATH=           ${LWIP_SRC}/apps/tftp/     \
                 :${LWIP_SRC}/core/ipv4/     \
                 :${LWIP_SRC}/api/           \
                 :${LWIP_SRC}/netif/         \
-                :${LWIP_CONTRIB}/
+                :${LWIP_CONTRIB}/			\
+				:${LWIP_CONTRIB}/arch
 #
 # External libraries
 #

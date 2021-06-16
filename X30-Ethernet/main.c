@@ -28,13 +28,26 @@
 
 #include "lwip/init.h"
 #include "lwip/netif.h"
+#include "netif/ethernet.h"
 #include "lwip/dhcp.h"
 #include "lwip/etharp.h"
 #include "lwip/timeouts.h"
+#include "arch/cc.h"
+#include "arch/sys_arch.h"
 #include "lwip/tcp.h"
 #include "lwip/prot/ethernet.h"
 #include "lwip/apps/tftp_server.h"
 #include "ethernetif.h"
+
+
+/** 
+ * @brief Configuration
+ */
+///@{
+//#define USE_HTTPD               1
+#define USE_TFTP                  1
+///@}
+
 
 /**
  * @brief IP_PORT
@@ -256,40 +269,51 @@ void message(char *msg,...) {
 ///////////////////// LWIP Functions //////////////////////////////////////////////////////////////
 
 /**
- * @brief mynetif_input
+ * @brief stnetif_output
+ *
+ * @note  Called by user to transmit data
+ */
+
+err_t
+stnetif_output(struct netif *netif, struct pbuf *p) {
+
+#if MIB2_STATS
+  LINK_STATS_INC(link.xmit);
+  /* Update SNMP stats (only if you use SNMP) */
+  MIB2_STATS_NETIF_ADD(netif, ifoutoctets, p->tot_len);
+  int unicast = ((p->payload[0] & 0x01) == 0);
+  if (unicast) {
+    MIB2_STATS_NETIF_INC(netif, ifoutucastpkts);
+  } else {
+    MIB2_STATS_NETIF_INC(netif, ifoutnucastpkts);
+  }
+#endif
+
+  lock_interrupts();
+//  pbuf_copy_partial(p, mac_send_buffer, p->tot_len, 0);
+  /* Start MAC transmit here */
+  unlock_interrupts();
+  return ERR_OK;
+}
+
+/**
+ * @brief stnetif_input
  *
  * @note  Called by lwip when data is received
  */
+err_t
+stnetif_input(struct netif *netif) {
 
-static err_t
-netif_output(struct netif *netif, struct pbuf *p) {
 
-//    LINK_STATS_INC(link.xmit);
-
-    lock_interrupts();
-//    pbuf_copy_partial(p, mac_send_buffer, p->tot_len, 0);
-    /* Start MAC transmit here */
-    unlock_interrupts();
     return ERR_OK;
 }
 
 /**
- * @brief mynetif_input
+ * @brief stnetif_link
  *
- * @note  Called by lwip when data is received
+ * @note  
  */
-err_t mynetif_input() {
-
-
-    return ERR_OK;
-}
-
-/**
- * @brief mynetif_input
- *
- * @note  Called by lwip when data is received
- */
-err_t mynetif_output() {
+err_t stnetif_link(struct netif *netif) {
 
 
     return ERR_OK;
@@ -297,23 +321,28 @@ err_t mynetif_output() {
 
 
 /**
- * @brief mynetif_init
+ * @brief stnetif_init
  *
  * @note  Called by lwip to initialize device
  */
-err_t mynetif_init(struct netif *netif) {
+err_t
+stnetif_init(struct netif *netif) {
 uint8_t macaddr[6];
 
-    netif->linkoutput = netif_output;
+    netif->linkoutput = stnetif_output;
     netif->output     = etharp_output;
+//    netif->input      = etharp_input;
+#if LWIP_IPV6
+    netif->output_ip6 = ethip6_output;
+#endif
 
-    netif->mtu        = ETH_MAX_ETH_PAYLOAD;
+    netif->mtu        =   ETH_MTU;
     netif->flags      =   NETIF_FLAG_BROADCAST
                         | NETIF_FLAG_ETHARP
                         | NETIF_FLAG_ETHERNET
                         | NETIF_FLAG_IGMP;
 
-    ETH_GetMACAddress(macaddr);
+    ETH_GetMACAddressAsVector(macaddr);
     SMEMCPY(netif->hwaddr, macaddr, ETH_HWADDR_LEN);
     netif->hwaddr_len = ETH_HWADDR_LEN;
 
@@ -328,26 +357,26 @@ uint8_t macaddr[6];
 
 
 /**
- * @brief mynetif_status_callback
+ * @brief stnetif_status_callback
  *
  * @note  Called every time the status (up,down) of network connection changes
  */
-void mynetif_status_callback(struct netif *netif) {
+void stnetif_status_callback(struct netif *netif) {
 
-    printf("netif status changed %s\n", ip4addr_ntoa(netif_ip4_addr(netif)));
+    message("netif status changed %s\n", ip4addr_ntoa(netif_ip4_addr(netif)));
 
 }
 
 
 
 /**
- * @brief mynetif_link_callback
+ * @brief stnetif_link_callback
  *
  * @note  Called every time the status (up,down) of network connection changes
  */
-void mynetif_link_callback(struct netif *netif) {
+void stnetif_link_callback(struct netif *netif) {
 
-    printf("netif status changed %s\n", ip4addr_ntoa(netif_ip4_addr(netif)));
+    message("netif status changed %s\n", ip4addr_ntoa(netif_ip4_addr(netif)));
 
 }
 
@@ -358,16 +387,17 @@ void mynetif_link_callback(struct netif *netif) {
 static void*
 tftp_open(const char* fname, const char* mode, u8_t is_write) {
 
-  if (is_write) {
-    return NULL; // not yet
-  } else {
-    return ONLY_FILE;
-  }
+    if (is_write) {
+        return NULL;                    // not yet
+    } else {
+        return ONLY_FILE;
+    }
 }
 
 static void
 tftp_close(void* handle) {
-  return;
+
+    return;
 }
 
 static int counter = 0;
@@ -380,11 +410,15 @@ int rc;
         return -1;
 
     rc = int2str(counter,buf,len);
+    counter++;
     return rc;
 }
 
 static int
 tftp_write(void* handle, struct pbuf* p) {
+
+    if( handle != ONLY_FILE )
+        return -1;
 
     while (p != NULL) {
         hexdump(p->payload,p->len,0);
@@ -401,8 +435,7 @@ tftp_config = {
   tftp_write
 };
 
-
-///////////////////// Main Function ///////////////////////////////////////////////////////////////
+//////////////////////// LWIP Data /////////////////////////////////////////////////////////////////
 
 /**
  * brief network interface configuration
@@ -421,45 +454,24 @@ static ip4_addr_t       ipaddr;
 static ip4_addr_t       netmask;
 static ip4_addr_t       gateway;
 #else
-static ip4_addr_t       ipaddr    = { IPV4(192,168,0,198) };
-static ip4_addr_t       netmask   = { IPV4(192,168,0,1)   };
-static ip4_addr_t       gateway   = { IPV4(255,255,255,0) };
+static ip4_addr_t       ipaddr    = { IPV4(192,168,0,201) };
+static ip4_addr_t       netmask   = { IPV4(255,255,255,1)   };
+static ip4_addr_t       gateway   = { IPV4(192,168,0,1) };
 #endif
-/**
- * @brief   main
- *
- * @note    Initializes GPIO and SDRAM, blinks LED and test SDRAM access
- */
-int main(void) {
-err_t rc;
 
-    message("Starting.at %ld KHz...\n",SystemCoreClock/1000);
 
-    /* Set Clock to 200 MHz */
-    SystemConfigMainPLL(&MainPLLConfiguration_200MHz);
-    SystemSetCoreClock(CLOCKSRC_PLL,1);
+#define IFNAME0         'e'
+#define IFNAME1         't'
 
-    message("Now running at %ld KHz...\n",SystemCoreClock/1000);
 
-    SysTick_Config(SystemCoreClock/1000);
+#define HOSTNAME        "lwipt"
 
-    printf("Starting SDRAM\n");
-    SDRAM_Init();
+///////////////////// LWIP Functions ///////////////////////////////////////////////////////////////
 
-    message("Initializing LWIP\n");
-    lwip_init();
+#define MESSAGE(text)  message(text)
 
-    message("Initializing interface\n");
-#if LWIP_DHCP
-    ipaddr.addr  = 0;
-    netmask.addr = 0;
-    gateway.addr = 0;
-#endif
-    netif_add(&netif, &ipaddr, &netmask, &gateway, NULL, mynetif_init, mynetif_input);
-    netif.name[0] = 'l';
-    netif.name[1] = 'n';
-    netif_set_status_callback(&netif, mynetif_status_callback);
-    netif_set_default(&netif);
+
+void LWIP_CheckLink(void) {
 
     if( netif_is_up(&netif) ) {
         netif_set_up(&netif);
@@ -467,15 +479,64 @@ err_t rc;
         netif_set_down(&netif);
     }
 
-    netif_set_link_callback(&netif,mynetif_link_callback);
+}
 
+/**
+ * @brief   Initialize lwIP
+ * 
+ * @note    Do all initialization for lwIP
+ */
+
+void LWIP_Init(void) {
+err_t err;
+
+    MESSAGE("Initialing lwip");
+    lwip_init();
+/*
+    test_netif_init
+ */
+    MESSAGE("Initializing interface\n");
+#if LWIP_DHCP
+    ipaddr.addr  = 0;
+    netmask.addr = 0;
+    gateway.addr = 0;
+#endif
+    netif_add(  &netif, 
+                &ipaddr, 
+                &netmask, 
+                &gateway, 
+                NULL, 
+                stnetif_init, 
+                ethernet_input);
+
+    netif.name[0] = 'e';
+    netif.name[1] = 't';
+
+    netif_set_status_callback(&netif, stnetif_status_callback);
+    netif_set_default(&netif);
+
+
+    netif_set_link_callback(&netif,stnetif_link_callback);
 
 #if LWIP_DHCP
-    message("Starting DHCP\n");
-    dhcp_start(&netif);
+    MESSAGE("Starting DHCP\n");
+    // dchp_set_struct
+    err = dhcp_start(&netif);
     Delay(100);
+    if( err != ERR_OK ) MESSAGE("DHCP Error");
 #endif
 
+#if USE_TFTP 
+    message("Starting TFTP server\n");
+    tftp_init(&tftp_config);
+#endif
+
+#if USE_HTTPD
+    // not tested yet!!! Not configured too.
+    // It uses TCP!!!
+    message("Starting HTTP server\n");
+    httpd_init();
+#endif
     if( verbose ) {
         if( ip4_addr_isany_val(ipaddr) ) {
             char s[20];
@@ -488,63 +549,67 @@ err_t rc;
         }
     }
 
-    message("Starting TFTP server\n");
-    tftp_init(&tftp_config);
+}
 
+/**
+ * @brief   LWIP processing in the main loop
+ * 
+ * @note    See lwip-2.1.2/doc/doxygen/output/html/group__lwip__nosys.html
+ *          Needs a queue data structure
+ */
+void LWIP_Process(void) {
 
-    /* Check for received frames, feed them to lwIP */
-#if 0
-    lock_interrupts();
-    struct pbuf* p = 0; //queue_try_get(&queue);
-    unlock_interrupts();
-    if(p != NULL) {
-//            LINK_STATS_INC(link.recv);
-        if(netif.input(p, &netif) != ERR_OK) {
-            pbuf_free(p);
-        }
-    }
+    LWIP_CheckLink();
+
+    stnetif_input(&netif);
+            
+    // Check timers
+    sys_check_timeouts();
+
+#if LWIP_NETIF_LOOPBACK
+    netif_poll(&netif);
 #endif
 
-    // Creating a Protocol Control Block (PCB)
-    struct tcp_pcb *pcb = tcp_new();
-    if( pcb == NULL ) {
-        STOP(1);
-    }
+#if !LWIP_NETIF_LOOPBACK_MULTITHREADING
+    // could call netif_poll twice for netif
+    netif_poll_all();
+#endif
+}
 
-    // Binding the PCB to a port number
-    rc = tcp_bind(pcb,&ipaddr,IP_PORT);
-    if( rc != ERR_OK ) {
-        STOP(2);
-    }
+///////////////////// Main Function ///////////////////////////////////////////////////////////////
 
-    // Configure listening
-    pcb = tcp_listen(pcb);
-    if( pcb == NULL ) {
-        STOP(3);
-    }
+/**
+ * @brief   main
+ *
+ * @note    Initializes GPIO and SDRAM, blinks LED and test SDRAM access
+ */
+int main(void) {
+err_t rc;
 
-    // Start listening
-   // tcp_accept(pcb,tcpecho_accept_callback);
+    // Disable buffering for stdout (Trying)
+    setvbuf(stdout, NULL,_IONBF, 0);
 
+    message("Starting.at %ld KHz...\n",SystemCoreClock/1000);
+
+    /* Set Clock to 200 MHz */
+    SystemConfigMainPLL(&MainPLLConfiguration_200MHz);
+    SystemSetCoreClock(CLOCKSRC_PLL,1);
+
+    message("Now running at %ld KHz...\n",SystemCoreClock/1000);
+
+    // Set SysTick to 1 ms
+    SysTick_Config(SystemCoreClock/1000);
+
+    printf("Starting SDRAM\n");
+    SDRAM_Init();
+
+    message("Initializing LWIP\n");
+    LWIP_Init();
 
     // Entering Main loop
     while(1) {
-        /* Check link state, e.g. via MDIO communication with PHY */
-        //if(link_state_changed()) {
-            if(netif_is_up(&netif)) {
-                netif_set_link_up(&netif);
-            } else {
-                netif_set_link_down(&netif);
-            }
-        //}
+        LWIP_Process();
 
-        // Check input
-        //ethernetif_input(&netif);
-
-        // Check timers
-        sys_check_timeouts();
-
-        netif_poll(&netif);
-
+        // Application code here
     }
 }

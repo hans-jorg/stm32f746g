@@ -10,6 +10,14 @@
 #include "stm32f746xx.h"
 #include "system_stm32f746.h"
 
+/**
+ * @brief By setting this symbol, no buffer is statically allocated.
+ *        The buffers must be allocated and then setting using
+ *        ETH_SetBuffers (TBD!)
+ * 
+ */
+
+//#define ETH_ALLOCATE_BUFFERS_DYNAMICALLY  (1)
 /*
  * @brief  Compilation flag
  *
@@ -17,7 +25,7 @@
  *         1. Use callbacks during interrupts
  *         2  Do all processing in the main loop
  */
-#define ETH_USE_INTERRUPTS
+#define ETH_USE_INTERRUPTS 1
 
 /* *
  * @brief  Periodic process
@@ -80,14 +88,20 @@ typedef struct {
 #define ETH_JUMBO_FRAME_PAYLOAD     (9000)  /*!< Jumbo frame payload size */
 ///@}
 
+/// Maximum transmission unit
+#define ETH_MTU                     ETH_MAX_ETH_PAYLOAD
 /**
  * @brief TX and RX BUFFER size and quantity
  */
 ///@{
+#ifndef ETH_TXBUFFER_COUNT
+    #define ETH_TXBUFFER_COUNT      (5)
+#endif
+#ifndef ETH_RXBUFFER_COUNT
+    #define ETH_RXBUFFER_COUNT      (4)
+#endif
 #define ETH_TXBUFFER_SIZE           ETH_MAX_PACKET_SIZE
-#define ETH_TXBUFFER_COUNT          5
 #define ETH_RXBUFFER_SIZE           ETH_MAX_PACKET_SIZE
-#define ETH_RXBUFFER_COUNT          5
 ///@}
 
 
@@ -155,8 +169,21 @@ void ETH_EnableReceptionMAC(void);
 void ETH_DisableReceptionMAC(void);
 void ETH_IRQHandler(void);
 void ETH_GetMACAddress(uint8_t macaddr[6]);
-
 void ETH_RegisterCallback(unsigned, void (*)(unsigned));
+void ETH_IRQHandler(void);
+
+void ETH_SetMACAddress(uint64_t macaddr);
+void ETH_SetMACAddressN(uint32_t n, uint64_t macaddr, uint32_t mbc);
+void ETH_GetMACAddressAsVector(uint8_t macaddr[6]);
+void ETH_GetMACAddressAsNetworkOrderedVector(uint8_t macaddr[6]);
+
+
+// TBD!!
+int  ETH_IsLinkUp(void);
+int  ETH_IsConnected(void);
+
+void ETH_SetBuffers(char *area);
+
 
 #endif
 

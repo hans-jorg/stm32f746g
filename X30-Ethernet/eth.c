@@ -18,6 +18,15 @@
 
 
 /**
+ * @brief   Round macro. It returns a value equal or greater than N, that is
+ *          a multiple of M.
+ * 
+ * @param   N: value to be rounded
+ * @param   M: rounding parameter, typically, sizeof(type)
+ */
+
+#define ROUND(N,M)  ( ( ((N)+(M)-1)/(M) )*(M) )
+/**
  * @brief   ETH DMA Descriptor structure
  *
  * @note    From stm32f7xx_hal_eth.h (DMADescTypeDef)
@@ -34,92 +43,155 @@ static void ETH_FlushTXFIFO(void);
 
 /**
  * @brief   Network configuration
+ * 
+ * @note    AUTONEGOTIATE overrides the other parameters
+ *          When Auto Negotiation does not work, use remaining parameters
  */
-#define ETH_CONFIG_AUTONEGOCIATE                (1)
-#define ETH_CONFIG_100BASET                     (2)
-#define ETH_CONFIG_10BASET                      (4)
-#define ETH_CONFIG_FULLDUPLEX                   (8)
-#define ETH_CONFIG_HALFDUPLEX                   (16)
-
-const uint32_t  eth_config = ETH_CONFIG_AUTONEGOCIATE;
-uint32_t        eth_status = 0;
-
-// 48 bit MAC address (must have 12 hexadecimal digits))
-uint64_t        eth_macaddress = 0x2F85936E2C78L;
+///@{
+#define ETH_CONFIG_AUTONEGOTIATE (1)
+#define ETH_CONFIG_100BASET      (2)
+#define ETH_CONFIG_10BASET       (4)
+#define ETH_CONFIG_FULLDUPLEX    (8)
+#define ETH_CONFIG_HALFDUPLEX    (16)
+///@}
+static const uint32_t ETH_Config =   ETH_CONFIG_AUTONEGOTIATE
+// Parameters below only used when Auto Negotiation does not work or not set
+                                    |ETH_CONFIG_100BASET
+                                    |ETH_CONFIG_FULLDUPLEX;
 
 /**
- * @brief   ETH Configuration
+ * @brief   Ethernet controller status
  */
+///@{
+#define ETH_STATE_RESET         (0)
+#define ETH_STATE_ERROR         (1)
+#define ETH_STATE_READY         (2)
 
+static uint32_t ETH_State = ETH_STATE_RESET;
+///@}
+
+/**
+ * @brief   Ethernet status
+ */
+///@{
+
+#define ETH_STATUS_LINKDOWN     (1)
+#define ETH_STATUS_LINKUP       (2)
+#define ETH_STATUS_100BASET     (4)
+#define ETH_STATUS_10BASET      (8)
+#define ETH_STATUS_FULLDUPLEX   (16)
+#define ETH_STATUS_HALFDUPLEX   (32)
+
+static uint32_t ETH_Status = ETH_STATUS_LINKDOWN;
+///@}
+
+
+// 48 bit MAC address (must have 12 hexadecimal digits))
+#ifndef ETH_MACADDRESS
+#define ETH_MACADDRESS 0x0080E1010101L
+#endif
+
+
+/**
+ * @brief   Timing parameters
+ * 
+ */
+///@{
+#define ETH_DELAY_AFTERREGISTERWRITE    1000
+#define ETH_DELAY_AFTERFLUSH            10
+#define ETH_DELAY_AFTERMAC              10
+#define ETH_DELAY_AFTERRESET            1000
+#define ETH_DELAY_AFTERAUTONEGOTIATION  1000
+#define ETH_DELAY_AFTERCONFIG           1000
+#define ETH_DELAY_BETWEENTESTS          1000
+///@}
+
+/**
+ * @brief   Timeout configuration
+ */
+///@{
+#define ETH_RETRIES_AUTONEGOTIATION     100
+#define ETH_RETRIES_LINK                1000
+//@}
+/**
+ * @brief   ETH IRQ Configuration
+ */
 
 #define ETH_IRQLevel                            (5)
 
 /**
  * @brief   RX and TX descriptors
+ * 
+ * @note    All sizes are rounded to uint32_t sizes, i.e. multiple of 4.
  */
 ///@{
-ETH_DMADescriptor *ETH_TXDescriptors = 0;
-ETH_DMADescriptor *ETH_RXDescriptors = 0;
-static ETH_DMAFrameInfo  RXFrameInfo = {0};
+#define ETH_TXBUFFERSIZE_UINT32U ROUND(ETH_TXBUFFER_SIZE,sizeof(uint32_t))
+#define ETH_RXBUFFERSIZE_UINT32U ROUND(ETH_RXBUFFER_SIZE,sizeof(uint32_t))
+
+#ifdef ETH_ALLOCATE_BUFFERS_DYNAMICALLY
+// These pointers must be initialized thru a call to ETH_SetBuffers
+ETH_DMADescriptor       *ETH_TXDescriptors = 0;
+ETH_DMADescriptor       *ETH_RXDescriptors = 0;
+#else
+ETH_DMADescriptor        ETH_TXDesc[ETH_TXBUFFER_COUNT] = { 0 };
+ETH_DMADescriptor        ETH_RXDesc[ETH_RXBUFFER_COUNT] = { 0 };
+ETH_DMADescriptor       *ETH_TXDescriptors = ETH_TXDesc;
+ETH_DMADescriptor       *ETH_RXDescriptors = ETH_RXDesc;
+// An alternative is to define as an array of 32-bit integers for alignement
+static uint8_t           txbuffer[ETH_TXBUFFERSIZE_UINT32U*ETH_TXBUFFER_COUNT] 
+    __attribute((aligned(sizeof(uint32_t))));
+static uint8_t           rxbuffer[ETH_RXBUFFERSIZE_UINT32U*ETH_RXBUFFER_COUNT]
+    __attribute((aligned(sizeof(uint32_t))));
+#endif
+static ETH_DMAFrameInfo  RXFrameInfo       = {0};
 ///@}
 
 /**
  * @brief   Callbacks
  */
-struct ETH_Callbacks_s ETH_Callbacks = {0};
+struct ETH_Callbacks_s ETH_Callbacks       = {0};
 
 /**
  * @brief   Defines for configure PHY
  *
  * @note LAN8742 PHY register description
  *
- *   |   #  |        | Description                                     |  Group           |
- *   |------|--------|-------------------------------------------------|------------------|
- *   |   0  | BCR    | Basic Control Register                          | Basic            |
- *   |   1  | BSR    | Basic Status Register                           | Basic            |
- *   |   2  | ID1R   | PHY Identifier 1 Register                       | Extended         |
- *   |   3  | ID2R   | PHY Identifier 2 Register                       | Extended         |
- *   |   4  | ANAR   | Auto Negotiation Advertisement Register         | Extended         |
- *   |   5  | ANLPR  | Auto Negotiation Link Partner Ability Register  | Extended         |
- *   |   6  | ANEPR  | Auto Negotiation Expansion Register             | Extended         |
- *   |   7  | ANNPTXR| Auto Negotiation Next Page TX Register          | Extended         |
- *   |   8  | ANNPRXR| Auto Negotiation Next Page RX Register          | Extended         |
- *   |  13  | MMDACR | MMD Access Control Register                     | Extended         |
- *   |  14  | MMADR  | MMD Access Address/Data Register                | Extended         |
- *   |  16  | EDPDR  | EDPD NLP/Crossover TimeRegister                 | Vendor-specific  |
- *   |  17  | MCSR   | Mode Control/Status Register                    | Vendor-specific  |
- *   |  18  | SMR    | Special Modes Register                          | Vendor-specific  |
- *   |  24  | TDRPDR | TDR Patterns/Delay Control Register             | Vendor-specific  |
- *   |  25  | TDCSR  | TDR Control/Status Register                     | Vendor-specific  |
- *   |  26  | SECR   | Symbol Error Counter Register                   | Vendor-specific  |
- *   |  27  | SCSIR  | Special Control/Status Indications Register     | Vendor-specific  |
- *   |  28  | CLR    | Cable Length Register                           | Vendor-specific  |
- *   |  29  | ISFR   | Interrupt Source Flag Register                  | Vendor-specific  |
- *   |  30  | IMR    | Interrupt Mask Register                         | Vendor-specific  |
- *   |  31  | SCSR   | PHY Special Control/Status Register             | Vendor-specific  |
+ *|  # |        | Description                                |  Group          |
+ *|----|--------|--------------------------------------------|-----------------|
+ *|  0 | BCR    | Basic Control Register                     | Basic           |
+ *|  1 | BSR    | Basic Status Register                      | Basic           |
+ *|  2 | ID1R   | PHY Identifier 1 Register                  | Extended        |
+ *|  3 | ID2R   | PHY Identifier 2 Register                  | Extended        |
+ *|  4 | ANAR   | Auto Negotiation Advertisement Register    | Extended        |
+ *|  5 | ANLPR  | Auto Negotiation Link Partner Register     | Extended        |
+ *|  6 | ANEPR  | Auto Negotiation Expansion Register        | Extended        |
+ *|  7 | ANNPTXR| Auto Negotiation Next Page TX Register     | Extended        |
+ *|  8 | ANNPRXR| Auto Negotiation Next Page RX Register     | Extended        |
+ *| 13 | MMDACR | MMD Access Control Register                | Extended        |
+ *| 14 | MMADR  | MMD Access Address/Data Register           | Extended        |
+ *| 16 | EDPDR  | EDPD NLP/Crossover TimeRegister            | Vendor-specific |
+ *| 17 | MCSR   | Mode Control/Status Register               | Vendor-specific |
+ *| 18 | SMR    | Special Modes Register                     | Vendor-specific |
+ *| 24 | TDRPDR | TDR Patterns/Delay Control Register        | Vendor-specific |
+ *| 25 | TDCSR  | TDR Control/Status Register                | Vendor-specific |
+ *| 26 | SECR   | Symbol Error Counter Register              | Vendor-specific |
+ *| 27 | SCSIR  | Special Control/Status Indications Register| Vendor-specific |
+ *| 28 | CLR    | Cable Length Register                      | Vendor-specific |
+ *| 29 | ISFR   | Interrupt Source Flag Register             | Vendor-specific |
+ *| 30 | IMR    | Interrupt Mask Register                    | Vendor-specific |
+ *| 31 | SCSR   | PHY Special Control/Status Register        | Vendor-specific |
+ * 
+ * 
  */
 
-
-
 /** PHY */
-#define ETH_PHY_ADDRESS                 1
+#define ETH_PHY_ADDRESS                         (1)
 
 /** Registers */
 ///@{
 #define ETH_PHY_BCR                             (0)
 #define ETH_PHY_BSR                             (1)
 #define ETH_PHY_ISFR                           (29)
-///@}
-
-
-/** Delays */
-///@{
-#define ETH_DELAY_AFTERRESET                1000
-#define ETH_DELAY_AFTERAUTONEGOCIATION      1000
-#define ETH_DELAY_AFTERCONFIG               1000
-#define ETH_DELAY_BETWEENTESTS              1000
-
-#define ETH_RETRIES_LINK                    1000
 ///@}
 
 
@@ -170,27 +242,173 @@ volatile int c = count;
 }
 
 
+////////////////// IRQ Handler /////////////////////////////////////////////////////////////////////
 
 /**
- * @brief   Get Mac Address as a vector of bytes
+ * @brief   ETH interrupt handler
+ */
+
+void ETH_IRQHandler(void) {
+
+    // Check if a frame was received
+    if( ETH->DMASR&ETH_DMASR_RS ) {
+        /* Call back if defined */
+        if( ETH_Callbacks.FrameReceived ) ETH_Callbacks.FrameReceived(0);
+        ETH->DMASR = ETH_DMASR_RS;
+        /* Set State to Ready */
+        ETH_State = ETH_STATE_READY;
+    }
+
+    // Check if a frame was transmitted
+    if( ETH->DMASR&ETH_DMASR_TS ) {
+        /* Call back if defined */
+        if( ETH_Callbacks.FrameTransmitted ) ETH_Callbacks.FrameTransmitted(0);
+        ETH->DMASR = ETH_DMASR_TS;
+        /* Set State to Ready */
+        ETH_State = ETH_STATE_READY;
+    }
+
+    // ETH DMA Error (Abnormal Interrupt Summary)
+    if( ETH->DMASR&ETH_DMASR_AIS ) {
+        /* Call back if defined */
+        if( ETH_Callbacks.ErrorDetected ) ETH_Callbacks.ErrorDetected(0);
+        ETH->DMASR = ETH_DMASR_AIS;
+        /* Set State to Ready */
+        ETH_State = ETH_STATE_READY;
+    }
+
+    // Clear interrupt summary
+    ETH->DMASR = ETH_DMASR_NIS;
+}
+
+
+////////////////// MAC Address Management //////////////////////////////////////////////////////////
+
+/*
+ * @brief   rev64
  *
- * @note    Least significant byte first
+ * @note    reverse byte order of a 64 bit integer
+ */
+
+
+static uint64_t rev64(uint64_t x) {
+uint32_t xh,xl,xt;
+
+    xt = (uint32_t) (x>>32);
+    xl = __REV(xt);
+    xt = (uint32_t) x;
+    xh = __REV(xt);
+    x = (((uint64_t) xh)<<32) | (uint64_t) xl;
+    return x;
+
+}
+
+/**
+ * @brief   Set Mac Address #0
+ *
+ * @note    The MAC address high register holds the upper 16 bits of the 6-byte 
+ *          first MAC address of the station. Note that the first DA byte that 
+ *          is received on the MII interface corresponds to the LS Byte 
+ *          (bits [7:0]) of the MAC address low register. For example, if
+ *          0x1122 3344 5566 is received (0x11 is the first byte) on the MII 
+ *          as the destination address, then the MAC address register [47:0]
+ *          is compared with 0x6655 4433 2211.
  */
 void
-ETH_GetMACAddress(uint8_t macaddr[6]) {
+ETH_SetMACAddress(uint64_t macaddr) {
+uint64_t macaddr_rev;
+const uint32_t mo = (1<<31);
 
-    macaddr[0] = (eth_macaddress>>0)&0xFF;
-    macaddr[1] = (eth_macaddress>>8)&0xFF;
-    macaddr[2] = (eth_macaddress>>16)&0xFF;
-    macaddr[3] = (eth_macaddress>>24)&0xFF;
-    macaddr[4] = (eth_macaddress>>32)&0xFF;
-    macaddr[5] = (eth_macaddress>>40)&0xFF;
+    macaddr_rev = rev64(macaddr);
+
+    ETH->MACA0HR =  ((uint32_t) (macaddr_rev>>32)&0xFFFF)|mo;
+    ETH->MACA0LR =   (uint32_t) (macaddr_rev);
+}
+
+/**
+ * @brief   Set MAC Address #0 to #3
+ *
+ * @note    
+ * 
+ * @param   n: which MAC Address
+ * @param   macaddr: 48-bit MAC Address in a 64-bit variable
+ * @param   mbc: Mask byte control, source and address enable flag
+ * 
+ * @note    See 38.8.2 of RM
+ */
+#define ETH_MACADDR_MBC_AE      (1<<31)
+#define ETH_MACADDR_MBC_SA      (1<<30)
+#define ETH_MACADDR_MBC_BYTE5   (1<<29)
+#define ETH_MACADDR_MBC_BYTE4   (1<<28)
+#define ETH_MACADDR_MBC_BYTE3   (1<<27)
+#define ETH_MACADDR_MBC_BYTE2   (1<<26)
+#define ETH_MACADDR_MBC_BYTE1   (1<<25)
+#define ETH_MACADDR_MBC_BYTE0   (1<<24)
+
+void
+ETH_SetMACAddressN(uint32_t n, uint64_t macaddr, uint32_t mbc) {
+const uint32_t mo = (1<<31);
+uint64_t macaddr_rev;
+
+    macaddr_rev = rev64(macaddr);
+    switch(n) {
+    case 0:
+        ETH->MACA0HR = ((uint32_t) (macaddr_rev>>32)&0xFF)|mo;
+        ETH->MACA0LR =  (uint32_t) (macaddr_rev);
+        break;
+    case 1:
+        ETH->MACA1HR = ((uint32_t) (macaddr>>32)&0xFF)|mbc;
+        ETH->MACA1LR =  (uint32_t) (macaddr);
+        break;
+    case 2:
+        ETH->MACA2HR = ((uint32_t) (macaddr>>32)&0xFF)|mbc;
+        ETH->MACA2LR =  (uint32_t) (macaddr);
+        break;
+    case 3:
+        ETH->MACA3HR = ((uint32_t) (macaddr>>32)&0xFF)|mbc;
+        ETH->MACA3LR =  (uint32_t) (macaddr);
+        break;
+    }
+
+}
+
+/**
+ * @brief   Get MAC Address #0 as a vector of bytes
+ *
+ * @note    Least significant byte first (CPU order)
+ */
+void
+ETH_GetMACAddressAsVector(uint8_t macaddr[6]) {
+
+    macaddr[0] = (ETH_MACADDRESS>>0)&0xFF;
+    macaddr[1] = (ETH_MACADDRESS>>8)&0xFF;
+    macaddr[2] = (ETH_MACADDRESS>>16)&0xFF;
+    macaddr[3] = (ETH_MACADDRESS>>24)&0xFF;
+    macaddr[4] = (ETH_MACADDRESS>>32)&0xFF;
+    macaddr[5] = (ETH_MACADDRESS>>40)&0xFF;
+
+}
+
+/**
+ * @brief   Get MAC Address #0 as a vector of bytes
+ *
+ * @note    Most significant byte first (Network order)
+ */
+void
+ETH_GetMACAddressAsNetworkOrderedVector(uint8_t macaddr[6]) {
+
+    macaddr[0] = (ETH_MACADDRESS>>40)&0xFF;
+    macaddr[1] = (ETH_MACADDRESS>>32)&0xFF;
+    macaddr[2] = (ETH_MACADDRESS>>24)&0xFF;
+    macaddr[3] = (ETH_MACADDRESS>>16)&0xFF;
+    macaddr[4] = (ETH_MACADDRESS>>8)&0xFF;
+    macaddr[5] = (ETH_MACADDRESS>>0)&0xFF;
 
 }
 
 ////////////////////////////////// Pin management //////////////////////////////////////////////////
 
-#if ETH_USEGPIO == 1
+#if ETH_USEGPIOFORCONFIGURATION == 1
 
 /**
  * Configuration for ETH
@@ -229,7 +447,8 @@ static const GPIO_PinConfiguration pinconfig[] = {
    {  GPIOG,   14,      11, 2, 0, 3, 1, 0  },       //     ETH_RMII_TXD1
    {  GPIOC,   4,       11, 2, 0, 3, 1, 0  },       //     ETH_RMII_RXD0
    {  GPIOC,   5,       11, 2, 0, 3, 1, 0  },       //     ETH_RMII_RXD1
-//   {  GPIOG,   2,       11, 0, 0, 3, 1, 0  },       //     ETH_RMII_RXER     AF0 or AF11 ?????
+//    There is a mismatch: AF0 according or AF11 according 
+//   {  GPIOG,   2,       11, 0, 0, 3, 1, 0  },       //     ETH_RMII_RXER     
    {  GPIOA,   7,       11, 2, 0, 3, 1, 0  },       //     ETH_RMII_CRS_DV
    {  GPIOC,   1,       11, 2, 0, 3, 1, 0  },       //     ETH_RMII_MDC
    {  GPIOA,   2,       11, 2, 0, 3, 1, 0  },       //     ETH_RMII_MDIO
@@ -251,11 +470,11 @@ ConfigureETHPins(void) {
 
 /* Configuring pins using direct access to registers */
 
-#define ETH_AF      (11)
-#define ETH_MODE    (2)
-#define ETH_OTYPE   (0)
-#define ETH_OSPEED  (3)
-#define ETH_PUPD    (0)
+#define ETH_AF                    (11)
+#define ETH_MODE                  (2)
+#define ETH_OTYPE                 (0)
+#define ETH_OSPEED                (3)
+#define ETH_PUPD                  (0)
 
 static void
 ConfigureETHPins(void) {
@@ -470,7 +689,7 @@ uint32_t macmiiar = ETH->MACMIIAR;
     macmiiar |= ETH_MACMIIAR_MW;
 
     // Wait until PHY is ready
-    while( (ETH->MACMIIAR&ETH_MACMIIAR_MB) != 0 ) {}                // TODO: Add timeout
+    while( (ETH->MACMIIAR&ETH_MACMIIAR_MB) != 0 ) {} // TODO: Add timeout
 
     // Set busy flag
     macmiiar |= ETH_MACMIIAR_MB;
@@ -508,7 +727,7 @@ uint32_t macmiiar = ETH->MACMIIAR;
     macmiiar |= ETH_MACMIIAR_MW;
 
     // Wait until PHY is ready
-    while( (ETH->MACMIIAR&ETH_MACMIIAR_MB) != 0 ) {}                // TODO: Add timeout
+    while( (ETH->MACMIIAR&ETH_MACMIIAR_MB) != 0 ) {}    // TODO: Add timeout
 
     // Set busy flag
     macmiiar |= ETH_MACMIIAR_MB;
@@ -532,64 +751,74 @@ uint32_t macmiiar = ETH->MACMIIAR;
  * @note   PHY is Microchip LAN
  */
 
-
-
 static int ETH_ConfigurePHY(void) {
 uint32_t value;
 int retries;
+int configured = 0;
 
     ETH_WritePHYRegister(ETH_PHY_BCR,ETH_PHY_BCR_RESET);
     delay(ETH_DELAY_AFTERRESET);
-    eth_status = 0;
 
-    if( eth_config&ETH_CONFIG_AUTONEGOCIATE ) {
-        // Check status
+    ETH_Status = 0;
+    if( ETH_Config&ETH_CONFIG_AUTONEGOTIATE ) {
+        // Autonegotiate set
         retries = ETH_RETRIES_LINK;
         do {
             ETH_ReadPHYRegister(ETH_PHY_BSR,&value);
             delay(ETH_DELAY_BETWEENTESTS);
             retries--;
         } while((retries>0)&&(value&ETH_PHY_BSR_LINKUP)!=ETH_PHY_BSR_LINKUP);
-        if( (value&ETH_PHY_BSR_LINKUP) != ETH_PHY_BSR_LINKUP )
+        if( (value&ETH_PHY_BSR_LINKUP) != ETH_PHY_BSR_LINKUP ) {
             return -1;
+        }
 
         // Configure Autonegociate
         ETH_WritePHYRegister(ETH_PHY_BCR,ETH_PHY_BCR_AUTONEGOCIATION);
-        delay(ETH_DELAY_AFTERAUTONEGOCIATION);
+        delay(ETH_DELAY_AFTERAUTONEGOTIATION);
+        retries = ETH_RETRIES_AUTONEGOTIATION;
         do {
             ETH_ReadPHYRegister(ETH_PHY_BSR,&value);
             delay(ETH_DELAY_BETWEENTESTS);
-        } while((value&ETH_PHY_BSR_AUTONEGOCIATIONCOMPLETED)!=ETH_PHY_BSR_AUTONEGOCIATIONCOMPLETED);
+        } while((retries>0)&&(value&ETH_PHY_BSR_AUTONEGOCIATIONCOMPLETED)!=ETH_PHY_BSR_AUTONEGOCIATIONCOMPLETED);
+        if( (value&ETH_PHY_BSR_AUTONEGOCIATIONCOMPLETED)!=ETH_PHY_BSR_AUTONEGOCIATIONCOMPLETED ) {
+            return -1;
+        }
         // Get the result
         ETH_ReadPHYRegister(ETH_PHY_BSR,&value);
         // Set status
         if( value&(ETH_PHY_BSR_100BASET_FULLDUPLEX|ETH_PHY_BSR_10BASET_FULLDUPLEX) ) {
-            eth_status |= ETH_CONFIG_FULLDUPLEX;
+            ETH_Status |= ETH_CONFIG_FULLDUPLEX;
         } else {
-            eth_status |= ETH_CONFIG_HALFDUPLEX;
+            ETH_Status |= ETH_CONFIG_HALFDUPLEX;
         }
         if( value&(ETH_PHY_BSR_100BASET_FULLDUPLEX|ETH_PHY_BSR_100BASET_HALFDUPLEX) ) {
-            eth_status |= ETH_CONFIG_100BASET;
+            ETH_Status |= ETH_CONFIG_100BASET;
         } else {
-            eth_status |= ETH_CONFIG_10BASET;
+            ETH_Status |= ETH_CONFIG_10BASET;
         }
-    } else {
-        // Autonegotiation not set. Configure Speed and Duplex Mode
+        configured = 1;
+    }
+    if( ! configured ) {
+        // Autonegotiation not set or not working
+        // Configure Speed and Duplex Mode
         value = 0;
-        if( eth_config&ETH_CONFIG_FULLDUPLEX ) {
-            if ( eth_config&ETH_CONFIG_100BASET )  {
-                value = ETH_PHY_BSR_100BASET_FULLDUPLEX;
-            } else if ( eth_config&ETH_CONFIG_10BASET ) {
-                value = ETH_PHY_BSR_10BASET_FULLDUPLEX;
+        if( ETH_Config&ETH_CONFIG_FULLDUPLEX ) {
+            if ( ETH_Config&ETH_CONFIG_100BASET )  {
+                value |= ETH_PHY_BSR_100BASET_FULLDUPLEX;
+                ETH_Status |= ETH_CONFIG_100BASET|ETH_CONFIG_FULLDUPLEX;
+            } else if ( ETH_Config&ETH_CONFIG_10BASET ) {
+                value |= ETH_PHY_BSR_10BASET_FULLDUPLEX;
+                ETH_Status |= ETH_CONFIG_10BASET|ETH_CONFIG_FULLDUPLEX;
             }
-        } else if( eth_config&ETH_CONFIG_HALFDUPLEX ) {
-            if ( eth_config&ETH_CONFIG_100BASET )  {
-                value = ETH_PHY_BSR_100BASET_HALFDUPLEX;
-            } else if ( eth_config&ETH_CONFIG_10BASET ) {
-                value = ETH_PHY_BSR_10BASET_HALFDUPLEX;
+        } else if( ETH_Config&ETH_CONFIG_HALFDUPLEX ) {
+            if ( ETH_Config&ETH_CONFIG_100BASET )  {
+                value |= ETH_PHY_BSR_100BASET_HALFDUPLEX;
+                ETH_Status |= ETH_CONFIG_100BASET|ETH_CONFIG_HALFDUPLEX;
+            } else if ( ETH_Config&ETH_CONFIG_10BASET ) {
+                value |= ETH_PHY_BSR_10BASET_HALFDUPLEX;
+                ETH_Status |= ETH_CONFIG_10BASET|ETH_CONFIG_HALFDUPLEX;
             }
         }
-
         // Write config
         ETH_WritePHYRegister(ETH_PHY_BCR,value);
         delay(ETH_DELAY_AFTERCONFIG);
@@ -599,83 +828,9 @@ int retries;
     ETH_ReadPHYRegister(ETH_PHY_ISFR,&value);
     value |= ETH_PHY_ISFR_INT4;
     ETH_WritePHYRegister(ETH_PHY_ISFR,value);
-
-
     return 0;
 }
 
-/**
- * @brief  Configure DMA
- *
- * @note Configuration for DMA
- *
- *   Drop TCP/IP Frame on Checksum error enabled
- *   Receive store forward enabled
- *   Flush received frame enable
- *   Transmit store forward enabled
- *   Transmit threshold control set to 64 bytes
- *   Forward error frames disabled
- *   Forward undersized goodframes disabled
- *   Received threshold control set to 64 bytes
- *   Second frame operarted enabled
- *
- *   Address aligned beats enabled
- *   Fixed burst_Enabled
- *   Rx DMA burst length set to 32 beats
- *   TxDMA burst length_set to 32 beats
- *   DMA enhanced descriptor enabled
- *   Descripto length set to 0x0;
- *   DMA arbitration roundrobin RX/TX 1/1
- */
-
-#define DMA_PBL                         (32)
-#define DMA_PM                          (0)
-#define DMA_DSL                         (0)
-#define DMA_TTC                         (0)
-
-#define ETH_DELAY_AFTERREGWRITE         1000
-#define ETH_DELAY_AFTERFLUSH            10
-#define ETH_DELAY_AFTERMAC              10
-
-static int ETH_ConfigureDMA(void) {
-
-    // Configure DMA mode register
-    uint32_t dmabmr = ETH->DMABMR;
-
-    // Clear all fields
-    dmabmr = 0;
-
-    // Configure
-    dmabmr |=  ETH_DMABMR_AAB
-              |ETH_DMABMR_FB
-              |(DMA_PM<<ETH_DMABMR_FPM_Pos)
-              |(DMA_PBL<<ETH_DMABMR_PBL_Pos)
-              |ETH_DMABMR_EDE
-              |(DMA_DSL<<ETH_DMABMR_DSL_Pos)
-              ;
-
-    // Configure DMABMR
-    ETH->DMABMR = dmabmr;
-    delay(ETH_DELAY_AFTERREGWRITE);
-
-
-    // Configure operation mode
-    uint32_t dmaomr = ETH->DMAOMR;
-
-    // clear fields
-    dmaomr = 0;
-
-    // Configure
-    dmaomr |= ETH_DMAOMR_DTCEFD
-             |ETH_DMAOMR_RSF
-             |ETH_DMAOMR_TSF
-             |(DMA_TTC<<ETH_DMAOMR_TTC_Pos)
-             ;
-    // Configure DMAOMR
-    ETH->DMAOMR = dmaomr;
-
-    return 0;
-}
 
 /**
  * @brief  Table used to set CR clock range to select MDC clock frequency
@@ -717,176 +872,302 @@ int cr;
 
 }
 
-
-/*
- * @brief   rev64
- *
- * @note    reverse byte order of a 64 bit integer
- */
-
-
-static uint64_t rev64(uint64_t x) {
-uint32_t xh,xl;
-
-    xh = x>>32;
-    xl = x;
-    xl = __REV(xl);
-    xh = __REV(xh);
-    x = (((uint64_t) xh)<<32) | (uint64_t) xl;
-    return x;
-
-}
-
-
 /**
  * @brief   ETH ConfigureMAC
  *
- * @note  General configuration
- *    Watchdog enabled
- *    Jabber enabled
- *    Interframe gap set to 96
- *    Carriersense enabled
- *    Receive own enable
- *    Loopback disabled
- *    Checksum done by hardware
- *    Retry transmission disabled
- *    Automatic PAD CRC strip disabled
- *    Backoff limit set to 10
- *    Deferral check disabled
+ * @note    Configuring Media Access Control of the ETH Controller 
+ * 
+ * @note    MAC Registers
+ * 
+ *          * MACR: configuration register
+ *          * MACFFR: frame filter register
+ *          * MACHTHR: hash table high register
+ *          * MACHTLR: hash table low register
+ *          * MACMIIAR: MII (Media Independent Interface) address register
+ *          * MACMIIDR: MII (Media Independent Interface) data register
+ *          * MACFCR: flow control register
+ *          * MACVLANTR: VLAN tag register
+ *          * MACRWUFFR: remote wakeup frame filter register
+ *          * MACPMRCSR: PMT (Power Management) control and status register
+ *          * MACDBGR: debug register
+ *          * MACSR: interrupt status register
+ *          * MACIMR: interrupt mask register
+ *          * MACA0HR: address 0 high register
+ *          * MACA0LR: address 0 low register
+ *          * MACA1HR: address 1 high register
+ *          * MACA1LR: address 1 low register
+ *          * MACA2HR: address 2 high register
+ *          * MACA2LR: address 2 low register
+ *          * MACA3HR: address 3 high register
+ *          * MACA3LR: address 3 low register
+ 
+ * 
+ * @note    Configuration generated by STM32CubeMX
+ * 
+ *          * Watchdog enabled
+ *          * Jabber enabled
+ *          * Interframe gap set to 96
+ *          * Carriersense enabled
+ *          * Receive own enable
+ *          * Loopback disabled
+ *          * Checksum done by hardware
+ *          * Retry transmission disabled
+ *          * Automatic PAD CRC strip disabled
+ *          * Backoff limit set to 10
+ *          * Deferral check disabled
+ *          * Receive all disabled
+ *          * Source address filter disabled
+ *          * Block all control frames
+ *          * Broadcastframes reception_enabled
+ *          * Destination filter normal
+ *          * Promiscuous mode disabled
+ *          * Multicast frames perfect
+ *          * Unicast frames filter perfect
+ *          * Zero quanta pause disabled
+ *          * Pause low threshold set to -4
+ *          * Unicast pause frame detect disabled
+ *          * Receive flow control disabled
+ *          * Transmit flow control disabled
  *
- * @note Filter configuration
- *
- *    Receive all disabled
- *    Source address filter disabled
- *    Block all control frames
- *    Broadcastframes reception_enabled
- *    Destination filter normal
- *    Promiscuous mode disabled
- *    Multicast frames perfect
- *    Unicast frames filter perfect
- *    Zero quanta pause disabled
- *    Pause low threshold set to -4
- *    Unicast pause frame detect disabled
- *    Receive flow control disabled
- *    Transmit flow control disabled
- *
- * @note  IFG Gap options
- *
- *     | IFG|  # bit times |
- *     |----|--------------|
- *     |  0 |  96          |
- *     |  1 |  88          |
- *     |  2 |  80          |
- *     |  4 |  64          |
- *     |  5 |  56          |
- *     |  6 |  48          |
- *     |  7 |  40          |
- *
- *
- * @note  Back-off limit. Random time delay after collision
- *
- *     | BL  |  Meaning           |
- *     |-----|--------------------|
- *     |  00 | 2^k, k = min(n,10) |
- *     |  01 | 2^k, k = min(n,8)  |
- *     |  10 | 2^k, k = min(n,4)  |
- *     |  11 | 2^k, k = min(n,1)  |
- *
- *     where n is retransmission attempt count
- *
- *
- * @note  Pause low threshold
- *
- *      | PLT  |  Meaning                        |
- *      |------|---------------------------------|
- *      |  00  | Pause time minus 4 slot times   |
- *      |  01  | Pause time minus 28 slot times  |
- *      |  10  | Pause time minus 144 slot times |
- *      |  11  | Pause time minus 256 slot times |
  */
 
-#define MAC_IFGGAP                          0
-#define MAC_BL                              2
-#define MAC_PCF                             0
-#define MAC_PAM                             0
-#define MAC_PT                              4
-#define MAC_PLT                             0
-
 static int ETH_ConfigureMAC(void) {
+
+    /*************** MACCR: MAC Configuration Register ************************/
+
     uint32_t maccr = ETH->MACCR;
-    maccr &= ~( ETH_MACCR_WD_Msk
-               |ETH_MACCR_JD_Msk
-               |ETH_MACCR_IFG_Msk
-               |ETH_MACCR_CSD_Msk
-               |ETH_MACCR_FES_Msk
-               |ETH_MACCR_ROD_Msk
-               |ETH_MACCR_LM_Msk
-               |ETH_MACCR_DM_Msk
-               |ETH_MACCR_IPCO_Msk
-               |ETH_MACCR_RD_Msk
-               |ETH_MACCR_APCS_Msk
-               |ETH_MACCR_BL_Msk
-               |ETH_MACCR_DC_Msk )
-               ;
 
-    // Set defaults
-    maccr |= (MAC_IFGGAP<<ETH_MACCR_IFG_Pos)
-            |ETH_MACCR_IPCO
-            |(MAC_BL<<ETH_MACCR_BL_Pos);
+    // Clear all fields
+    maccr &= 0;
 
-    // Set configuration
-    if( eth_config&ETH_CONFIG_100BASET )   maccr |= ETH_MACCR_FES;
-    if( eth_config&ETH_CONFIG_FULLDUPLEX ) maccr |= ETH_MACCR_DM;
+    // Configure
+    // There are many fields with negative logic (1 to disable, 0 to enable)
+    // No CRC stripping
+    // Watchdog enable. Receive at most 2048 bytes
+    // Jabber enable. Transmit at most 2048 bytes
+    // Carrier sense active and generate error/abort transmission
+    // Fast Ethernet will be set accordingly later
+    // Receive own frames enabled!!!
+    // No Loopback
+    // Duplex mode will be set accordingly later
+    // IPv4 checksum offload (ETH controller calculates CRC)
+    // Retry enabled (based on BL)
+    // No automatic pad/CRC stripping
+    // Back-off limit = 10
+    // No deferral check
+    // Receiver and transmitter disabled, for now
+    maccr |=     0
+                |ETH_MACCR_IPCO         // Checksum by hardware
+                |ETH_MACCR_IFG_96Bit    // Interframe gap = 96
+                |ETH_MACCR_RD           // Retry disable = 1
+                |ETH_MACCR_BL_10        // Backoff limit = min(n,4)
+                ;
+
+                
+
+    // Set configuration for Fast Ethernet and Full Duplex, when possible
+    if( ETH_Status&ETH_CONFIG_100BASET )   maccr |= ETH_MACCR_FES;
+    if( ETH_Status&ETH_CONFIG_FULLDUPLEX ) maccr |= ETH_MACCR_DM;
 
     // Set configuration
     ETH->MACCR = maccr;
 
-    // Configure filter
+    /*************** MACFFR: MAC Frame Filter Register ************************/
+
     uint32_t macffr = ETH->MACFFR;
 
     // Clear all fields
-    macffr = 0;
+    macffr  &= 0;
 
-    // Set defaults
-    macffr |= ETH_MACFFR_HPF
-             |(MAC_PCF<<ETH_MACFFR_PCF_Pos)
-             |(MAC_PAM<<ETH_MACFFR_PAM_Pos)
-             ;
-
+    // Configure
+    // Receive all disabled
+    // Perfect filter????
+    // Source address filter disabled
+    // Source address inverse filter disabled
+    // Block all control frames
+    // Broadcast frame enabled
+    // Pass all multicast depends on Hash multicast bit
+    // Destination address inverse filtering normal
+    // Hash multicast perfect
+    // No promiscuous mode
+    macffr |=    0
+                |ETH_MACFFR_PCF_BlockAll    // Block all control frames
+                ;
     // Set configuration
     ETH->MACFFR = macffr;
+    delay(ETH_DELAY_AFTERREGISTERWRITE);
 
-    // Configure flow control
-    uint32_t macfcr = ETH->MACFCR;
+    /*************** MACHTxR: Hash table high/low register ********************/
 
-    // Clear all fields
-    macfcr  = 0;
-
-    // set defaults
-    macfcr  |= (MAC_PT<<ETH_MACFCR_PT_Pos)
-              |(MAC_PLT<<ETH_MACFCR_PLT_Pos)
-              ;
-    delay(ETH_DELAY_AFTERREGWRITE);
-
-    // Se configuration
-    ETH->MACFCR = macfcr;
-
-    // Configure hast tables
     ETH->MACHTHR = 0;
     ETH->MACHTLR = 0;
 
-    // Configure VLAN register
-    ETH->MACVLANTR  = 0;
+    /*************** MACMIIAR: MII address register ***************************/
+    // Used in ConfigurePHY
 
-    // Configure MAC Address
+    /*************** MACMIIDR: MII data register ******************************/
+    // Used in ConfigurePHY
 
-    uint64_t ma = rev64(eth_macaddress);
+    /*************** MACFCR: Flow control register ****************************/
 
-    ETH->MACA0HR = (uint32_t) (ma>>32)|(1<<31);
-    ETH->MACA0LR = (uint32_t) ma;
+    uint32_t macfcr = ETH->MACFCR;
+
+    // Clear all fields
+    macfcr  &= 0;
+
+    // Configure
+    // pause time = 0
+    // zero quanta pause at normal operation
+    // pause low threshold set to Pause time - 4
+    // unicast pause frame detect only for multicast address at 802.3 standard
+    // receive flow control disabled
+    // transmit flow control disabled
+    // flow control ??
+
+    macfcr |=    0
+                |ETH_MACFCR_PLT_Minus4      // Pause low = Pause time - 4
+                 ;
+
+    // Set configuration
+    ETH->MACFCR = macfcr;
+    delay(ETH_DELAY_AFTERREGISTERWRITE);
+
+    /*************** MACMVLANTR: VLAN tag register ****************************/
+
+    uint32_t macvlantr = ETH->MACVLANTR;
+
+    // Clear all fields
+    macvlantr &= 0;
+
+    // Configure
+    // 16 bit comparison
+    // Tag = 0
+    ETH->MACVLANTR  = macvlantr;
+    delay(ETH_DELAY_AFTERREGISTERWRITE);
+
+    /*************** MAC Address **********************************************/
+
+    ETH_SetMACAddress(ETH_MACADDRESS);
 
     return 0;
 }
+
+
+
+/**
+ * @brief   Configure DMA
+ *
+ * @note    Configurate DMA
+ * 
+ * @note    DMA Registers
+ * 
+ *          * DMAMBR: Bus mode register
+ *          * DMATODR: Transmit poll demand register
+ *          * DMARPDR: Receive poll demand register
+ *          * DMARDLAR: Receive descriptor list address register
+ *          * DMARDLAR: Transmit descriptor list address register
+ *          * DMASR: Status register
+ *          * DMAOMR: Operation mode register
+ *          * DMAIER: Interrupt enable register
+ *          * DMAMFBOCR: Missed frame and buffer overflow counter register
+ *          * DMARSWTR: Receive status watchdog timer register
+ *          * DMACHTDR: Current host transmit descriptor register
+ *          * DMACHRDR: Current host receive descriptor register
+ *          * DMACHRBAR: Current host transmit buffer address register
+ *          * DMACHTBAR: Current host transmit buffer address register
+ * 
+ *
+ * @note    Configuration generated by STM32CubeMX
+ * 
+ *          * Drop TCP/IP Frame on Checksum error enabled
+ *          * Receive store forward enabled
+ *          * Flush received frame enable
+ *          * Transmit store forward enabled
+ *          * Transmit threshold control set to 64 bytes
+ *          * Forward error frames disabled
+ *          * Forward undersized goodframes disabled
+ *          * Received threshold control set to 64 bytes
+ *          * Second frame operarted enabled
+ *          * Address aligned beats enabled
+ *          * Fixed burst_Enabled
+ *          * Rx DMA burst length set to 32 beats
+ *          * TxDMA burst length_set to 32 beats
+ *          * DMA enhanced descriptor enabled
+ *          * Descripto length set to 0x0;
+ *          * DMA arbitration roundrobin RX/TX 1/1
+ */
+
+
+static int ETH_ConfigureDMA(void) {
+
+    /*************** DMA Mode Register ****************************************/
+
+    uint32_t dmabmr = ETH->DMABMR;
+
+    // Clear all fields
+    dmabmr &= 0;
+
+    // Configure
+    // Fixed burst for length < 16
+    // Address aligned beats enabled
+    // PBL mode 4x disabled
+    // Separate PBL (Programmable Burst Length) for Rx and TX
+    // Rx DMA PBL (Programmable Burst Length)
+    // Fixed burst enabled
+    // Rx/Tx priority ratio = 1:1
+    // Programmable Burst Length (PBL) = 32
+    // Enhanced descriptor format enabled (IPv4 offload active)
+    // Descriptor skip length = 0
+    // DMA arbitration = round robin
+    // Software
+
+    dmabmr |=  ETH_DMABMR_AAB
+              |ETH_DMABMR_USP
+              |ETH_DMABMR_RDP_32Beat
+              |ETH_DMABMR_FB
+              |ETH_DMABMR_RTPR_1_1
+              |ETH_DMABMR_PBL_32Beat
+              |ETH_DMABMR_EDE
+              ;
+
+    // Configure DMABMR
+    ETH->DMABMR = dmabmr;
+    delay(ETH_DELAY_AFTERREGISTERWRITE);
+
+
+    /*************** DMA Operation Mode Register ******************************/
+   uint32_t dmaomr = ETH->DMAOMR;
+
+    // clear fields
+    dmaomr &= 0;
+
+    // Configure
+    // Drop frame with checksum error
+    // Receive store and forward enabled
+    // Enable flush of received framed
+    // Transmit store and forward
+    // Flush transmit FIFO (do not touch it yet!)
+    // Transmit threshold control = 64 
+    // Start/stop transmission (do not touch it yet!)
+    // Forward error frames disabled
+    // Forward undersized good frames disabled
+    // Receive threshold control = 64
+    // Operate on second frame enabled
+    // Start/stop receive
+
+    dmaomr |= ETH_DMAOMR_RSF
+             |ETH_DMAOMR_TSF
+             |ETH_DMAOMR_TTC_64Bytes
+             |ETH_DMAOMR_RTC_64Bytes
+             |ETH_DMAOMR_OSF
+             ;
+    // Configure DMAOMR
+    ETH->DMAOMR = dmaomr;
+    delay(ETH_DELAY_AFTERREGISTERWRITE);
+
+    return 0;
+}
+
 
 /**
  * @brief ETH InitializeDescriptorsTX
@@ -898,6 +1179,7 @@ static int ETH_ConfigureMAC(void) {
  * @note  desc and area must be static!!!
  */
 
+///@{
 // This bit is the highest order of word 0 of both descriptors
 #define ETH_TXDESC_OWN                   (1<<31)
 #define ETH_RXDESC_OWN                   (1<<31)
@@ -924,16 +1206,17 @@ static int ETH_ConfigureMAC(void) {
 #define ETH_RXDESC_BUFFER2SIZE_POS       (16)
 #define ETH_RXDESC_ENDOFRING             (1<<15)
 #define ETH_RXDESC_CHAINED               (1<<14)
-
+///@}
 
 void ETH_InitializeDescriptorsTX(ETH_DMADescriptor *desc, int count, char *area) {
 int i;
+uint32_t *a = (uint32_t *) area;
 
     ETH_TXDescriptors = desc;
     for(i=0;i<count;i++) {
         desc->Status    = ETH_TXDESC_CHAINED | ETH_TXDESC_CIC;
         desc->ControlBufferSize = 0;
-        desc->Buffer1Addr = (uint32_t) (area + i*ETH_TXBUFFER_SIZE);
+        desc->Buffer1Addr = (uint32_t) (a + i*ETH_TXBUFFERSIZE_UINT32U);
         desc->Buffer2NextDescAddr = (uint32_t) (desc+((i+1)%count));
         desc++;
     }
@@ -952,20 +1235,66 @@ int i;
  * @note  desc and area must be static!!!
  */
 
+
 void ETH_InitializeDescriptorsRX(ETH_DMADescriptor *desc, int count, char *area) {
 int i;
+uint32_t *a = (uint32_t *) area;
 
     ETH_RXDescriptors = desc;
     for(i=0;i<count;i++) {
         desc->Status    = ETH_RXDESC_OWN;
         desc->ControlBufferSize = ETH_RXBUFFER_SIZE | ETH_RXDESC_CHAINED;
-        desc->Buffer1Addr =  (uint32_t) (area + i*ETH_RXBUFFER_SIZE);
+        desc->Buffer1Addr =  (uint32_t) (a + i*ETH_RXBUFFERSIZE_UINT32U);
         desc->Buffer2NextDescAddr =  (uint32_t) (desc + ((i+1)%count));
         desc++;
     }
 
     // Write table address to the ETH interface
     ETH->DMARDLAR = (uint32_t) desc;
+}
+
+
+/**
+ * @brief ETH InitializeBuffers
+ *
+ * @note  Initialize all descriptors to point to buffers insided area
+ *
+ * @note  area must be aligned to a word address.]
+ *
+ * @note  area must have a size equal or largert to (ETH_TXBUFFER_COUNT*ETH_TXBUFFER_SIZE
+ *   +ETH_RXBUFFER_COUNT*ETH_TXBUFFER_SIZE) bytes, with ETH_TXBUFFER_SIZE and ETH_RXBUFFER_SIZE
+ *   multiple of sizeof(uint32_t)_
+ */
+
+void ETH_InitializeBuffers(char *area) {
+uint32_t *a = (uint32_t *) area;
+
+    ETH_InitializeDescriptorsTX(ETH_TXDesc,ETH_TXBUFFER_COUNT,(char *) a);
+    a += ETH_TXBUFFER_SIZE*ETH_TXBUFFER_COUNT;
+    ETH_InitializeDescriptorsRX(ETH_RXDesc,ETH_RXBUFFER_COUNT,(char *) a);
+
+}
+
+
+/**
+ * @brief   ConfigureRMII
+ * 
+ * @note    This configuration must be done while the MAC is under reset and
+ *          before enabling the MAC clocks. Since this is done using SYSCFG
+ *          controller, its clock must be enabled first.
+ */
+static void ConfigureMediaInterface(void) {
+uint32_t media = 1; // RMII PHY Interface
+
+    // Enable SYSCFG clock to select the ethernet PHY interface to be used
+    RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
+    __NOP();
+    __NOP();
+    __DSB();
+
+    //  Select RMII mode
+    SYSCFG->PMC = (SYSCFG->PMC&~(SYSCFG_PMC_MII_RMII_SEL))
+                 |(media<<SYSCFG_PMC_MII_RMII_SEL_Pos);
 }
 
 /**
@@ -981,26 +1310,20 @@ int i;
  */
 
 void ETH_Init(void) {
-uint32_t media = 1;
+
 
     // Configure pins
     ConfigureETHPins();
 
-    // Enable SYSCFG clock to select the ethernet PHY interface to be used
-    RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
-    __NOP();
-    __NOP();
-    __DSB();
-
-    //  Select RMII mode
-    SYSCFG->PMC = (SYSCFG->PMC&~(SYSCFG_PMC_MII_RMII_SEL))|(media<<SYSCFG_PMC_MII_RMII_SEL_Pos);
+    // Configure Media Interface
+    ConfigureMediaInterface();
 
     // Enable clocks for ETH
     ETH_EnableClock(ETH_CLOCK_MAC|ETH_CLOCK_MACRX|ETH_CLOCK_MACTX);
 
     // Reset ETH system
     ETH->DMABMR |= ETH_DMABMR_SR;
-    // Wait until reset
+    // Wait until reset TODO: Add timeout
     while( (ETH->DMABMR&ETH_DMABMR_SR) != 0 ) {
         delay(100);
     }
@@ -1032,15 +1355,6 @@ uint32_t media = 1;
  *
  * @note    ETH_Init must be successfully called before
  */
-void ETH_EnableTransmissionDMA(void);
-void ETH_DisableTransmissionDMA(void);
-void ETH_EnableReceptionDMA(void);
-void ETH_DisableReceptionDMA(void);
-void ETH_EnableTransmissionMAC(void);
-void ETH_DisableTransmissionMAC(void);
-void ETH_EnableReceptionMAC(void);
-void ETH_DisableReceptionMAC(void);
-
 
 void ETH_Start(void) {
 
@@ -1159,7 +1473,7 @@ ETH_DMADescriptor *desc;
 
 
 /**
- * @brief    Receive data
+ * @brief   Receive data
  *
  * @note    Check if there is data in buffers and sets an indicator
  *
@@ -1259,6 +1573,7 @@ ETH_DMADescriptor *desc;
         RXFrameInfo.SegmentCount++;
         return 1;
     } else {
+        // Middle buffer
         RXFrameInfo.SegmentCount++;
     }
     // Point to next
@@ -1353,35 +1668,21 @@ void ETH_DisableReceptionMAC(void) {
 }
 ///@}
 
-////////////////// IRQ Handler //////////////////////////////////////////////////////////////////
+
+////////////////// Status Functions /////////////////////////////////////////////////////////////
 
 /**
- * @brief   ETH interrupt handler
+ * @brief  Check link status and return if it up (connected)
+ * 
+ * @return int 
  */
+int  ETH_IsConnected(void) {
 
-void ETH_IRQHandler(void) {
 
-    // Check if a frame was received
-    if( ETH->DMASR&ETH_DMASR_RS ) {
-        if( ETH_Callbacks.FrameReceived ) ETH_Callbacks.FrameReceived(0);
-        ETH->DMASR = ETH_DMASR_RS;
-
-    }
-    // Check if a frame was transmitted
-    if( ETH->DMASR&ETH_DMASR_TS ) {
-        if( ETH_Callbacks.FrameTransmitted ) ETH_Callbacks.FrameTransmitted(0);
-        ETH->DMASR = ETH_DMASR_TS;
-    }
-
-    // Check error
-    if( ETH->DMASR&ETH_DMASR_AIS ) {
-        if( ETH_Callbacks.ErrorDetected ) ETH_Callbacks.ErrorDetected(0);
-        ETH->DMASR = ETH_DMASR_AIS;
-    }
-
-    // Clear interrupt summary
-    ETH->DMASR = ETH_DMASR_NIS;
+    return 1;
 }
+
+
 
 
 
