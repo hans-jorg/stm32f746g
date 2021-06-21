@@ -49,16 +49,35 @@
 ///@}
 
 
+#if USE_HTTPD
 /**
- * @brief IP_PORT
+ * @brief IP_PORT for HTTP
  *
  * @note  Port number where the server listens
  */
 #define IP_PORT              8080
+#endif
+
+//////////////////// Network configuration /////////////////////////////////////
+
+#if LWIP_DHCP
+static ip4_addr_t       ipaddr;
+static ip4_addr_t       netmask;
+static ip4_addr_t       gateway;
+#else
+static ip4_addr_t       ipaddr    = { IPV4(192,168,0,201) };
+static ip4_addr_t       netmask   = { IPV4(255,255,255,1)   };
+static ip4_addr_t       gateway   = { IPV4(192,168,0,1) };
+#endif
 
 
+#define IFNAME0         'e'
+#define IFNAME1         't'
 
-////////////////// Timing Functions  /////////////////////////////////////////////////////////////
+
+#define HOSTNAME        "lwipt"
+
+////////////////// Timing Functions  ///////////////////////////////////////////
 
 static volatile uint32_t tick_ms = 0;
 static volatile uint32_t delay_ms = 0;
@@ -111,7 +130,7 @@ static int static_code;
 }
 
 
-////////////////// Auxiliary Functions  ///////////////////////////////////////////////////////////
+////////////////// Auxiliary Functions  /////////////////////////////////////////
 
 /**
  * @brief convertbyte to string
@@ -248,8 +267,8 @@ int i;
  * @note  This version uses the standard library vprintf function.
  *
  *
- * @note  Another version using a macro with variable number of arguments was tried. But
- *        such macros must have at least two arguments. Dismissed!!!!
+ * @note  Another version using a macro with variable number of arguments was
+ *        tried. But such macros must have at least two arguments. Dismissed!!!!
  */
 int verbose = 1;
 
@@ -266,7 +285,100 @@ void message(char *msg,...) {
 }
 
 
-///////////////////// LWIP Functions //////////////////////////////////////////////////////////////
+///////////////////// lwIP Device Driver ///////////////////////////////////////
+/*
+ *    components of device driver
+ *     
+ *    * myif_init:        Calls low_level_init() function and initializes the 
+ *                        netif structure. 
+ * 
+ *    * myif_input:       Calls low_level_input() function to read a packet from
+ *                        the MAC hardware and passes it to the lwIP input
+ *                        function. 
+ * 
+ *    * low_level_init:   Initializes the MAC hardware. 
+ * 
+ *    * low_level_input:  Reads one packet from the MAC hardware.
+ * 
+ *    * low_level_output: Writes one packet to the MAC hardware.
+ * 
+ * 
+ *     @note low_level_* handle hardware and myif_* the netif structure.
+ * 
+ *     @note netif->state should point to a struct stnetif static variable
+ */
+
+/**
+ * @brief   struct used to store hardware specific info
+ * 
+ * @note    ethaddr is already in netif!
+ * 
+ * @note    netif->state should point to a variable of this type
+ */
+
+struct stnetif {
+    struct eth_addr *ethaddr;                   // Duplicated!!!!
+};
+
+/**
+ * @brief   hardware specific info
+ * 
+ * @note    a static allocated variable is used because there is support for
+ *          only one interface
+ */
+
+static struct stnetif stnetif;  // statically allocated
+
+
+/**
+ * @brief   low_level_check_link
+ * 
+ * @note    check link status and set netif accordingly
+ * 
+ * @note    lwIP has a set of functions/macros to handle this
+ * 
+ *          * netif_is_up:          macro returns 1 of UP flag is set, 
+ *                                  otherwise 0. This flag set set means that
+ *                                  the interface is enabled and can handle
+ *                                  traffic
+ *          * netif_set_up:         function
+ *          * netif_set_down:       function
+ *          * netif_is_link_up:     macro returns 1 of LINK_UP flag is set, 
+ *                                  otherwise 0. When set, the link should be
+ *                                  active.
+ *          * netif_set_link_up:    function sets flag LINK_UP
+ *          * netif_set_link_down:  function
+ * 
+ * @note    The *netif_set_link_up* and *netif_set_link_down* function must be
+ *          used when the  LWIP_NETIF_LINK_CALLBACK compilation flag is set. 
+ *          When not set, the flag netif->flags could be set directly.
+ */
+
+u8_t low_level_check_link_status(void) {
+
+    return ETH_IsLinkUp();
+
+}
+
+
+/**
+ * @brief   low_level_init
+ * 
+ * @note    handles hardware initialization
+ */
+err_t low_level_init(struct netif *netif) {
+
+    // Initialize device
+    ETH_Init();
+
+    // Check link status
+    low_level_check_link_status();
+
+    // Start device
+    ETH_Start();
+
+    return ERR_OK;
+}
 
 /**
  * @brief stnetif_output
@@ -276,24 +388,83 @@ void message(char *msg,...) {
 
 err_t
 stnetif_output(struct netif *netif, struct pbuf *p) {
+struct pbuf *q;
+ETH_DMADescriptor *desc;
+err_t rc;
 
 #if MIB2_STATS
-  LINK_STATS_INC(link.xmit);
-  /* Update SNMP stats (only if you use SNMP) */
-  MIB2_STATS_NETIF_ADD(netif, ifoutoctets, p->tot_len);
-  int unicast = ((p->payload[0] & 0x01) == 0);
-  if (unicast) {
-    MIB2_STATS_NETIF_INC(netif, ifoutucastpkts);
-  } else {
-    MIB2_STATS_NETIF_INC(netif, ifoutnucastpkts);
-  }
+    LINK_STATS_INC(link.xmit);
+    /* Update SNMP stats (only if you use SNMP) */
+    MIB2_STATS_NETIF_ADD(netif, ifoutoctets, p->tot_len);
+    int unicast = ((p->payload[0] & 0x01) == 0);
+    if (unicast) {
+        MIB2_STATS_NETIF_INC(netif, ifoutucastpkts);
+    } else {
+        MIB2_STATS_NETIF_INC(netif, ifoutnucastpkts);
+    }
 #endif
 
-  lock_interrupts();
-//  pbuf_copy_partial(p, mac_send_buffer, p->tot_len, 0);
-  /* Start MAC transmit here */
-  unlock_interrupts();
-  return ERR_OK;
+    lock_interrupts();
+    /*
+     * Copy data from all pbufs to one or more DMA buffers
+     * concatenating them
+     */
+    desc = &ETH_TXDescriptors[0];               // first DMA descriptor
+    uint16_t framelength = 0;                   // frame size
+    uint8_t *dst = (uint8_t *)desc->Buffer1Addr;// first DMA buffer;
+    uint16_t dstpos = 0;                        // offset
+    // scan all pbufs and transfer their contents to DMA buffers
+    for(q=p; q && desc; q = q->next ) {
+        if( desc->Status&ETH_DMADESCRIPTOR_STATUS_OWN ) {
+            rc = ERR_USE;
+            goto error;
+        }
+        // get source information
+        uint16_t srccnt = q->len;
+        uint16_t srcpos = 0;
+        uint8_t *src = q->payload;
+        int dstcnt = ETH_TXBUFFER_SIZE - dstpos;
+        while( dstcnt < srccnt ) {
+            memcpy(dst + dstpos, src + srcpos, dstcnt );
+            framelength += dstcnt;
+            srccnt -= dstcnt;
+            srcpos += dstcnt;
+            // Get next DMA buffer
+            desc = (ETH_DMADescriptor *) desc->Buffer2NextDescAddr;
+            if( !desc )
+                break;
+            if( (desc->Status&ETH_DMADESCRIPTOR_STATUS_OWN) ) {
+                rc = ERR_USE;
+                goto error;
+            }
+            dst = (uint8_t *) desc->Buffer1Addr;
+            dstpos = 0;
+            dstcnt = ETH_TXBUFFER_SIZE - dstpos;
+        }
+        // copy remaining data
+        if( desc ) {
+            memcpy(dst + dstpos, src + srcpos, srccnt );
+            framelength += srccnt;
+            dstpos += srccnt;
+        }
+    }
+
+    
+    /* Start MAC transmit here */
+    ETH_TransmitFrame(framelength);
+
+    unlock_interrupts();
+    rc = ERR_OK;
+
+    // An error occured
+error:
+    // Clear error condition and resume transmission
+    // TODO: Understand what is happening here
+    if( ETH->DMASR&ETH_DMASR_TUS ) {
+        ETH->DMASR = ETH_DMASR_TUS;
+        ETH->DMATPDR = 0;
+    }  
+    return rc;
 }
 
 /**
@@ -301,19 +472,97 @@ stnetif_output(struct netif *netif, struct pbuf *p) {
  *
  * @note  Called by lwip when data is received
  */
-err_t
+struct pbuf *
 stnetif_input(struct netif *netif) {
+struct pbuf *p,*q;
+ETH_DMAFrameInfo RxFrameInfo;
+ETH_DMADescriptor *desc;
+err_t rc;
 
 
-    return ERR_OK;
+    p = 0;
+    q = 0;
+
+    rc = ETH_ReceiveFrame(&RxFrameInfo);
+    if( rc <= 0 ) return NULL;
+
+    int len = RxFrameInfo.FrameLength;
+    if( len > 0 ) {
+        // Allocate a chain of pbuf large enough to accommodate data
+        p = pbuf_alloc(PBUF_RAW,len,PBUF_POOL);
+        if( p ) {
+            desc = &ETH_TXDescriptors[0];                // first DMA descriptor
+            uint16_t framelength = 0;                    // frame size
+            uint8_t *src = (uint8_t *) desc->Buffer1Addr;// first DMA buffer;
+            uint16_t srcpos = 0;                         // offset
+            // scan all pbufs and transfer their contents to DMA buffers
+            for(q=p; q && desc; q = q->next ) {
+                if( desc->Status&ETH_DMADESCRIPTOR_STATUS_OWN ) {
+                    p = NULL;
+                    goto error;
+                }
+                // get source information
+                uint16_t dstcnt = q->len;
+                uint16_t dstpos = 0;
+                uint8_t *dst = q->payload;
+                int srccnt = ETH_TXBUFFER_SIZE - srcpos;
+                while( srccnt < dstcnt ) {
+                    memcpy(dst + dstpos, src + srcpos, srccnt );
+                    framelength += srccnt;
+                    dstcnt -= srccnt;
+                    dstpos += srccnt;
+                    // Get next DMA buffer
+                    desc = (ETH_DMADescriptor *) desc->Buffer2NextDescAddr;
+                    if( !desc )
+                        break;
+                    if( desc->Status&ETH_DMADESCRIPTOR_STATUS_OWN ) {
+                        p = NULL;
+                        goto error;
+                    }
+                    src = (uint8_t *) desc->Buffer1Addr;
+                    srcpos = 0;
+                    srccnt = ETH_TXBUFFER_SIZE - srcpos;
+                }
+                // copy remaining data
+                if( desc ) {
+                    memcpy(dst + dstpos, src + srcpos, dstcnt );
+                    framelength += dstcnt;
+                    srcpos += dstcnt;
+                }
+            }
+        }
+    }
+
+error:
+    // Clear all OWN bits. DMA can use them now
+    desc = RxFrameInfo.FirstSegmentDesc;
+    for(int i=0;i<RxFrameInfo.SegmentCount;i++) {
+        desc->Status |= ETH_DMADESCRIPTOR_STATUS_OWN;
+        desc = (ETH_DMADescriptor *) desc->Buffer2NextDescAddr;
+    }
+
+    // Clear flag and resume reception
+    if( ETH->DMASR&ETH_DMASR_RBUS ) {
+        ETH->DMASR = ETH_DMASR_RBUS;
+        ETH->DMARPDR = 0;
+    }
+
+    return p;
 }
 
 /**
- * @brief stnetif_link
+ * @brief   stnetif_link
  *
- * @note  
+ * @note    check link status
  */
 err_t stnetif_link(struct netif *netif) {
+
+    if( low_level_check_link_status() ) {
+        netif_set_link_up(netif);
+    } else {
+        netif_set_link_down(netif);
+    }
+    return (netif->flags&NETIF_FLAG_LINK_UP)!=0;
 
 
     return ERR_OK;
@@ -329,9 +578,34 @@ err_t
 stnetif_init(struct netif *netif) {
 uint8_t macaddr[6];
 
+
+#if LWIP_NETIF_HOSTNAME
+    /* Initialize interface hostname */
+    netif->hostname = "lwip";
+#endif /* LWIP_NETIF_HOSTNAME */
+
+#if LWIP_SNMP
+  /* ifType ethernetCsmacd(6) @see RFC1213 (snmp_mib2.h)*/
+  netif->link_type = 6;
+  /* Estimated speed */
+  netif->link_speed = 100000000;
+  netif->ts = 0;
+  netif->ifinoctets = 0;
+  netif->ifinucastpkts = 0;
+  netif->ifinnucastpkts = 0;
+  netif->ifindiscards = 0;
+  netif->ifoutoctets = 0;
+  netif->ifoutucastpkts = 0;
+  netif->ifoutnucastpkts = 0;
+  netif->ifoutdiscards = 0;
+#endif  /* LWIP_SNMP */
+
+    netif->name[0] = IFNAME0;
+    netif->name[1] = IFNAME1;
+
     netif->linkoutput = stnetif_output;
     netif->output     = etharp_output;
-//    netif->input      = etharp_input;
+
 #if LWIP_IPV6
     netif->output_ip6 = ethip6_output;
 #endif
@@ -346,13 +620,16 @@ uint8_t macaddr[6];
     SMEMCPY(netif->hwaddr, macaddr, ETH_HWADDR_LEN);
     netif->hwaddr_len = ETH_HWADDR_LEN;
 
-    // Initialize device
-    ETH_Init();
+    // Initialization of hardware specific info 
+    netif->state = &stnetif;
+    SMEMCPY(stnetif.ethaddr, macaddr, ETH_HWADDR_LEN); // Duplicated!!!!
+    
+    // Do hardware initialization
 
-    // Start device
-    ETH_Start();
+    low_level_init(netif);
 
     return ERR_OK;
+
 }
 
 
@@ -368,7 +645,7 @@ void stnetif_status_callback(struct netif *netif) {
 }
 
 
-
+#if LWIP_NETIF_LINK_CALLBACK
 /**
  * @brief stnetif_link_callback
  *
@@ -379,8 +656,9 @@ void stnetif_link_callback(struct netif *netif) {
     message("netif status changed %s\n", ip4addr_ntoa(netif_ip4_addr(netif)));
 
 }
+#endif
 
-///////////////////// TFTP Functions //////////////////////////////////////////////////////////////
+///////////////////// TFTP Functions ///////////////////////////////////////////
 
 
 #define ONLY_FILE  ((void *) 1)
@@ -444,42 +722,22 @@ static struct netif     netif;
 
 // Generate an 32-bit integer with network order of a network address or mask
 #if BYTE_ORDER == LITTLE_ENDIAN
-#define IPV4(A,B,C,D) (((u32_t)(D)<<24)|((u32_t)(C)<<16)|((u32_t)(B)<<8)|((u32_t)(A)<<0))
+#define IPV4(A,B,C,D)   (((u32_t)(D)<<24)                   \
+                        |((u32_t)(C)<<16)                   \
+                        |((u32_t)(B)<<8)                    \
+                        |((u32_t)(A)<<0))
 #else
-#define IPV4(A,B,C,D) (((u32_t)(A)<<24)|((u32_t)(B)<<16)|((u32_t)(C)<<8)|((u32_t)(D)<<0))
+#define IPV4(A,B,C,D)   (((u32_t)(A)<<24)                   \
+                        |((u32_t)(B)<<16)                   \
+                        |((u32_t)(C)<<8)                    \
+                        |((u32_t)(D)<<0))
 #endif
 
-#if LWIP_DHCP
-static ip4_addr_t       ipaddr;
-static ip4_addr_t       netmask;
-static ip4_addr_t       gateway;
-#else
-static ip4_addr_t       ipaddr    = { IPV4(192,168,0,201) };
-static ip4_addr_t       netmask   = { IPV4(255,255,255,1)   };
-static ip4_addr_t       gateway   = { IPV4(192,168,0,1) };
-#endif
-
-
-#define IFNAME0         'e'
-#define IFNAME1         't'
-
-
-#define HOSTNAME        "lwipt"
-
-///////////////////// LWIP Functions ///////////////////////////////////////////////////////////////
+///////////////////// Network Functions ////////////////////////////////////////
 
 #define MESSAGE(text)  message(text)
 
 
-void LWIP_CheckLink(void) {
-
-    if( netif_is_up(&netif) ) {
-        netif_set_up(&netif);
-    } else {
-        netif_set_down(&netif);
-    }
-
-}
 
 /**
  * @brief   Initialize lwIP
@@ -487,7 +745,7 @@ void LWIP_CheckLink(void) {
  * @note    Do all initialization for lwIP
  */
 
-void LWIP_Init(void) {
+void Network_Init(void) {
 err_t err;
 
     MESSAGE("Initialing lwip");
@@ -509,14 +767,13 @@ err_t err;
                 stnetif_init, 
                 ethernet_input);
 
-    netif.name[0] = 'e';
-    netif.name[1] = 't';
-
     netif_set_status_callback(&netif, stnetif_status_callback);
-    netif_set_default(&netif);
-
-
     netif_set_link_callback(&netif,stnetif_link_callback);
+    
+    netif_set_default(&netif);
+    netif_set_link_up(&netif);
+    netif_set_up(&netif);
+
 
 #if LWIP_DHCP
     MESSAGE("Starting DHCP\n");
@@ -526,17 +783,7 @@ err_t err;
     if( err != ERR_OK ) MESSAGE("DHCP Error");
 #endif
 
-#if USE_TFTP 
-    message("Starting TFTP server\n");
-    tftp_init(&tftp_config);
-#endif
-
-#if USE_HTTPD
-    // not tested yet!!! Not configured too.
-    // It uses TCP!!!
-    message("Starting HTTP server\n");
-    httpd_init();
-#endif
+    MESSAGE("Ethernet interface up\n");
     if( verbose ) {
         if( ip4_addr_isany_val(ipaddr) ) {
             char s[20];
@@ -549,6 +796,20 @@ err_t err;
         }
     }
 
+
+#if USE_TFTP 
+    message("Starting TFTP server\n");
+    tftp_init(&tftp_config);
+#endif
+
+#if USE_HTTPD
+    // not tested yet!!! Not configured too.
+    // It uses TCP!!!
+    message("Starting HTTP server\n");
+    httpd_init();
+#endif
+
+
 }
 
 /**
@@ -557,9 +818,9 @@ err_t err;
  * @note    See lwip-2.1.2/doc/doxygen/output/html/group__lwip__nosys.html
  *          Needs a queue data structure
  */
-void LWIP_Process(void) {
+void Network_Process(void) {
 
-    LWIP_CheckLink();
+    //LWIP_CheckLink();
 
     stnetif_input(&netif);
             
@@ -604,11 +865,11 @@ err_t rc;
     SDRAM_Init();
 
     message("Initializing LWIP\n");
-    LWIP_Init();
+    Network_Init();
 
     // Entering Main loop
     while(1) {
-        LWIP_Process();
+        Network_Process();
 
         // Application code here
     }

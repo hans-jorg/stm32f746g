@@ -51,7 +51,7 @@ PARTCLASSCMSIS=STM32F7xx
 # Suppress warnings
 # Comment out to have verbose output
 #MAKEFLAGS+= --silent
-#.SILENT:
+.SILENT:
 
 #
 # Main target

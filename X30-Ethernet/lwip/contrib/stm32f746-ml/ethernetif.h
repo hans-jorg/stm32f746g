@@ -18,7 +18,7 @@ void        stnetif_update_config(struct netif *netif);
 void        stnetif_callback_conn_changed(struct netif *netif);
 
 
-err_t       stnetif_input(struct netif *netif);
+struct pbuf *stnetif_input(struct netif *netif);
 
 
 #endif

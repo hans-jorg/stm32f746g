@@ -17,7 +17,7 @@ u32_t sys_counter;
 /**
  * @brief   Implementation of sys_now
  * 
- * @note    It can not be inline'd because timeout.c does not include sys_arch.h
+ * @note    It can not be inlined because timeout.c does not include sys_arch.h
  * 
  * @return u32_t 
  */

@@ -58,6 +58,10 @@ typedef struct {
     uint32_t   TimeStampHigh;               /*!< Time Stamp High */
 } ETH_DMADescriptor;
 
+/**
+ * @brief   Symbols for fields in ETH_DMADescriptor
+ */
+#define ETH_DMADESCRIPTOR_STATUS_OWN        (1<<31)
 
 /**
   * @brief  Received Frame Information structure definition
@@ -73,6 +77,12 @@ typedef struct {
     uint32_t            FrameLength;        /*!< Frame length */
 //    uint32_t            buffer;           /*!< Frame buffer */
 } ETH_DMAFrameInfo;
+
+/**
+ * @brief   Received Frame Info
+ * 
+ */
+extern ETH_DMAFrameInfo  ETH_RXFrameInfo;
 
 /**
  * @brief Info about buffer size
@@ -126,6 +136,7 @@ struct ETH_Callbacks_s {
     void    (*FrameReceived)(unsigned);
     void    (*FrameTransmitted)(unsigned);
     void    (*ErrorDetected)(unsigned);
+    void    (*LinkStatusChanged)(unsigned);
 };
 
 extern struct ETH_Callbacks_s ETH_Callbacks;
@@ -138,6 +149,7 @@ extern struct ETH_Callbacks_s ETH_Callbacks;
 #define ETH_CALLBACK_FRAMERECEIVED              1
 #define ETH_CALLBACK_FRAMETRANSMITTED           2
 #define ETH_CALLBACK_ERRORDETECTED              3
+#define ETH_CALLBACK_LINKSTATUSCHANGED          4
 ///@}
 
 /**
@@ -151,14 +163,23 @@ extern struct ETH_Callbacks_s ETH_Callbacks;
 #define ETH_CLOCK_ALL                           0x000F
 ///@}
 
+// Initialization functions
 void ETH_Init(void);
-void ETH_EnableClock(uint32_t which);
-void ETH_DisableClock(uint32_t which);
-void ETH_InitializeDescriptorsTX(ETH_DMADescriptor *desc, int count, char *area);
-void ETH_InitializeDescriptorsRX(ETH_DMADescriptor *desc, int count, char *area);
+#ifdef ETH_ALLOCATE_BUFFERS_DYNAMICALLY
+void ETH_InitTXDescriptors(ETH_DMADescriptor *desc, int count, uint8_t *area);
+void ETH_InitRXDescriptors(ETH_DMADescriptor *desc, int count, uint8_t *area);
+#endif
+
+// Operation function
+int  ETH_TransmitFrame(unsigned size);
+int  ETH_ReceiveFrame(ETH_DMAFrameInfo *RxFrameInfo);
+int  ETH_CheckReception(void);
+
+// Control functions (Enable/Disable)
 void ETH_Start(void);
 void ETH_Stop(void);
-int  ETH_TransmitFrame(unsigned size);
+void ETH_EnableClock(uint32_t which);
+void ETH_DisableClock(uint32_t which);
 void ETH_EnableTransmissionDMA(void);
 void ETH_DisableTransmissionDMA(void);
 void ETH_EnableReceptionDMA(void);
@@ -167,23 +188,22 @@ void ETH_EnableTransmissionMAC(void);
 void ETH_DisableTransmissionMAC(void);
 void ETH_EnableReceptionMAC(void);
 void ETH_DisableReceptionMAC(void);
+
+
 void ETH_IRQHandler(void);
 void ETH_GetMACAddress(uint8_t macaddr[6]);
 void ETH_RegisterCallback(unsigned, void (*)(unsigned));
 void ETH_IRQHandler(void);
 
+// MAC Address Management functions
 void ETH_SetMACAddress(uint64_t macaddr);
 void ETH_SetMACAddressN(uint32_t n, uint64_t macaddr, uint32_t mbc);
 void ETH_GetMACAddressAsVector(uint8_t macaddr[6]);
 void ETH_GetMACAddressAsNetworkOrderedVector(uint8_t macaddr[6]);
 
-
-// TBD!!
+// Link status function
 int  ETH_IsLinkUp(void);
 int  ETH_IsConnected(void);
-
-void ETH_SetBuffers(char *area);
-
 
 #endif
 
