@@ -125,10 +125,10 @@ static uint32_t ETH_Status = ETH_STATUS_LINKDOWN;
  * @note    All sizes are rounded to uint32_t sizes, i.e. multiple of 4.
  */
 ///@{
-#define ETH_TXBUFFERSIZE_UINT32U ROUND(ETH_TXBUFFER_SIZE,sizeof(uint32_t))
-#define ETH_RXBUFFERSIZE_UINT32U ROUND(ETH_RXBUFFER_SIZE,sizeof(uint32_t))
-#define ETH_TXBUFFERSIZE_UINT8 (ETH_TXBUFFERSIZE_UINT32U*sizeof(uint32_t))
-#define ETH_RXBUFFERSIZE_UINT8 (ETH_RXBUFFERSIZE_UINT32U*sizeof(uint32_t))
+#define ETH_TXBUFFERSIZE_INT32UNITS ROUND(ETH_TXBUFFER_SIZE,sizeof(uint32_t))
+#define ETH_RXBUFFERSIZE_INT32UNITS ROUND(ETH_RXBUFFER_SIZE,sizeof(uint32_t))
+#define ETH_TXBUFFERSIZE_INT8UNITS (ETH_TXBUFFERSIZE_INT32UNITS*sizeof(uint32_t))
+#define ETH_RXBUFFERSIZE_INT8UNITS (ETH_RXBUFFERSIZE_INT32UNITS*sizeof(uint32_t))
 
 #ifdef ETH_ALLOCATE_BUFFERS_DYNAMICALLY
     // These pointers must be initialized thru a call to ETH_SetBuffers
@@ -142,10 +142,10 @@ static uint32_t ETH_Status = ETH_STATUS_LINKDOWN;
     static ETH_DMADescriptor         ETH_RXDesc[ETH_RXBUFFER_COUNT] = { 0 };
     ETH_DMADescriptor               *ETH_TXDescriptors = ETH_TXDesc;
     ETH_DMADescriptor               *ETH_RXDescriptors = ETH_RXDesc;
-// An alternative is to define as an array of 32-bit integers for alignement
-    static uint8_t          txbuffer[ETH_TXBUFFERSIZE_UINT32U*ETH_TXBUFFER_COUNT] 
+// An alternative is to define them as an array of 32-bit integers for alignment
+    static uint8_t          txbuffer[ETH_TXBUFFERSIZE_INT8UNITS*ETH_TXBUFFER_COUNT] 
                                 __attribute((aligned(sizeof(uint32_t))));
-    static uint8_t          rxbuffer[ETH_RXBUFFERSIZE_UINT32U*ETH_RXBUFFER_COUNT]
+    static uint8_t          rxbuffer[ETH_RXBUFFERSIZE_INT8UNITS*ETH_RXBUFFER_COUNT]
                                 __attribute((aligned(sizeof(uint32_t))));
 #endif
 ///@}
@@ -1173,7 +1173,7 @@ uint32_t *a = (uint32_t *) area;
     for(i=0;i<count;i++) {
         desc->Status    = ETH_TXDESC_CHAINED | ETH_TXDESC_CIC;
         desc->ControlBufferSize = 0;
-        desc->Buffer1Addr = (uint32_t) (a + i*ETH_TXBUFFERSIZE_UINT32U);
+        desc->Buffer1Addr = (uint32_t) (a + i*ETH_TXBUFFERSIZE_INT32UNITS);
         desc->Buffer2NextDescAddr = (uint32_t) (desc+((i+1)%count));
         desc++;
     }
@@ -1206,7 +1206,7 @@ uint32_t *a = (uint32_t *) area;
     for(i=0;i<count;i++) {
         desc->Status    = ETH_RXDESC_OWN;
         desc->ControlBufferSize = ETH_RXBUFFER_SIZE | ETH_RXDESC_CHAINED;
-        desc->Buffer1Addr =  (uint32_t) (a + i*ETH_RXBUFFERSIZE_UINT32U);
+        desc->Buffer1Addr =  (uint32_t) (a + i*ETH_RXBUFFERSIZE_INT32UNITS);
         desc->Buffer2NextDescAddr =  (uint32_t) (desc + ((i+1)%count));
         desc++;
     }
@@ -1236,7 +1236,7 @@ void ETH_InitializeBuffers(char *area) {
 uint32_t *a = (uint32_t *) area;
 
     ETH_InitTXDescriptors(ETH_TXDesc,ETH_TXBUFFER_COUNT,(uint8_t *) a);
-    a += ETH_TXBUFFERSIZE_UINT32U *ETH_TXBUFFER_COUNT;
+    a += ETH_TXBUFFERSIZE_INT32UNITS *ETH_TXBUFFER_COUNT;
     ETH_InitRXDescriptors(ETH_RXDesc,ETH_RXBUFFER_COUNT,(uint8_t *) a);
 
 }
