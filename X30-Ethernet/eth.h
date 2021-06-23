@@ -189,21 +189,22 @@ void ETH_DisableTransmissionMAC(void);
 void ETH_EnableReceptionMAC(void);
 void ETH_DisableReceptionMAC(void);
 
-
-void ETH_IRQHandler(void);
-void ETH_GetMACAddress(uint8_t macaddr[6]);
+// Callback routines 
 void ETH_RegisterCallback(unsigned, void (*)(unsigned));
-void ETH_IRQHandler(void);
 
 // MAC Address Management functions
 void ETH_SetMACAddress(uint64_t macaddr);
 void ETH_SetMACAddressN(uint32_t n, uint64_t macaddr, uint32_t mbc);
+void ETH_GetMACAddress(uint8_t macaddr[6]);
 void ETH_GetMACAddressAsVector(uint8_t macaddr[6]);
 void ETH_GetMACAddressAsNetworkOrderedVector(uint8_t macaddr[6]);
 
 // Link status function
 int  ETH_IsLinkUp(void);
 int  ETH_IsConnected(void);
+
+// Reconfigure Link 
+int  ETH_UpdateConfig(void);
 
 #endif
 

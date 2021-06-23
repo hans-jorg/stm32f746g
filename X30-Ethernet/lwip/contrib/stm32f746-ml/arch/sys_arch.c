@@ -12,7 +12,7 @@
  * @note    Overruns after 49 days!!!
  */
 
-u32_t sys_counter;
+u32_t sys_counter = 0;
 
 /**
  * @brief   Implementation of sys_now

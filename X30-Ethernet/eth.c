@@ -38,8 +38,6 @@
  * Function prototypes (forward referenced);
  */
 static void ETH_FlushTXFIFO(void);
-static int  ETH_UpdateConfig();
-
 
 /**
  * @brief   Network configuration
@@ -1389,7 +1387,7 @@ void ETH_Stop(void) {
  * 
  * @note    To be used when reconnecting
  */
-static int
+int
 ETH_UpdateConfig(void) {
 int configured = 0;
 int retries = 0;
@@ -1459,6 +1457,7 @@ uint32_t value;
         ETH_WritePHYRegister(ETH_PHY_BCR,value);
         delay(ETH_DELAY_AFTERCONFIG);
     }
+    return 0;
 }
 /**
  * @brief   Transmit data in buffer (maximal ETH_TXBUFFER_SIZE*ETH_MAX_PACKET_SIZE)
@@ -1777,13 +1776,13 @@ void ETH_RegisterCallback(unsigned which, void (*pFunction)(unsigned) ) {
 
     switch(which) {
     case ETH_CALLBACK_FRAMERECEIVED:
-        ETH_Callbacks.FrameReceived = pFunction;
+        ETH_Callbacks.FrameReceived     = pFunction;
         break;
     case ETH_CALLBACK_FRAMETRANSMITTED:
-        ETH_Callbacks.FrameTransmitted = pFunction;
+        ETH_Callbacks.FrameTransmitted  = pFunction;
         break;
     case ETH_CALLBACK_ERRORDETECTED:
-        ETH_Callbacks.ErrorDetected = pFunction;
+        ETH_Callbacks.ErrorDetected     = pFunction;
         break;
     case ETH_CALLBACK_LINKSTATUSCHANGED:
         ETH_Callbacks.LinkStatusChanged = pFunction;
