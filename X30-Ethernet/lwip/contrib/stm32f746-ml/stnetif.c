@@ -24,8 +24,8 @@
 #include "netif/ppp/pppoe.h"
 
 // Port to STM32F746xx
-#include "ethernetif.h"
 #include "eth.h"
+#include "stnetif.h"
 
 /**
  * @brief   verbose flag

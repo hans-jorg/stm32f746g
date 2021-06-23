@@ -37,7 +37,7 @@
 #include "lwip/tcp.h"
 #include "lwip/prot/ethernet.h"
 #include "lwip/apps/tftp_server.h"
-#include "ethernetif.h"
+#include "stnetif.h"
 
 
 /**
