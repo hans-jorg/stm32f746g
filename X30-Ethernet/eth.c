@@ -422,15 +422,15 @@ ETH_GetMACAddressAsNetworkOrderedVector(uint8_t macaddr[6]) {
  *    | RMII_TXD1    |  PG14    |  11  |  TXD1              | Transmit Data 1          |
  *    | RMII_RXD0    |  PC4     |  11  |  RXD0/MODE0        | Receive Data 0           |
  *    | RMII_RXD1    |  PC5     |  11  |  RDD1/MODE1        | Receive Data 1           |
- *    | RMII_RXER    |  PG2     |   ?  |  RXER/PHYAD0       | Receive Error            |
+ *    | RMII_RXER    |  PG2     |   0  |  RXER/PHYAD0       | Receive Error            |
  *    | RMII_CRS_DV  |  PA7     |  11  |  CRS_DV/MODE2      | Carrier Sense/Data Valid |
  *    | RMII_MDC     |  PC1     |  11  |  MDC               | SMI Clock                |
  *    | RMII_MDIO    |  PA2     |  11  |  MDIO              | SMI Data Input/Output    |
- *    | RMII_REF_CLK |  PA1     |  11  |  nINT/REFCLK0      | Active Low interrupt Req |
- *    | NRST         |          |      |  rRST              |                          |
+ *    | RMII_REF_CLK |  PA1     |  11  |  nINT/REFCLK0      | 50 MHz REF_CLK           |
+ *    | NRST         |          |      |  rRST              | Reset                    |
  *    | OSC_25M      |          |      |  XTAL1/CLKIN       |                          |
  *
- * NOTE: PG2 is not listed as having a AF11 alternate function on datasheet!!!!!!!
+ * NOTE: PG2 is used as a GPIO input. This is the default.
  */
 
 static const GPIO_PinConfiguration pinconfig[] = {
@@ -449,8 +449,7 @@ static const GPIO_PinConfiguration pinconfig[] = {
    {  GPIOG,   14,      11, 2, 0, 3, 1, 0  },       //     ETH_RMII_TXD1
    {  GPIOC,   4,       11, 2, 0, 3, 1, 0  },       //     ETH_RMII_RXD0
    {  GPIOC,   5,       11, 2, 0, 3, 1, 0  },       //     ETH_RMII_RXD1
-//    There is a mismatch: AF0 according or AF11 according 
-//   {  GPIOG,   2,       11, 0, 0, 3, 1, 0  },       //     ETH_RMII_RXER     
+   {  GPIOG,   0,       11, 0, 0, 3, 1, 0  },       //     ETH_RMII_RXER     
    {  GPIOA,   7,       11, 2, 0, 3, 1, 0  },       //     ETH_RMII_CRS_DV
    {  GPIOC,   1,       11, 2, 0, 3, 1, 0  },       //     ETH_RMII_MDC
    {  GPIOA,   2,       11, 2, 0, 3, 1, 0  },       //     ETH_RMII_MDIO
@@ -509,7 +508,7 @@ uint32_t mAND,mOR; // Mask
     mOR  =   (ETH_OSPEED<<GPIO_OSPEEDR_OSPEEDR1_Pos)
             |(ETH_OSPEED<<GPIO_OSPEEDR_OSPEEDR2_Pos)
             |(ETH_OSPEED<<GPIO_OSPEEDR_OSPEEDR7_Pos);
-    GPIOA->OSPEEDR = (GPIOD->OSPEEDR&~mAND)|mOR;
+    GPIOA->OSPEEDR = (GPIOA->OSPEEDR&~mAND)|mOR;
 
     mAND =   GPIO_PUPDR_PUPDR1_Msk
             |GPIO_PUPDR_PUPDR2_Msk
@@ -517,7 +516,7 @@ uint32_t mAND,mOR; // Mask
     mOR  =   (ETH_PUPD<<GPIO_PUPDR_PUPDR1_Pos)
             |(ETH_PUPD<<GPIO_PUPDR_PUPDR2_Pos)
             |(ETH_PUPD<<GPIO_PUPDR_PUPDR7_Pos);
-    GPIOA->PUPDR   = (GPIOD->PUPDR&~mAND)|mOR;
+    GPIOA->PUPDR   = (GPIOA->PUPDR&~mAND)|mOR;
 
     mAND =   GPIO_OTYPER_OT1_Msk
             |GPIO_OTYPER_OT2_Msk
@@ -525,7 +524,7 @@ uint32_t mAND,mOR; // Mask
     mOR  =   (ETH_OTYPE<<GPIO_OTYPER_OT1_Pos)
             |(ETH_OTYPE<<GPIO_OTYPER_OT2_Pos)
             |(ETH_OTYPE<<GPIO_OTYPER_OT7_Pos);
-    GPIOA->OTYPER  = (GPIOD->OTYPER&~mAND)|mOR;
+    GPIOA->OTYPER  = (GPIOA->OTYPER&~mAND)|mOR;
 
     // Configure pins in GPIOC
     // 1/MDC  4/RXD0  5/RXD1
@@ -546,7 +545,7 @@ uint32_t mAND,mOR; // Mask
     mOR  =   (ETH_MODE<<GPIO_MODER_MODER1_Pos)
             |(ETH_MODE<<GPIO_MODER_MODER4_Pos)
             |(ETH_MODE<<GPIO_MODER_MODER5_Pos);
-    GPIOC->MODER   = (GPIOA->MODER&~mAND)|mOR;
+    GPIOC->MODER   = (GPIOC->MODER&~mAND)|mOR;
 
     mAND =   GPIO_OSPEEDR_OSPEEDR1_Msk
             |GPIO_OSPEEDR_OSPEEDR4_Msk
@@ -554,7 +553,7 @@ uint32_t mAND,mOR; // Mask
     mOR  =   (ETH_OSPEED<<GPIO_OSPEEDR_OSPEEDR1_Pos)
             |(ETH_OSPEED<<GPIO_OSPEEDR_OSPEEDR4_Pos)
             |(ETH_OSPEED<<GPIO_OSPEEDR_OSPEEDR5_Pos);
-    GPIOC->OSPEEDR = (GPIOD->OSPEEDR&~mAND)|mOR;
+    GPIOC->OSPEEDR = (GPIOC->OSPEEDR&~mAND)|mOR;
 
     mAND =   GPIO_PUPDR_PUPDR1_Msk
             |GPIO_PUPDR_PUPDR4_Msk
@@ -562,7 +561,7 @@ uint32_t mAND,mOR; // Mask
     mOR  =   (ETH_PUPD<<GPIO_PUPDR_PUPDR1_Pos)
             |(ETH_PUPD<<GPIO_PUPDR_PUPDR4_Pos)
             |(ETH_PUPD<<GPIO_PUPDR_PUPDR5_Pos);
-    GPIOC->PUPDR   = (GPIOD->PUPDR&~mAND)|mOR;
+    GPIOC->PUPDR   = (GPIOC->PUPDR&~mAND)|mOR;
 
     mAND =   GPIO_OTYPER_OT1_Msk
             |GPIO_OTYPER_OT4_Msk
@@ -570,18 +569,13 @@ uint32_t mAND,mOR; // Mask
     mOR  =   (ETH_OTYPE<<GPIO_OTYPER_OT1_Pos)
             |(ETH_OTYPE<<GPIO_OTYPER_OT4_Pos)
             |(ETH_OTYPE<<GPIO_OTYPER_OT5_Pos);
-    GPIOC->OTYPER  = (GPIOD->OTYPER&~mAND)|mOR;
+    GPIOC->OTYPER  = (GPIOC->OTYPER&~mAND)|mOR;
 
     // Configure pins in GPIOG
-    // 2/RXCVER  11/RXD0  13/RXD1  14
+    // 11/TX_EN  13/TXD0  14/TXD1
 
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOGEN;
 
-/*
- *   mAND =   GPIO_AFRH_AFRH2_Msk;
- *   mOR  =   (ETH_AF<<GPIO_AFRH_AFRH2_Pos);
- *   GPIOG->AFR[0]  = (GPIOC->AFR[0]&~mAND)|mOR;
- */
     mAND =   GPIO_AFRH_AFRH3_Msk
             |GPIO_AFRH_AFRH5_Msk
             |GPIO_AFRH_AFRH6_Msk;
@@ -598,7 +592,7 @@ uint32_t mAND,mOR; // Mask
             |(ETH_MODE<<GPIO_MODER_MODER11_Pos)
             |(ETH_MODE<<GPIO_MODER_MODER13_Pos)
             |(ETH_MODE<<GPIO_MODER_MODER14_Pos);
-    GPIOG->MODER   = (GPIOA->MODER&~mAND)|mOR;
+    GPIOG->MODER   = (GPIOG->MODER&~mAND)|mOR;
 
     mAND =   GPIO_OSPEEDR_OSPEEDR3_Msk
             |GPIO_OSPEEDR_OSPEEDR11_Msk
@@ -608,7 +602,7 @@ uint32_t mAND,mOR; // Mask
             |(ETH_OSPEED<<GPIO_OSPEEDR_OSPEEDR11_Pos)
             |(ETH_OSPEED<<GPIO_OSPEEDR_OSPEEDR13_Pos)
             |(ETH_OSPEED<<GPIO_OSPEEDR_OSPEEDR14_Pos);
-    GPIOG->OSPEEDR = (GPIOD->OSPEEDR&~mAND)|mOR;
+    GPIOG->OSPEEDR = (GPIOG->OSPEEDR&~mAND)|mOR;
 
     mAND =   GPIO_PUPDR_PUPDR3_Msk
             |GPIO_PUPDR_PUPDR11_Msk
@@ -618,7 +612,7 @@ uint32_t mAND,mOR; // Mask
             |(ETH_PUPD<<GPIO_PUPDR_PUPDR11_Pos)
             |(ETH_PUPD<<GPIO_PUPDR_PUPDR13_Pos)
             |(ETH_PUPD<<GPIO_PUPDR_PUPDR14_Pos);
-    GPIOG->PUPDR   = (GPIOD->PUPDR&~mAND)|mOR;
+    GPIOG->PUPDR   = (GPIOG->PUPDR&~mAND)|mOR;
 
     mAND =   GPIO_OTYPER_OT3_Msk
             |GPIO_OTYPER_OT11_Msk
@@ -628,7 +622,7 @@ uint32_t mAND,mOR; // Mask
             |(ETH_OTYPE<<GPIO_OTYPER_OT11_Pos)
             |(ETH_OTYPE<<GPIO_OTYPER_OT13_Pos)
             |(ETH_OTYPE<<GPIO_OTYPER_OT14_Pos);
-    GPIOG->OTYPER  = (GPIOD->OTYPER&~mAND)|mOR;
+    GPIOG->OTYPER  = (GPIOG->OTYPER&~mAND)|mOR;
 
 }
 

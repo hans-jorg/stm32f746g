@@ -23,48 +23,87 @@ The ETH interface
 The STM32F746 MCU has an interface (ETH) to an Ethernet controller with support to 10/100
  Mbps Ethernet (Ethernet/Fast Ethernet).
 
-The controller is compliant to the IEEE 803.3 standard. Furthermore, it is compatible to the
- IEEE 1588 precision network clock synchronization and to the Reduced Media Inde-
-pendent Interface (RMII) specification.
+The controller is compliant to:
 
-It needs a physical (PHY) interface provided by an Ethernet transceiver.
+* IEEE 802.3 standard (10/100 MHz)
+* IEEE 1588 precision network clock synchronization (PTP)
+* Media Independent Interface (MII) specification.
+* Reduced Media Independent Interface (RMII) specification.
 
-The ETH controller implements
+The main component of the Ethernet controller is the Media Access Control (MAC) interface.
+It gets data from the network and transfers it to the processor memory.
+To do this, the Ethernet controller has a builtin DMA controller. It does not use 
+the STM32F7xxx DMA controller. 
 
-* Station Management Interface (SMI): Serial interface to access PHY registers.
-* Media independent interface (MII): Interface between MCU and PHY.
-* Reduced media independent interface (RMII): Reduces the MII pin count.
+To bridge the pins of the Ethernet interface and the pins of MAC unit, an
+ external physical interface controller (PHY) is needed.
 
-Internally, it uses a 50 MHz clock signal.
+The Ethernet controller has two interface to such devices:
 
-The ETH interface has an integrated DMA controller.
+* Media Independent Interface (MII).
+* Reduced Media Independent Interface (RMII) 
+
+Furthermore , the ETH controller implements an additional communication mechanism
+to the PHY device, the Station Management Interface (SMI). It is a serial
+ interface to access PHY registers. It uses two signals:
+
+ * MDC: a clock signal with 2.5 MHz maximal frequency
+ * MDIO: a bidirectional data signal.
+
+
+The MII interface uses 17 pins (including MDC and MDIO) to communicate with the PHY device. 
+It needs two clock signals: TX_CLK and RX_CLK from the PHY device. Both are 2.5 MHz for 10 Mbps
+and 25 MHz for a 100 Mbps speed. The clock signal for the PHY device can be provided by the STM32F74xx
+thru the MCO pin.
+
+The RMII interface 9 pins (including MDC and MDIO). Among them, a REF_CLK signal, that must be a 
+50 MHz signal provided by an external source and shared by the MAC interface and the PHY device.
+Some PHY devices can generate the 50 MHz using a PLL.
 
 It can generate interrupts with IRQ 68 (69 for wake-up).
 
 The Ethernet interface on the STM32F746 Discovery board
 -------------------------------------------------------
 
-The Ethernet interface uses the Microchip LAN8742A Ethernet Transceiver and the HR961160C connector
- with embedded transformers and LEDs.
- 
+The Ethernet interface uses as PHY device the Microchip LAN8742A Ethernet Transceiver.
+The connector is a HR961160C connector with embedded transformers and LEDs.
+
+The LAN8742A can work in two clock modes:
+
+* *REF_CLK In Mode (nINT)*: The nINT pin is an interrupt generator or a 
+* *REF_CLK Out Mode*: 
+
 The transceiver uses a 25 MHz clock sourced by the same oscillator used by the MCU.
+But the MAC and PHY devices need a 50 MHz clock signal.
+
+This is configured by the value at nINTSEL pin at Power On Reset (POR). By default, 
+it is configured to nINT mode by a pull-up resistor. In this case, the nINT/REFCLKO pin 
+is used by the PHY device to generate interrupts on the STM32F74xx and 
+the 50 MHz REF_CLK signal must be generated externally and feed to the XTAL1/CLKIN pin.
+When nINTSEL is pulled down, the nINT/REFCLKO pin is used to output the 50 MHz REFCLKO 
+signal, that is generated internally from the 25 MHz XTAL or CLKIN clock signal.
+In this case, the LAN8742 can not use the nINT pin to generate interrupts. 
+The interrupt signal can be routed to the LED1 or LED2 pins, by XXXXXXXx.
+But in the STM32F746 Discovery board, the LED1 and LED2 signals are used to
+control the LEDs in the RJ45 connector. So the PHY device in the STM32F746 can
+ not generate interrupts.
 
 The Ethernet interface uses the MCU pins below.
 
-| Board Signal | MCU Pin  |  TRX Pin           | Description              |
-|--------------|----------|--------------------|--------------------------|
-| RMII_TX_EN   |  PG11    |  TXEN              | Transmit Enable          |
-| RMII_TXD0    |  PG13    |  TXD0              | Transmit Data 0          |
-| RMII_TXD1    |  PG14    |  TXD1              | Transmit Data 1          |
-| RMII_RXD0    |  PC4     |  RXD0/MODE0        | Receive Data 0           |
-| RMII_RXD1    |  PC5     |  RDD1/MODE1        | Receive Data 1           |
-| RMII_RXER    |  PG2     |  RXER/PHYAD0       | Receive Error            |
-| RMII_CRS_DV  |  PA7     |  CRS_DV/MODE2      | Carrier Sense/Data Valid |
-| RMII_MDC     |  PC1     |  MDC               | SMI Clock                |
-| RMII_MDIO    |  PA2     |  MDIO              | SMI Data Input/Output    |
-| RMII_REF_CLK |  PA1     |  nINT/REFCLK0      | Active Low interrupt Req |
-| NRST         |          |  rRST              |                          |
-| OSC_25M      |          |  XTAL1/CLKIN       |                          |
+| Board Signal | MCU Pin  |  PHY  Pin           | Description                |
+|--------------|----------|--------------------|-----------------------------|
+| RMII_TX_EN   |  PG11    |  TXEN              | Transmit Enable             |
+| RMII_TXD0    |  PG13    |  TXD0              | Transmit Data 0             |
+| RMII_TXD1    |  PG14    |  TXD1              | Transmit Data 1             |
+| RMII_RXD0    |  PC4     |  RXD0/MODE0        | Receive Data 0              |
+| RMII_RXD1    |  PC5     |  RDD1/MODE1        | Receive Data 1              |
+| RMII_RXER    |  PG2     |  RXER/PHYAD0       | Receive Error               |
+| RMII_CRS_DV  |  PA7     |  CRS_DV/MODE2      | Carrier Sense/Data Valid    |
+| RMII_MDC     |  PC1     |  MDC               | SMI Clock                   |
+| RMII_MDIO    |  PA2     |  MDIO              | SMI Data Input/Output       |
+| RMII_REF_CLK |  PA1     |  nINT/REFCLK0      | 50 MHz REF_CLK clock signal |
+| NRST         |          |  rRST              | Reset signal                |
+| OSC_25M      |          |  XTAL1/CLKIN       | 25 MHz clock signal         |
 
 
 The pin usage is shown below.
