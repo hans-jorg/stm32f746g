@@ -591,7 +591,9 @@ DEPFLAGS=-MT $@  -MMD -MP -MF ${OBJDIR}/$*.d
 # Linker script
 #
 #LINKERSCRIPT=${PROGNAME}.ld
-LINKERSCRIPT=${shell echo ${PART}| tr A-Z a-z}.ld
+#LINKERSCRIPT=${shell echo ${PART}| tr A-Z a-z}.ld
+LINKERSCRIPT=stm32f746-disco.ld
+
 
 #
 # Entry Point
