@@ -30,7 +30,7 @@
  *
  * @note    DTCMRAM+SRAM1+SRAM2 forms a 320 KB contiguous area
  *
- * @note External memories of STM32F746G Discovery Board
+ * @note    External memories of STM32F746G Discovery Board
  *
  * EXTRAM       | 8 MB   | 0xC000_0000-0xC07F_FFFF
  * EXTFLASH     | 16 MB  | 0x9000_0000-0x90FF_FFFF (QSPI)
@@ -45,7 +45,7 @@ MEMORY
      *AXIMFLASH (rx)   : ORIGIN = 0x08000000, LENGTH = 1024K
      */
     FLASH (rx)         : ORIGIN = 0x00200000, LENGTH = 1024K
-    /* Contiguous RAM
+    /* System RAM (Contiguous)
      *DTCMRAM (rwx)    : ORIGIN = 0x20000000, LENGTH = 64K
      *SRAM1 (rwx)      : ORIGIN = 0x20010000, LENGTH = 240K
      *SRAM2 (rwx)      : ORIGIN = 0x2004C000, LENGTH = 16K
@@ -82,40 +82,38 @@ HEAP_SIZE              =     0x400;
 
 
 /*
- * Sections for C
- * .text        : instructions (code area)
- * .data        : initialized data Must be stored in flash and moved to RAM
- * .bss         : non initialized data
- * .stack       : just a pointer to end of RAM (Stack grows downward)
+ * Standard Sections for C
+ * .text        : Instructions (code area)
+ * .data        : Initialized data Must be stored in flash and moved to RAM
+ * .bss         : Non initialized data
+ * .stack       : Just a pointer to end of RAM (The stack grows downward)
  *
- *  isr_vector  : non standard section to make the vector table appear
+ * Non standard sections for C
+ * .isr_vector  : non standard section to make the vector table appear
  *                at the begin of RAM
  *
- *  sdram       : area in external SDRAM (only non initialized data)
+ * .sdram       : area in external SDRAM (only non initialized data)
  *
  * There are additional sectors for C++ (Not tested)
- *
- *
  */
 
 SECTIONS
 {
   _text       = ORIGIN(FLASH);
-  _text_start = ORIGIN(FLASH);         /* remember start of text (code area) */
-    .text :   
-    {   
+  _text_start = ORIGIN(FLASH);     /* Remember start of text (code area) */
+  .text :   
+  {   
+    KEEP(*(.isr_vector))           /* Must appear at the beginning */
+      .            = ALIGN(4);   
+      *(.text*)                    /* Instructions follow */
+      .            = ALIGN(4);   
+      *(.rodata*)                  /* Constants follow immediatly */
+      .            = ALIGN(4);   
    
-     KEEP(*(.isr_vector))              /* Must appear at the beginning */
-          .            = ALIGN(4);   
-          *(.text*)                    /* Instructions follow */
-          .            = ALIGN(4);   
-          *(.rodata*)                  /* Constants follow immediatly */
-          .            = ALIGN(4);   
-   
-    } > FLASH                          /* All in flash memory */
+  } > FLASH                        /* All in flash memory */
   .                    = ALIGN(4);   
-  _text_end            = .;            /* Remember end of text */
-  _etext               = .;
+  _text_end            = .;        /* Remember end of text */
+  _etext               = .;        /* Alias */
 
 
     /*
@@ -127,17 +125,16 @@ SECTIONS
 
     .data :
     {
-          .            = ALIGN(4);
-          _data        = .;
-          _data_start  = .;            /* remember start of data area */
-          *(.data*)
-          .            = ALIGN(4);
-          *(vtable)                    /* vtables are used by C++ */
-          .            = ALIGN(4);
-          _data_end    = .;            /* remember end of data area */
-          _edata       = .;            /* alias for data_end */
-
-    } > SRAM  AT>FLASH                 /* linked for RAM but with a copy in flash
+      .            = ALIGN(4);
+      _data        = .;
+      _data_start  = .;            /* remember start of data area */
+      *(.data*)
+      .            = ALIGN(4);
+      *(vtable)                    /* vtables are used by C++ */
+      .            = ALIGN(4);
+      _data_end    = .;            /* remember end of data area */
+      _edata       = .;            /* alias for data_end  
+    } > SRAM  AT>FLASH             /* linked for RAM but with a copy in flash
 
     /*
      * Non initialized data is in RAM.
@@ -145,15 +142,15 @@ SECTIONS
      */
     .bss :
     {
-          .            = ALIGN(4);
-          _bss         = .;
-          _bss_start   = .;            /* remember start of bss area */
-          *(.bss.*)                    /* non initialized data */
-          *(COMMON)                    /* maybe fortran (not tested) */
-          .            = ALIGN(4);
-          _bss_end     = .;            /* remember end of area */
-          _ebss        = .;            /* alias for bss_end */
-          HEAP_START   = .;
+      .            = ALIGN(4);
+      _bss         = .;
+      _bss_start   = .;            /* remember start of bss area */
+      *(.bss.*)                    /* non initialized data */
+      *(COMMON)                    /* maybe fortran (not tested) */
+      .            = ALIGN(4);
+      _bss_end     = .;            /* remember end of area */
+      _ebss        = .;            /* alias for bss_end */
+      HEAP_START   = .;
     } > SRAM
 
     /*
@@ -161,13 +158,13 @@ SECTIONS
      */
     .sdram :
     {
-        .              = ALIGN(4);
-        _sdram         = .;
-        _sdram_start   = .;            /* remember start of sdram area */
-        *(.sdram.*)                    /* non initialized data */
-        .              = ALIGN(4);
-        _sdram_end     = .;            /* remember end of area */
-        _esdram        = .;            /* alias for _sdram_end */
+      .              = ALIGN(4);
+      _sdram         = .;
+      _sdram_start   = .;          /* remember start of sdram area */
+      *(.sdram.*)                  /* non initialized data */
+      .              = ALIGN(4);
+      _sdram_end     = .;          /* remember end of area */
+      _esdram        = .;          /* alias for _sdram_end */
     } > EXTRAM
 
     /*
