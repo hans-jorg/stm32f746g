@@ -36,6 +36,6 @@ int SDRAM_Init();
  *          of the 32 bits are used.
  */
 
-#define SDRAM_SIZE               0x0800000
+#define SDRAM_SIZE               0x00800000
 
 #endif
