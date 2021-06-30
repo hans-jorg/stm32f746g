@@ -11,10 +11,12 @@
 
 
  /**
- * @note Memory map for STM32F746NG Flash memory
+ * @note    Memory map for STM32F746NG Flash memory. The same memory can be 
+ *          accessed thru two different buses.
  *
  * ITCMFLASH    | 1 MB    | 0x0020_0000-0x002F_FFFF
- * AXIMFLASH    | 1 MB    | 0x0080_0000-0x008F_FFFF
+ * AXIMFLASH    | 1 MB    | 0x0800_0000-0x080F_FFFF
+ *
  *
  * @note    Memory map for STM32F746NG RAM memory
  *
@@ -31,10 +33,7 @@
  * @note External memories of STM32F746G Discovery Board
  *
  * EXTRAM       | 8 MB    | 0xC000_0000-0xC07F_FFFF
- * EXTFLASH     | 16 MB   | 0x6000_0000-0x60FF_FFFF (Read only)
- *
- *
- * @note    This is the same memory accessed thru different buses
+ * EXTFLASH     | 16 MB   | 0x9000_0000-0x90FF_FFFF (QSPI)
  *
  ******************************************************************************/
 
@@ -43,8 +42,8 @@ MEMORY
 {
     /* Choose one of them and rename to FLASH
      *ITCMFLASH (rx)   : ORIGIN = 0x00200000, LENGTH = 1024K
-     *AXIMFLASH (rx)   : ORIGIN = 0x00800000, LENGTH = 1024K
-    */
+     *AXIMFLASH (rx)   : ORIGIN = 0x08000000, LENGTH = 1024K
+     */
     FLASH (rx)         : ORIGIN = 0x00200000, LENGTH = 1024K
     /* Contiguous RAM
      *DTCMRAM (rwx)    : ORIGIN = 0x20000000, LENGTH = 64K
@@ -57,7 +56,7 @@ MEMORY
     BACKUPRAM (rwx)    : ORIGIN = 0x40024000, LENGTH = 4K
     /* External memories on the discovery board */
     EXTRAM(rwx)        : ORIGIN = 0xC0000000, LENGTH = 8M
-    EXTFLASH(rx)       : ORIGIN = 0x60000000, LENGTH = 16M
+    EXTFLASH(rx)       : ORIGIN = 0x90000000, LENGTH = 16M
     
 
 };
