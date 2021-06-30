@@ -1,8 +1,8 @@
 /**
- * @file     stm32l476.ld
+ * @file     stm32l476-disco.ld
  * @brief    loader script compatible with CMSIS
- * @version  V1.0
- * @date     05/10/2020
+ * @version  V1.1
+ * @date     06/30/2021
  *
  * @author   Hans
  *
@@ -32,8 +32,8 @@
  *
  * @note External memories of STM32F746G Discovery Board
  *
- * EXTRAM       | 8 MB    | 0xC000_0000-0xC07F_FFFF
- * EXTFLASH     | 16 MB   | 0x9000_0000-0x90FF_FFFF (QSPI)
+ * EXTRAM       | 8 MB   | 0xC000_0000-0xC07F_FFFF
+ * EXTFLASH     | 16 MB  | 0x9000_0000-0x90FF_FFFF (QSPI)
  *
  ******************************************************************************/
 
