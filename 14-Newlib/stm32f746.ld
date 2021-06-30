@@ -26,7 +26,7 @@
  * @note Memory map for STM32F746NG Flash memory
  *
  * ITCMFLASH    | 1 MB    | 0x0020_0000-0x002F_FFFF
- * AXIMFLASH    | 1 MB    | 0x0080_0000-0x008F_FFFF
+ * AXIMFLASH    | 1 MB    | 0x0800_0000-0x080F_FFFF
  *
  * @note    This is the same memory accessed thru different buses
  *
@@ -37,7 +37,7 @@ MEMORY
 {
     /* Choose one of them and rename to FLASH
      *ITCMFLASH (rx)   : ORIGIN = 0x00200000, LENGTH = 1024K
-     *AXIMFLASH (rx)   : ORIGIN = 0x00800000, LENGTH = 1024K
+     *AXIMFLASH (rx)   : ORIGIN = 0x08000000, LENGTH = 1024K
     */
     FLASH (rx)         : ORIGIN = 0x00200000, LENGTH = 1024K
     /* Contiguous RAM
