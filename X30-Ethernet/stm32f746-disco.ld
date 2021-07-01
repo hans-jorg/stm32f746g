@@ -116,64 +116,64 @@ SECTIONS
   _etext               = .;        /* Alias */
 
 
-    /*
-     * Initialized data must be in RAM but the initial values must be stored in flash
-     * and copied to RAM at start of execution
-     *
-     * The specification > SRAM AT>FLASH tells the linker to put a copy in the flash
-     */
+  /*
+    * Initialized data must be in RAM but the initial values must be stored in flash
+    * and copied to RAM at start of execution
+    *
+    * The specification > SRAM AT>FLASH tells the linker to put a copy in the flash
+    */
 
-    .data :
-    {
-      .            = ALIGN(4);
-      _data        = .;
-      _data_start  = .;            /* remember start of data area */
-      *(.data*)
-      .            = ALIGN(4);
-      *(vtable)                    /* vtables are used by C++ */
-      .            = ALIGN(4);
-      _data_end    = .;            /* remember end of data area */
-      _edata       = .;            /* alias for data_end  
-    } > SRAM  AT>FLASH             /* linked for RAM but with a copy in flash
+  .data :
+  {
+    .            = ALIGN(4);
+    _data        = .;
+    _data_start  = .;            /* remember start of data area */
+    *(.data*)
+    .            = ALIGN(4);
+    *(vtable)                    /* vtables are used by C++ */
+    .            = ALIGN(4);
+    _data_end    = .;            /* remember end of data area */
+    _edata       = .;            /* alias for data_end  */
+  } > SRAM  AT>FLASH             /* linked for RAM but with a copy in flash
 
-    /*
-     * Non initialized data is in RAM.
-     * Must be zeroed at startup
-     */
-    .bss :
-    {
-      .            = ALIGN(4);
-      _bss         = .;
-      _bss_start   = .;            /* remember start of bss area */
-      *(.bss.*)                    /* non initialized data */
-      *(COMMON)                    /* maybe fortran (not tested) */
-      .            = ALIGN(4);
-      _bss_end     = .;            /* remember end of area */
-      _ebss        = .;            /* alias for bss_end */
-      HEAP_START   = .;
-    } > SRAM
+  /*
+    * Non initialized data is in RAM.
+    * Must be zeroed at startup
+    */
+  .bss :
+  {
+    .            = ALIGN(4);
+    _bss         = .;
+    _bss_start   = .;            /* remember start of bss area */
+    *(.bss.*)                    /* non initialized data */
+    *(COMMON)                    /* maybe fortran (not tested) */
+    .            = ALIGN(4);
+    _bss_end     = .;            /* remember end of area */
+    _ebss        = .;            /* alias for bss_end */
+    HEAP_START   = .;
+  } > SRAM
 
-    /*
-     * only non initialized data in external sdram (EXTRAM)
-     */
-    .sdram :
-    {
-      .              = ALIGN(4);
-      _sdram         = .;
-      _sdram_start   = .;          /* remember start of sdram area */
-      *(.sdram.*)                  /* non initialized data */
-      .              = ALIGN(4);
-      _sdram_end     = .;          /* remember end of area */
-      _esdram        = .;          /* alias for _sdram_end */
-    } > EXTRAM
+  /*
+    * only non initialized data in external sdram (EXTRAM)
+    */
+  .sdram (NOLOAD) :
+  {
+    .              = ALIGN(4);
+    _sdram         = .;
+    _sdram_start   = .;          /* remember start of sdram area */
+    *(.sdram.*)                  /* non initialized data */
+    .              = ALIGN(4);
+    _sdram_end     = .;          /* remember end of area */
+    _esdram        = .;          /* alias for _sdram_end */
+  } > EXTRAM
 
-    /*
-     * Stack
-     */
-    .stack :
-    {
+  /*
+    * Stack
+    */
+  .stack :
+  {
 
-    } > SRAM
+  } > SRAM
 
 
 }

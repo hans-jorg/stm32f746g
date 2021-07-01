@@ -187,7 +187,7 @@ TERMAPP=gnome-terminal
 #
 TTYTERM=/dev/ttyACM0
 TTYBAUD=9600
-TTYBAUD=115200
+
 
 #
 # Serial terminal emulator
@@ -598,6 +598,7 @@ usage:
 	@echo " nemiver:    enter a debug session using nemiver (GUI)"
 	@echo " tui:        enter a debug session using gdb in text UI"
 	@echo "doxygen:     generate doc files (alias=docs)"
+	@echo "term:        starts a new window with a terminal connected to board"
 	@echo "clean:       clean all generated files"
 	@echo "help:        print options (default)"
 
@@ -848,6 +849,13 @@ cproto:
 cflow:
 	(cflow ${CFLOWFLAGS} -D${PART} ${addprefix -I ,${INCLUDEPATH}} ${SRCFILES} 2>&1} | egrep -v "^cflow"
 
+
+#
+#
+# opens a window with a terminal
+#
+term:
+	${TERMAPP} -- ${TTYPROG}  ${TTYPARMS} 
 
 #
 # These labels are not files !!!
