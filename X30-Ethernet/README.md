@@ -13,15 +13,29 @@ To have a working TCP/IP connection a set of requisites must be attended.
 * A software implementation of the TCP/IP stack over Ethernet
 
 
-The software implementation of a TCP/IP stack is a daunting task, specially, in a embedded system, 
-that generally has constrained resources (performance, memory).
+The software implementation of a TCP/IP stack is a daunting task, specially,   
+in a embedded system, that generally has constrained resources 
+(performance, memory).
+
+The Light-Weight IP (lwIP) library is a library tailored for such systems.
+
+
+
+> NOTE: Since the STM32F7xx micro-controllers have a L1 cache, special care must 
+> be taken to write software for device that have Direct Memory Capabilities 
+> (DMA). Writing to a memory position or reading from it do not mean that you 
+> get the memory contents. See below for the cache handling.
+
+Initialization
+--------------
+
 
 
 The ETH interface 
 -----------------
 
-The STM32F746 MCU has an interface (ETH) to an Ethernet controller with support to 10/100
- Mbps Ethernet (Ethernet/Fast Ethernet).
+The STM32F746 MCU has an interface (ETH) to an Ethernet controller with 
+support to 10/100 Mbps Ethernet (Ethernet/Fast Ethernet).
 
 The controller is compliant to:
 
@@ -30,10 +44,10 @@ The controller is compliant to:
 * Media Independent Interface (MII) specification.
 * Reduced Media Independent Interface (RMII) specification.
 
-The main component of the Ethernet controller is the Media Access Control (MAC) interface.
-It gets data from the network and transfers it to the processor memory.
-To do this, the Ethernet controller has a builtin DMA controller. It does not use 
-the STM32F7xxx DMA controller. 
+The main component of the Ethernet controller is the Media Access Control (MAC)
+interface. It gets data from the network and transfers it to the processor 
+memory. To do this, the Ethernet controller has a builtin DMA controller. It does 
+not use the STM32F7xxx general purpose DMA controller. 
 
 To bridge the pins of the Ethernet interface and the pins of MAC unit, an
  external physical interface controller (PHY) is needed.
@@ -61,6 +75,72 @@ The RMII interface 9 pins (including MDC and MDIO). Among them, a REF_CLK signal
 Some PHY devices can generate the 50 MHz using a PLL.
 
 It can generate interrupts with IRQ 68 (69 for wake-up).
+
+
+
+Cache handling
+--------------
+
+The STM32F746 has a L1 cache splitted in two separated caches:
+
+* Data cache (D-cache)
+* Instruction cache (I-Cache)
+
+Both are 32 bytes wide and 4 KBytes large.
+
+
+
+The ETH controller has an independent DMA unit. It does not use the General 
+Purpose DMA controller available in the STM32F746 devices.
+
+The communication between the CPU and the ETH controller happens thru:
+
+* Registers mapped in a non cacheable memory region
+* Descriptors stored in RAM memory and accessed/updated by the CPU and the ETH controller.
+
+The STM32F746 has many builtin RAM units.
+
+| RAM     | Size   | Address range           |                                  |
+|---------|--------|-------------------------|----------------------------------|
+| SRAM1   | 240 KB | 0x2001_0000-0x2004_BFFF | System RAM 1                     |
+| SRAM2   |  16 KB | 0x2004_C000-0x2004_FFFF | System RAM 2                     |
+| DTCMRAM |  64 KB | 0x2000_0000-0x2000_FFFF | Data Tightly Coupled RAM         | 
+| ITCMRAM |  16 KB | 0x0000_0000-0x0000_3FFF | Instruction Tightly Coupled RAM  |
+| BKPSRAM |   4 KB | 0x4002_4000-0x4002_4FFF | Battery backup RAM               |
+
+Different memory regions have 
+
+| RAM      | Attributes                      |
+|----------|---------------------------------|
+| SRAM1    | Cacheable, Write-Through        |
+| SRAM2    | Cacheable, Write-Through 
+| DTCMRAM  | Non cacheable
+| ITCMRAM  | Non cacheable, non shareable    |
+
+
+
+> NOTE: The two default regions of SDRAM banks are not cacheable. So even if the cache is
+enabled, the data or instructions will not go through the cache. To benefit from the cache
+acceleration, the SDRAM banks can be remapped from 0xC000 0000 and 0xD000 0000 to
+0x6000 0000 and 0x7000 0000 respectively, which are, by default, cacheable regions. This
+is done by setting the field SWP_FMC [1:0] = 01 in the SYSCFG_MEMRMP register. If the
+remapping is not suitable for the application, the Cortex ® -M7 MPU can be used to modify
+the propriety of the default SDRAM memory region to be cacheable. (AN4667)
+
+The cache coherency problem consists of one device (CPU) accessing one content 
+and other device (DMA) accessing other content from the same memory address. 
+This occurs when one device access the memory thru a cache and uses the information
+in cache for the information in memory.
+
+When allocating buffers and descriptors for the ETH controller, there are 
+the following alternatives:
+
+* Disable D-Cache (with a performance penalty).
+* Set a write
+* Use normal memory and use cache clean and invalidate before access and clean after.
+* Use non cacheable regions for buffers and descriptors.
+* Use the MPU to make the memory area used for buffers and descriptors non-cacheable.
+
 
 The Ethernet interface on the STM32F746 Discovery board
 -------------------------------------------------------
@@ -122,7 +202,6 @@ The pin usage is shown below.
 |  PA1   |   ETH_RMII_REFCLK     | 11 |              |  
 |        |   nRST                |    |              | 
 |        |   XTAL1/CLKIN         |    |              |
-
 
 
 
@@ -587,7 +666,8 @@ References
 7. [LwIP Wiki](https://lwip.fandom.com/wiki/LwIP_Wiki)
 8. [Porting For Bare Metal](https://lwip.fandom.com/wiki/Porting_For_Bare_Metal)
 9. [AN3966 LwIP TCP/IP stack demonstration for STM32F4x7](https://www.st.com/resource/en/application_note/dm00036052-lwip-tcpip-stack-demonstration-for-stm32f4x7-microcontrollers-stmicroelectronics.pdf)
-
-
-
-
+10. [Porting Drivers to the STM32F7](https://cwiki.apache.org/confluence/display/NUTTX/Porting+Drivers+to+the+STM32+F7)
+11. [AN4839-Level 1 cache on STM32F7 Series and STM32H7 Series](https://www.st.com/resource/en/application_note/dm00272913-level-1-cache-on-stm32f7-series-and-stm32h7-series-stmicroelectronics.pdf)
+12. [AN4667-STM32F7 Series system architecture and performance](https://www.st.com/resource/en/application_note/dm00169764-stm32f7-series-system-architecture-and-performance-stmicroelectronics.pdf)
+13. [Web Server with a STM32F746](https://github.com/khoih-prog/EthernetWebServer_STM32)
+14. [Level 1 cache on STM32F7 Series and STM32H7 Series](http://www.st.com/content/ccc/resource/technical/document/application_note/group0/08/dd/25/9c/4d/83/43/12/DM00272913/files/DM00272913.pdf/jcr:content/translations/en.DM00272913.pdf)

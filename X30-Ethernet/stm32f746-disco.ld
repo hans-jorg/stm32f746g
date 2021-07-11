@@ -20,8 +20,8 @@
  *
  * @note    Memory map for STM32F746NG RAM memory
  *
- *  DTCMRAM     |  64 KB | 0x2000_0000-0x2000_FFFF
- *  SRAM1       | 240 KB | 0x2001_0000-0x2004_BFFF
+ *  DTCMRAM     |  64 KB | 0x2000_0000-0x2000_FFFF     |  o-wait states
+ *  SRAM1       | 240 KB | 0x2001_0000-0x2004_BFFF     |
  *  SRAM2       |  16 KB | 0x2004_C000-0x2004_FFFF
  *  Subtotal    | 320 KB |
  *  ITCMRAM     |  16 KB | 0x0000_0000-0x0000_3FFF
@@ -32,8 +32,8 @@
  *
  * @note    External memories of STM32F746G Discovery Board
  *
- * EXTRAM       | 8 MB   | 0xC000_0000-0xC07F_FFFF
- * EXTFLASH     | 16 MB  | 0x9000_0000-0x90FF_FFFF (QSPI)
+ * SDRAM        | 8 MB   | 0xC000_0000-0xC07F_FFFF
+ * QSPIFLASH    | 16 MB  | 0x9000_0000-0x90FF_FFFF (QSPI)
  *
  ******************************************************************************/
 
@@ -50,13 +50,14 @@ MEMORY
      *SRAM1 (rwx)      : ORIGIN = 0x20010000, LENGTH = 240K
      *SRAM2 (rwx)      : ORIGIN = 0x2004C000, LENGTH = 16K
      */
-    SRAM (rwx)         : ORIGIN = 0x20000000, LENGTH = 320K
+    DTCMRAM (rwx)      : ORIGIN = 0x20000000, LENGTH = 64K
+    SRAM (rwx)         : ORIGIN = 0x20010000, LENGTH = 256K
     /* Extra RAM */
     ITCMRAM (rwx)      : ORIGIN = 0x00000000, LENGTH = 16K
     BACKUPRAM (rwx)    : ORIGIN = 0x40024000, LENGTH = 4K
     /* External memories on the discovery board */
-    EXTRAM(rwx)        : ORIGIN = 0xC0000000, LENGTH = 8M
-    EXTFLASH(rx)       : ORIGIN = 0x90000000, LENGTH = 16M
+    SDRAM(rwx)         : ORIGIN = 0xC0000000, LENGTH = 8M
+    QSPIFLASH(rx)      : ORIGIN = 0x90000000, LENGTH = 16M
     
 
 };
@@ -66,10 +67,10 @@ _ram_start             =     ORIGIN(SRAM);
 _ram_end               =     ORIGIN(SRAM) + LENGTH(SRAM)-1;
 _flash_start           =     ORIGIN(FLASH);
 _flash_end             =     ORIGIN(FLASH) + LENGTH(FLASH)-1;
-_extram_start          =     ORIGIN(EXTRAM);
-_extram_end            =     ORIGIN(EXTRAM) + LENGTH(EXTRAM)-1;
-_extflash_start        =     ORIGIN(EXTFLASH);
-_extflash_end          =     ORIGIN(EXTFLASH) + LENGTH(EXTFLASH)-1;
+_sdram_start           =     ORIGIN(SDRAM);
+_sdram_end             =     ORIGIN(SDRAM) + LENGTH(SDRAM)-1;
+_qspiflash_start       =     ORIGIN(QSPIFLASH);
+_qspiflash_end         =     ORIGIN(QSPIFLASH) + LENGTH(QSPIFLASH)-1;
 /* Stack definition. Actually not neccessary    */
 STACK_SIZE             =     4K;
 STACK_BASE             =     ORIGIN(SRAM) + LENGTH(SRAM) - STACK_SIZE;
@@ -160,12 +161,32 @@ SECTIONS
   {
     .              = ALIGN(4);
     _sdram         = .;
-    _sdram_start   = .;          /* remember start of sdram area */
-    *(.sdram.*)                  /* non initialized data */
+    _sdrambss_start   = .;          /* remember start of sdram area */
+    *(.sdram*)                      /* non initialized data */
     .              = ALIGN(4);
-    _sdram_end     = .;          /* remember end of area */
+    _sdrambss_end     = .;          /* remember end of area */
     _esdram        = .;          /* alias for _sdram_end */
-  } > EXTRAM
+  } > SDRAM
+
+  .dtcmram (NOLOAD) :
+  {
+    .              = ALIGN(4);
+    _dtcm_start    = .;
+    *(.dtcm.*)
+    .              = ALIGN(4);
+    _dtcm_end      = .;
+    _dtcmram       = .;
+  } > DTCMRAM
+
+  .itcmram (NOLOAD) :
+  {
+    .              = ALIGN(4);
+    _itcm_start    = .;
+    *(.itcm.*)
+    .              = ALIGN(4);
+    _itcm_end      = .;
+    _itcmram       = .;
+  } > ITCMRAM
 
   /*
     * Stack

@@ -236,7 +236,7 @@ int e10 = 1;
  *
  * @note    print a memory dump
  */
-static int
+void
 hexdump(void *area, int size, unsigned addr) {
 unsigned offset;
 unsigned a = addr;
@@ -264,7 +264,7 @@ int i;
         putchar('\n');
         a += 16;
     }
-    return 0;
+    return;
 }
 
 
@@ -380,12 +380,11 @@ static struct netif     netif;
 void Network_Init(void) {
 err_t err;
 
-    MESSAGE("Initialing lwip");
+    MESSAGE("Initialing lwip\n");
     lwip_init();
-/*
-    test_netif_init
- */
+
     MESSAGE("Initializing interface\n");
+
 #if LWIP_DHCP
     ipaddr.addr  = 0;
     netmask.addr = 0;
@@ -397,16 +396,26 @@ err_t err;
                 &gateway, 
                 NULL, 
                 stnetif_init, 
-                ethernet_input);
+                ethernet_input
+                );
+
+    netif_set_default(&netif);
+    netif_set_link_up(&netif);
+
+    if( netif_is_link_up(&netif) ) {
+        MESSAGE("Link is up\n");
+        netif_set_up(&netif);
+    } else {
+        netif_set_down(&netif);
+        MESSAGE("Link is down\n");
+    }
 
     netif_set_status_callback(&netif, stnetif_status_callback);
     netif_set_link_callback(&netif, stnetif_link_callback);
     //netif_set_remove_callback(&netif,0);
     
-    netif_set_default(&netif);
-    netif_set_link_up(&netif);
+    //netif_set_link_up(&netif);
     netif_set_up(&netif);
-
 
 #if LWIP_DHCP
     MESSAGE("Starting DHCP\n");
@@ -442,7 +451,6 @@ err_t err;
     httpd_init();
 #endif
 
-
 }
 
 /**
@@ -453,7 +461,11 @@ err_t err;
  */
 void Network_Process(void) {
 
+    // Print status (for debug)
+    //stnetif_printstatus();
+
     //LWIP_CheckLink();
+    stnetif_link(&netif);
 
     stnetif_input(&netif);
             
@@ -468,6 +480,7 @@ void Network_Process(void) {
     // could call netif_poll twice for netif
     netif_poll_all();
 #endif
+
 }
 
 ///////////////////// Main Function ///////////////////////////////////////////////////////////////
@@ -481,7 +494,7 @@ int main(void) {
 err_t rc;
 
     // Disable buffering for stdout (Trying)
-    setvbuf(stdout, NULL,_IONBF, 0);
+    //setvbuf(stdout, NULL,_IONBF, 0);
 
     message("Starting.at %ld KHz...\n",SystemCoreClock/1000);
 
@@ -497,13 +510,18 @@ err_t rc;
     printf("Starting SDRAM\n");
     SDRAM_Init();
 
+#if 1
     message("Initializing LWIP\n");
     Network_Init();
-
+ #endif
     // Entering Main loop
+    int cnt = 0;
     while(1) {
-        Network_Process();
 
+        Network_Process();
+        int x = 1<<24;
+        while(x--) {}
+        printf("%d\n",cnt++);
         // Application code here
     }
 }

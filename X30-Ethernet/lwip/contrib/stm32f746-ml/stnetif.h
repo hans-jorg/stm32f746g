@@ -36,5 +36,6 @@ void stnetif_status_callback(struct netif *netif);
 void stnetif_remove_callback(struct netif *netif);
 #endif
 
-
+// For debug
+void stnetif_printstatus(void);
 #endif

@@ -657,7 +657,6 @@ usage:
 	@echo " tui:        enter a debug session using gdb in text UI"
 	@echo "doxygen:     generate doc files (alias=docs)"
 	@echo "term:        starts a new window with a terminal connected to board"
-	@echo "term:        starts a new window with a terminal connected to board"
 	@echo "clean:       clean all generated files"
 	@echo "help:        print options"
 
@@ -679,6 +678,8 @@ clean:
 ${OBJDIR}/${PROGNAME}.bin: ${OBJDIR} ${OBJDIR}/${PROGNAME}.axf
 	@echo "  Generating binary ${@}"
 	${OBJCOPY} -O binary  ${OBJDIR}/${PROGNAME}.axf ${@}
+	@echo "  Size is " "` stat --format=\"%s\" $@`" " bytes"
+
 
 #
 # The rule for linking the application.
@@ -806,6 +807,10 @@ gdbserver-cube: gdbinit-cube
 #
 # Debugger initialization scripts
 #
+${GDBINIT}: gdbinit-stutil
+	@echo "GDB Init criado"
+
+
 gdbinit-stutil: FORCE
 	echo "# Run this script using gdb source command" > ${GDBINIT}
 	echo "target extended-remote localhost:${STGDBPORT}" >> ${GDBINIT}
@@ -858,6 +863,7 @@ ${OBJDIR}:
 ${OBJDIR}/${PART}.svd: ${OBJDIR}
 	echo "  Copying ${PART}.svd file to build folder"
 	cp ../${PART}.svd ${OBJDIR}
+
 
 #
 # Open files in editor windows
@@ -913,20 +919,14 @@ cflow:
 # opens a window with a terminal emulator
 #
 term:
-	${TERMAPP} -- ${TTYPROG}  ${TTYPARMS} ${TTYPARMS}
-
-#
-#
-# opens a window with a terminal
-#
-term:
-	${TERMAPP} -- ${TTYPROG}  ${TTYPARMS} 
+	${TERMAPP} -- ${TTYPROG}  ${TTYPARMS}
 
 #
 # These labels are not files !!!
 #
-.PHONY: burn cflow clean cproto ddd debug default deploy disassembly docs docs-clean
-.PHONY: doxygen dump edit flash force-flash gdb gdbserver help nemiver nm size tui usage
+.PHONY: burn cflow clean cproto ddd debug default deploy disassembly docs 
+.PHONY: docs-clean doxygen dump edit flash force-flash gdb gdbserver help
+.PHONY: nemiver nm size tui usage term
 .PHONY: FORCE
 
 # Force run

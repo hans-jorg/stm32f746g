@@ -163,6 +163,15 @@ extern struct ETH_Callbacks_s ETH_Callbacks;
 #define ETH_CLOCK_ALL                           0x000F
 ///@}
 
+/**
+ * @brief   Codification of link info
+ * 
+ */
+#define ETH_LINKINFO_100BASET_FULLDUPLEX        0x6
+#define ETH_LINKINFO_100BASET_HALFDUPLEX        0x2
+#define ETH_LINKINFO_10BASET_FULLDUPLEX         0x5
+#define ETH_LINKINFO_10BASET_HALFDUPLEX         0x16
+
 // Initialization functions
 void ETH_Init(void);
 #ifdef ETH_ALLOCATE_BUFFERS_DYNAMICALLY
@@ -171,7 +180,7 @@ void ETH_InitRXDescriptors(ETH_DMADescriptor *desc, int count, uint8_t *area);
 #endif
 
 // Operation function
-int  ETH_TransmitFrame(unsigned size);
+int  ETH_TransmitFrame(ETH_DMADescriptor *desc, unsigned size);
 int  ETH_ReceiveFrame(ETH_DMAFrameInfo *RxFrameInfo);
 int  ETH_CheckReception(void);
 
@@ -204,7 +213,11 @@ int  ETH_IsLinkUp(void);
 int  ETH_IsConnected(void);
 
 // Reconfigure Link 
-int  ETH_UpdateConfig(void);
-
+int  ETH_UpdateLinkStatus(void);
+unsigned ETH_GetLinkStatus(void);
+void ETH_PHYRegisterDump(void);
+int ETH_GetLinkInfo(void);
+char const * ETH_GetLinkInfoString(void);
 #endif
 
+void ETH_DumpDescriptors(void);

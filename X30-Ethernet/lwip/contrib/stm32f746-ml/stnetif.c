@@ -34,7 +34,6 @@
  */
 extern int verbose;
 
-
 /**
  * @brief message
  *
@@ -132,12 +131,13 @@ ETH_DMAFrameInfo RxFrameInfo;
 ETH_DMADescriptor *desc;
 err_t rc;
 
-
+    MESSAGE("low_level_input\n");
     p = 0;
     q = 0;
 
     rc = ETH_ReceiveFrame(&RxFrameInfo);
     if( rc <= 0 ) return NULL;
+    MESSAGE("Received something\n");
 
     int len = RxFrameInfo.FrameLength;
     if( len > 0 ) {
@@ -256,8 +256,13 @@ static err_t low_level_output_arp_off(struct netif *netif, struct pbuf *q, const
 
 static void low_level_init(struct netif *netif) {
 
+    MESSAGE("Entering low_level_init\n");
+
     // Initialize device
     ETH_Init();
+
+    // Set link status
+    //netif->flags |= NETIF_FLAG_LINK_UP;
 
     // Check link status
     (void) low_level_get_link_status();
@@ -266,8 +271,9 @@ static void low_level_init(struct netif *netif) {
     ETH_Start();
 
     // Set flags accordingly
-    stnetif_link(netif);
+    //stnetif_link(netif);
 
+    MESSAGE("Exiting low_level_init\n");
 }
 
 
@@ -304,6 +310,8 @@ struct pbuf *q;
 ETH_DMADescriptor *desc;
 err_t rc;
 
+    MESSAGE("Entering stnet output\n");
+    
 #if MIB2_STATS
     LINK_STATS_INC(link.xmit);
     /* Update SNMP stats (only if you use SNMP) */
@@ -322,34 +330,38 @@ err_t rc;
     pbuf_remove_header(p, ETH_PAD_SIZE); /* drop the padding word */
 #endif
 
-
     /*
      * Copy data from all pbufs to one or more DMA buffers
      * concatenating them
      */
-    desc = &ETH_TXDescriptors[0];               // first DMA descriptor
+    desc = ETH_TXDescriptors;                   // first DMA descriptor
     uint16_t framelength = 0;                   // frame size
     uint8_t *dst = (uint8_t *)desc->Buffer1Addr;// first DMA buffer;
     uint16_t dstpos = 0;                        // offset
     // scan all pbufs and transfer their contents to DMA buffers
     for(q=p; q && desc; q = q->next ) {
+        message("Processing pbuf at %p\n",q);
         if( desc->Status&ETH_DMADESCRIPTOR_STATUS_OWN ) {
+            MESSAGE("Descriptor not free\n");
             rc = ERR_USE;
             goto error;
         }
+        message("Free descriptor found at %p\n",desc);
         // get source information
         uint16_t srccnt = q->len;
         uint16_t srcpos = 0;
         uint8_t *src = q->payload;
         int dstcnt = ETH_TXBUFFER_SIZE - dstpos;
+        // Transfer to DMA buffers
         while( dstcnt < srccnt ) {
             memcpy(dst + dstpos, src + srcpos, dstcnt );
+            message("%d bytes copied (1)\n",dstcnt);
             framelength += dstcnt;
             srccnt -= dstcnt;
             srcpos += dstcnt;
             // Get next DMA buffer
             desc = (ETH_DMADescriptor *) desc->Buffer2NextDescAddr;
-            if( !desc )
+            if( desc == ETH_TXDescriptors )
                 break;
             if( (desc->Status&ETH_DMADESCRIPTOR_STATUS_OWN) ) {
                 rc = ERR_USE;
@@ -362,14 +374,15 @@ err_t rc;
         // copy remaining data
         if( desc ) {
             memcpy(dst + dstpos, src + srcpos, srccnt );
+            message("%d bytes copied (2)\n",dstcnt);
             framelength += srccnt;
             dstpos += srccnt;
         }
     }
 
-    
+    MESSAGE("Starting transmission\n");
     /* Start MAC transmit here */
-    ETH_TransmitFrame(framelength);
+    ETH_TransmitFrame(ETH_TXDescriptors, framelength);
 
 #if MIB2_STATS
     MIB2_STATS_NETIF_ADD(netif, ifoutoctets, p->tot_len);
@@ -392,19 +405,19 @@ err_t rc;
     LINK_STATS_INC(link.xmit);
 #endif
 
-
-
     unlock_interrupts();
     rc = ERR_OK;
 
-    // An error occured
+    // An error occurred
 error:
     // Clear error condition and resume transmission
     // TODO: Understand what is happening here
     if( ETH->DMASR&ETH_DMASR_TUS ) {
         ETH->DMASR = ETH_DMASR_TUS;
         ETH->DMATPDR = 0;
-    }  
+    }
+
+    MESSAGE("Exiting stnet_output\n");
     return rc;
 }
 
@@ -417,15 +430,18 @@ error:
 
 void
 stnetif_input(struct netif *netif) {
-struct stnetif *stnetif;
+//struct stnetif *stnetif;
 struct pbuf *p;
 
-    stnetif = netif->state;
+    MESSAGE("Entering stnet input\n");
+
+    //stnetif = netif->state;
 
     /* move received packet into a new pbuf */
     p = low_level_input(netif);
     /* if no packet could be read, silently ignore this */
     if (p != NULL) {
+        MESSAGE("Passing to ethernet_input\n");
         /* pass all packets to ethernet_input, which decides what packets it supports */
         if (netif->input(p, netif) != ERR_OK) {
           LWIP_DEBUGF(NETIF_DEBUG, ("ethernetif_input: IP input error\n"));
@@ -433,6 +449,8 @@ struct pbuf *p;
           p = NULL;
         }
     }
+
+    MESSAGE("Exiting stnet input\n");
 
 }
 
@@ -462,6 +480,8 @@ err_t
 stnetif_init(struct netif *netif) {
 uint8_t macaddr[6];
 
+    MESSAGE("Entering netif_init\n");
+
 #if LWIP_NETIF_HOSTNAME
     /* Initialize interface hostname */
     netif->hostname = "lwip";
@@ -486,7 +506,7 @@ uint8_t macaddr[6];
     netif->name[0] = IFNAME0;
     netif->name[1] = IFNAME1;
 
-    netif->linkoutput = stnetif_output; // Or low_level_output
+    netif->linkoutput = stnetif_output; // Or low_level_output?
 #if LWIP_IPV4
     netif->output = etharp_output;
 #endif /* LWIP_IPV4 */
@@ -518,6 +538,8 @@ uint8_t macaddr[6];
     // Do hardware initialization
     low_level_init(netif);
 
+    MESSAGE("Exiting netif_init\n");
+
     return ERR_OK;
 
 }
@@ -529,7 +551,7 @@ uint8_t macaddr[6];
  *    For ethernet, there are the link status problem. The ethernet cable
  *    can be plugged out or the switch went offline.
  * 
- *    There are two possibilites. One using the interrupt generated by th
+ *    There are two possibilities. One using the interrupt generated by th
  *    PHY interface device. Another is to poll the device.
  *    
  *    lwIP has a set of functions/macros to handle this situation.
@@ -607,7 +629,47 @@ uint8_t macaddr[6];
 
 u8_t low_level_get_link_status(void) {
 
+    ETH_UpdateLinkStatus();
     return ETH_IsLinkUp();
+
+}
+
+/**
+ * @brief   Print link status
+ * 
+ */
+#define PRINTPHYSTATUS(M,DESC) printf("%-30s  : %s\n",(DESC),((M)!=0)?"ON":"OFF")
+
+void stnetif_printstatus(void) {
+#if 0
+uint32_t s;
+
+    s = ETH_GetLinkStatus();
+
+    // BSR
+    PRINTPHYSTATUS(s&0x4000,"100BASET Full Duplex");
+    PRINTPHYSTATUS(s&0x2000,"100BASET Half Duplex");
+    PRINTPHYSTATUS(s&0x1000,"10BASET Full Duplex");
+    PRINTPHYSTATUS(s&0x0800,"10BASET Half Duplex");
+    PRINTPHYSTATUS(s&0x0100,"Extended Status");
+    PRINTPHYSTATUS(s&0x0020,"Auto Negotiation Completed");
+    PRINTPHYSTATUS(s&0x0008,"Auto Negotiation Ability");
+    PRINTPHYSTATUS(s&0x0004,"Link Status");
+    PRINTPHYSTATUS(s&0x0002,"Jabber Detect");
+    PRINTPHYSTATUS(s&0x0001,"Extended Capabilities");
+    s >>= 16;
+
+    // BCR
+    PRINTPHYSTATUS(s&0x8000,"Soft Reset");
+    PRINTPHYSTATUS(s&0x4000,"Loopback");
+    PRINTPHYSTATUS(s&0x2000,"Speed Select");
+    PRINTPHYSTATUS(s&0x1000,"Auto Negotiation Enable");
+    PRINTPHYSTATUS(s&0x0800,"Power Down");
+    PRINTPHYSTATUS(s&0x0400,"Isolate");
+    PRINTPHYSTATUS(s&0x0200,"Restart Auto Negotiation");
+    PRINTPHYSTATUS(s&0x0100,"Duplex Mode");
+#endif
+    message("Link status = %s\n",ETH_GetLinkInfoString());
 
 }
 
@@ -620,7 +682,17 @@ u8_t low_level_get_link_status(void) {
 void stnetif_link(struct netif *netif) {
 u8_t up;
 
+    MESSAGE("stnet link\n");
+
+    // ETH_PHYRegisterDump();
+
     up = low_level_get_link_status();
+
+    if( up ) {
+        MESSAGE("Link is up\n");
+    } else {
+        MESSAGE("Link is down\n");
+    }
 
     if( up&&!netif_is_link_up(netif) ) {
         // If link is up but netif state is link_down
@@ -631,6 +703,9 @@ u8_t up;
         // set link down in netif
         netif_set_link_down(netif);
     }
+
+    up = netif_is_link_up(netif);
+    message("Link is %s\n",up?"UP":"DOWN");
 }
 
 
@@ -647,12 +722,11 @@ void stnetif_update_config(struct netif *netif) {
 
     if( netif_is_link_up(netif) ) {
         // Update configuration (Speed/Duplex)
-        ETH_UpdateConfig();
+        ETH_UpdateLinkStatus();
 
         /* Restart MAC interface */
         ETH_Start();
-    }
-    if( !netif_is_link_up(netif) ) {
+    } else {
         /* Stop MAC interface */
         ETH_Stop();
     }
@@ -684,3 +758,4 @@ void stnetif_link_callback(struct netif *netif) {
 
 }
 #endif
+

@@ -1138,12 +1138,29 @@ SystemInit(void) {
     /* Update SystemCoreClock */
     SystemCoreClockUpdate();
 
+    /**
+     * @note    There is a L1 cache in the CPU core, but only for
+     *          access thru AXIM bus (range 0x0800_0000-0x080F_FFFF).
+     * 
+     * @noter   The is a Adaptive Real-Time (ART) Accelerator, a ST tecnology 
+     *          for instruction lookahead. It works for *Flash memory* accesses
+     *          thru the ITCM bus (range 0x0020_0000-0x002F_FFFF).  It has
+     *          64 cache lines with 256 bits.
+     *          
+     */
 
-    /* Enable cache for Instruction and Data . Only for AXIM interface */
+    // Invalidate both caches to avoid using invalid values
+    SCB_InvalidateICache();
+    SCB_InvalidateDCache();
+
+    // Enable Instruction Cache
     SCB_EnableICache();
+    __ISB();                                 // See manual
+
+    // Enable Instruction Cache
     SCB_EnableDCache();
 
-    /* Enable ART (ST technology). Only for TCM interface  */
+    /* Enable ART (ST technology) */
     FLASH->ACR &= ~FLASH_ACR_ARTEN;         /* Disable ART */
     FLASH->ACR |= FLASH_ACR_ARTRST;         /* Reset ART */
     //FLASH->ACR &= ~FLASH_ACR_ARTRST;      /* Reset ART */
@@ -1151,12 +1168,27 @@ SystemInit(void) {
     FLASH->ACR |= FLASH_ACR_ARTEN;          /* Enable ART */
     FLASH->ACR |= FLASH_ACR_PRFTEN;         /* Enable ART Prefetch*/
 
-    /* It is possible to relocate Vector Table Must be a 512 byte boundary. Bits 8:0 = 0 */
-    //SCB->VTOR = FLASH_BASE;                 /* Vector Table Relocation in Internal FLASH */
+    /**
+     * @note It is possible to relocate Vector Table
+     *       It must be a 512 byte boundary. Bits 8:0 = 0
+     */
+    //SCB->VTOR = FLASH_BASE;    /* Vector Table Relocation in Internal FLASH */
 
 
-    /* Additional initialization here */
+    /*
+     * Additional initialization here 
+     */
 
+    /*
+     * Turn off display, by setting pin 3 of GPIO Port K to zero
+     */
+    RCC->AHB1ENR |= (1<<10);       
+    __DSB();
+    // Set mode to output */
+    GPIOK->MODER = (GPIOK->MODER&~(0x3<<(3*2)))|(0x1<<(3*2));
+    /* Turn off display */
+    GPIOK->ODR  &= ~(1<<3);
+                                        
 }
 
 

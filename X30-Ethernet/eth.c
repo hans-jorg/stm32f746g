@@ -10,11 +10,22 @@
  */
 
 
+#include <stdarg.h>
+#include <stdio.h>
 
 #include "stm32f746xx.h"
 #include "system_stm32f746.h"
 #include "gpio.h"
 #include "eth.h"
+
+#include "debugmessages.h"
+
+/**
+ * @brief   Which routine to use for configuring pin
+ */
+//#define ETH_USEGPIOFORCONFIGURATION     1
+
+
 
 
 /**
@@ -26,18 +37,15 @@
  */
 
 #define ROUND(N,M)  ( ( ((N)+(M)-1)/(M) )*(M) )
-/**
- * @brief   ETH DMA Descriptor structure
- *
- * @note    From stm32f7xx_hal_eth.h (DMADescTypeDef)
- *
- * @note    Uses extended descriptor format (include PTP info)
- */
+
 
 /**
  * Function prototypes (forward referenced);
  */
 static void ETH_FlushTXFIFO(void);
+static void ETH_UpdateConfigStatus(void);
+static void ETH_ManualConfig(void);
+
 
 /**
  * @brief   Network configuration
@@ -52,7 +60,7 @@ static void ETH_FlushTXFIFO(void);
 #define ETH_CONFIG_FULLDUPLEX    (8)
 #define ETH_CONFIG_HALFDUPLEX    (16)
 ///@}
-static const uint32_t ETH_Config =   ETH_CONFIG_AUTONEGOTIATE
+static const uint32_t ETH_Config =   0 // ETH_CONFIG_AUTONEGOTIATE
 // Parameters below only used when Auto Negotiation does not work or not set
                                     |ETH_CONFIG_100BASET
                                     |ETH_CONFIG_FULLDUPLEX;
@@ -73,20 +81,20 @@ static uint32_t ETH_State = ETH_STATE_RESET;
  */
 ///@{
 
-#define ETH_STATUS_LINKDOWN     (1)
-#define ETH_STATUS_LINKUP       (2)
-#define ETH_STATUS_100BASET     (4)
-#define ETH_STATUS_10BASET      (8)
-#define ETH_STATUS_FULLDUPLEX   (16)
-#define ETH_STATUS_HALFDUPLEX   (32)
+#define ETH_CONFIGSTATUS_LINKDOWN     (1)
+#define ETH_CONFIGSTATUS_LINKUP       (2)
+#define ETH_CONFIGSTATUS_100BASET     (4)
+#define ETH_CONFIGSTATUS_10BASET      (8)
+#define ETH_CONFIGSTATUS_FULLDUPLEX   (16)
+#define ETH_CONFIGSTATUS_HALFDUPLEX   (32)
 
-static uint32_t ETH_Status = ETH_STATUS_LINKDOWN;
+static uint32_t ETH_ConfigStatus = ETH_CONFIGSTATUS_LINKDOWN;
 ///@}
 
 
 // 48 bit MAC address (must have 12 hexadecimal digits))
 #ifndef ETH_MACADDRESS
-#define ETH_MACADDRESS 0x0080E1010101L
+#define ETH_MACADDRESS 0x2cf05e0bbabdL
 #endif
 
 
@@ -134,28 +142,27 @@ static uint32_t ETH_Status = ETH_STATUS_LINKDOWN;
     
 #ifdef ETH_ALLOCATE_BUFFERS_DYNAMICALLY
     // These pointers must be initialized thru a call to ETH_SetBuffers
+    // They must be in a non cacheable area
     ETH_DMADescriptor               *ETH_TXDescriptors = 0;
     ETH_DMADescriptor               *ETH_RXDescriptors = 0;
     static uint32_t                 *ETH_Area;
     static uint8_t                  *txbuffer = 0;
     static uint8_t                  *rxbuffer = 0;
 #else 
-    EXTRAM static ETH_DMADescriptor         ETH_TXDesc[ETH_TXBUFFER_COUNT] = { 0 };
-    EXTRAM static ETH_DMADescriptor         ETH_RXDesc[ETH_RXBUFFER_COUNT] = { 0 };
+    EXTRAM static ETH_DMADescriptor  ETH_TXDesc[ETH_TXBUFFER_COUNT] = { 0 };
+    EXTRAM static ETH_DMADescriptor  ETH_RXDesc[ETH_RXBUFFER_COUNT] = { 0 };
     ETH_DMADescriptor               *ETH_TXDescriptors = ETH_TXDesc;
     ETH_DMADescriptor               *ETH_RXDescriptors = ETH_RXDesc;
 // An alternative is to define them as an array of 32-bit integers for alignment
-    EXTRAM static uint8_t          txbuffer[ETH_TXBUFFERSIZE_INT8UNITS*ETH_TXBUFFER_COUNT] 
-                                __attribute((aligned(sizeof(uint32_t))));
-    EXTRAM static uint8_t          rxbuffer[ETH_RXBUFFERSIZE_INT8UNITS*ETH_RXBUFFER_COUNT]
-                                __attribute((aligned(sizeof(uint32_t))));
+#define TXBUFFERSIZE (ETH_TXBUFFERSIZE_INT8UNITS*ETH_TXBUFFER_COUNT)
+#define RXBUFFERSIZE (ETH_RXBUFFERSIZE_INT8UNITS*ETH_RXBUFFER_COUNT)
+
+    EXTRAM static uint8_t          txbuffer[TXBUFFERSIZE] 
+                                   __attribute((aligned(sizeof(uint32_t))));
+    EXTRAM static uint8_t          rxbuffer[RXBUFFERSIZE]
+                                   __attribute((aligned(sizeof(uint32_t))));
 #endif
 
-/**
- * @brief     Pointers to the ETH_TXDescriptor to be used
- */
-static ETH_DMADescriptor             *ETH_TXDescToBeUsed;
-static ETH_DMADescriptor             *ETH_RXDescToBeUsed;
 ///@}
 
 /**
@@ -184,19 +191,26 @@ struct ETH_Callbacks_s ETH_Callbacks       = {0};
 
 
 //** For RX Descriptors **
-// These fields are in word 0
-#define ETH_RXDESC_RCH                   (1<<14)
+// These fields are in Status word (0)
+#define ETH_RXDESC_FRAMELENGTH_POS       (16)
+#define ETH_RXDESC_FRAMELENGTH_MASK      (0x3FFF0000)
+#define ETH_RXDESC_ERROR_SUMMARY         (1<<15)
+#define ETH_RXDESC_ERROR_DESCRIPTOR      (1<<14)
+#define ETH_RXDESC_ERROR_LENGTH          (1<<12)
+#define ETH_RXDESC_ERROR_OVERFLOW        (1<<10)
 #define ETH_RXDESC_FIRST                 (1<<9)
 #define ETH_RXDESC_LAST                  (1<<8)
-#define ETH_RXDESC_FIELDLENGTH_POS       (16)
-#define ETH_RXDESC_FIELDLENGTH_MASK      (0x3FFF0000)
-// These fields are in word 1
+#define ETH_RXDESC_ERROR_RECEIVE         (1<<3)
+#define ETH_RXDESC_ERROR_CRC             (1<<1)
+// These fields are in ControlBufferSize word (1)
 #define ETH_RXDESC_BUFFER1SIZE_MASK      (0x1FFF)
 #define ETH_RXDESC_BUFFER1SIZE_POS       (0)
 #define ETH_RXDESC_BUFFER2SIZE_MASK      (0x1FFF0000)
 #define ETH_RXDESC_BUFFER2SIZE_POS       (16)
 #define ETH_RXDESC_ENDOFRING             (1<<15)
 #define ETH_RXDESC_CHAINED               (1<<14)
+#define ETH_RXBUFFER_DIC                 (1<<31)
+
 ///@}
 
 /**
@@ -233,7 +247,7 @@ struct ETH_Callbacks_s ETH_Callbacks       = {0};
  */
 
 /** PHY */
-#define ETH_PHY_ADDRESS                         (1)
+#define ETH_PHY_ADDRESS                         (0)
 
 /** Registers */
 ///@{
@@ -241,6 +255,8 @@ struct ETH_Callbacks_s ETH_Callbacks       = {0};
 #define ETH_PHY_BSR                             (1)
 #define ETH_PHY_ISFR                           (29)
 #define ETH_PHY_IMR                            (30)
+#define ETH_PHY_ANA                             (4)
+#define ETH_PHY_SCSR                           (31)
 ///@}
 
 
@@ -249,8 +265,11 @@ struct ETH_Callbacks_s ETH_Callbacks       = {0};
 #define ETH_PHY_BCR_RESET                       (uint16_t) (0x8000)
 #define ETH_PHY_BCR_LOOPBACK                    (uint16_t) (0x4000)
 #define ETH_PHY_BCR_SPEED100MHz                 (uint16_t) (0x2000)
-#define ETH_PHY_BCR_AUTONEGOTIATION             (uint16_t) (0x1000)
+#define ETH_PHY_BCR_AUTONEGOTIATIONENABLE       (uint16_t) (0x1000)
 #define ETH_PHY_BCR_POWERDOWN                   (uint16_t) (0x0800)
+#define ETH_PHY_BCR_ISOLATE                     (uint16_t) (0x0400)
+#define ETH_PHY_BCR_AUTONEGOTIATIONRESTART      (uint16_t) (0x0200)
+#define ETH_PHY_BCR_DUPLEX                      (uint16_t) (0x0100)
 ///@}
 
 /* Fields of BSR Register */
@@ -286,6 +305,29 @@ struct ETH_Callbacks_s ETH_Callbacks       = {0};
 #define ETH_PHY_IMR_INT2                        (uint16_t) (0x0004)
 #define ETH_PHY_IMR_INT1                        (uint16_t) (0x0002)
 ///@}
+
+/* Fields of ANA Register */
+///@{
+#define ETH_PHY_ANA_100BASET_FULLDUPLEX         (uint16_t) (0x0100)
+#define ETH_PHY_ANA_100BASET                    (uint16_t) (0x0080)
+#define ETH_PHY_ANA_10BASET_FULLDUPLEX          (uint16_t) (0x0040)
+#define ETH_PHY_ANA_10BASET                     (uint16_t) (0x0020)
+#define ETH_PHY_ANA_SELDEFAULT                  (uint16_t) (0x0001)
+#define ETH_PHY_ANA_ALL                         (uint16_t) (0x01E1)
+///@}
+
+/* Fields of SCSR Register */
+///@{
+#define ETH_PHY_SCSR_100BASET_FULLDUPLEX        (uint16_t) (0x0018)
+#define ETH_PHY_SCSR_100BASET_HALFDUPLEX        (uint16_t) (0x0008)
+#define ETH_PHY_SCSR_10BASET_FULLDUPLEX         (uint16_t) (0x0012)
+#define ETH_PHY_SCSR_10BASET_HALFDUPLEX         (uint16_t) (0x0002)
+#define ETH_PHY_SCSR_SPEED_M                    (uint16_t) (0x001C)
+#define ETH_PHY_SCSR_AUTODONE                   (uint16_t) (0x1000)
+#define ETH_PHY_SCSR_WRITEONE                   (uint16_t) (0x0040)
+///@}
+
+
 
 
 /**
@@ -527,18 +569,18 @@ static const GPIO_PinConfiguration pinconfig[] = {
  *    | Pull-up/Push down |     0     | No pull-up or push-down  |
  */
 /*    GPIOx    Pin      AF  M  O  S  P  I */
-   {  GPIOG,   11,      11, 2, 0, 3, 1, 0  },       //     ETH_RMII_TXEN
-   {  GPIOG,   13,      11, 2, 0, 3, 1, 0  },       //     ETH_RMII_TXD0
-   {  GPIOG,   14,      11, 2, 0, 3, 1, 0  },       //     ETH_RMII_TXD1
-   {  GPIOC,   4,       11, 2, 0, 3, 1, 0  },       //     ETH_RMII_RXD0
-   {  GPIOC,   5,       11, 2, 0, 3, 1, 0  },       //     ETH_RMII_RXD1
-   {  GPIOG,   0,       11, 0, 0, 3, 1, 0  },       //     ETH_RMII_RXER     
-   {  GPIOA,   7,       11, 2, 0, 3, 1, 0  },       //     ETH_RMII_CRS_DV
-   {  GPIOC,   1,       11, 2, 0, 3, 1, 0  },       //     ETH_RMII_MDC
-   {  GPIOA,   2,       11, 2, 0, 3, 1, 0  },       //     ETH_RMII_MDIO
-   {  GPIOA,   1,       11, 2, 0, 3, 1, 0  },       //     ETH_RMII_REFCLK
+   {  GPIOG,   11,      11, 2, 0, 3, 0, 0  },       // ETH_RMII_TXEN
+   {  GPIOG,   13,      11, 2, 0, 3, 0, 0  },       // ETH_RMII_TXD0
+   {  GPIOG,   14,      11, 2, 0, 3, 0, 0  },       // ETH_RMII_TXD1
+   {  GPIOC,   4,       11, 2, 0, 3, 0, 0  },       // ETH_RMII_RXD0
+   {  GPIOC,   5,       11, 2, 0, 3, 0, 0  },       // ETH_RMII_RXD1
+   {  GPIOG,   0,       11, 0, 0, 3, 0, 0  },       // ETH_RMII_RXER     
+   {  GPIOA,   7,       11, 2, 0, 3, 0, 0  },       // ETH_RMII_CRS_DV
+   {  GPIOC,   1,       11, 2, 0, 3, 0, 0  },       // ETH_RMII_MDC
+   {  GPIOA,   2,       11, 2, 0, 3, 0, 0  },       // ETH_RMII_MDIO
+   {  GPIOA,   1,       11, 2, 0, 3, 0, 0  },       // ETH_RMII_REFCLK
 //
-   {     0,    0,        0, 0,  0, 0, 0, 0  }       // End of List Mark
+   {      0,   0,        0, 0,  0, 0, 0, 0 }        // End of List Mark
 };
 
 static void
@@ -575,7 +617,7 @@ uint32_t mAND,mOR; // Mask
     mOR  =   (ETH_AF<<GPIO_AFRH_AFRH1_Pos)
             |(ETH_AF<<GPIO_AFRH_AFRH2_Pos)
             |(ETH_AF<<GPIO_AFRH_AFRH7_Pos);
-    GPIOA->AFR[0]  = (GPIOC->AFR[0]&~mAND)|mOR;
+    GPIOA->AFR[0]  = (GPIOA->AFR[0]&~mAND)|mOR;
 
     mAND =   GPIO_MODER_MODER1_Msk
             |GPIO_MODER_MODER2_Msk
@@ -665,44 +707,36 @@ uint32_t mAND,mOR; // Mask
     mOR  =   (ETH_AF<<GPIO_AFRH_AFRH3_Pos)
             |(ETH_AF<<GPIO_AFRH_AFRH5_Pos)
             |(ETH_AF<<GPIO_AFRH_AFRH6_Pos);
-    GPIOG->AFR[1]  = (GPIOC->AFR[1]&~mAND)|mOR;
+    GPIOG->AFR[1]  = (GPIOG->AFR[1]&~mAND)|mOR;
 
-    mAND =   GPIO_MODER_MODER3_Msk
-            |GPIO_MODER_MODER11_Msk
+    mAND =   GPIO_MODER_MODER11_Msk
             |GPIO_MODER_MODER13_Msk
             |GPIO_MODER_MODER14_Msk;
-    mOR  =   (ETH_MODE<<GPIO_MODER_MODER3_Pos)
-            |(ETH_MODE<<GPIO_MODER_MODER11_Pos)
+    mOR  =   (ETH_MODE<<GPIO_MODER_MODER11_Pos)
             |(ETH_MODE<<GPIO_MODER_MODER13_Pos)
             |(ETH_MODE<<GPIO_MODER_MODER14_Pos);
     GPIOG->MODER   = (GPIOG->MODER&~mAND)|mOR;
 
-    mAND =   GPIO_OSPEEDR_OSPEEDR3_Msk
-            |GPIO_OSPEEDR_OSPEEDR11_Msk
+    mAND =   GPIO_OSPEEDR_OSPEEDR11_Msk
             |GPIO_OSPEEDR_OSPEEDR13_Msk
             |GPIO_OSPEEDR_OSPEEDR14_Msk;
-    mOR  =   (ETH_OSPEED<<GPIO_OSPEEDR_OSPEEDR3_Pos)
-            |(ETH_OSPEED<<GPIO_OSPEEDR_OSPEEDR11_Pos)
+    mOR  =   (ETH_OSPEED<<GPIO_OSPEEDR_OSPEEDR11_Pos)
             |(ETH_OSPEED<<GPIO_OSPEEDR_OSPEEDR13_Pos)
             |(ETH_OSPEED<<GPIO_OSPEEDR_OSPEEDR14_Pos);
     GPIOG->OSPEEDR = (GPIOG->OSPEEDR&~mAND)|mOR;
 
-    mAND =   GPIO_PUPDR_PUPDR3_Msk
-            |GPIO_PUPDR_PUPDR11_Msk
+    mAND =   GPIO_PUPDR_PUPDR11_Msk
             |GPIO_PUPDR_PUPDR13_Msk
             |GPIO_PUPDR_PUPDR14_Msk;
-    mOR  =   (ETH_PUPD<<GPIO_PUPDR_PUPDR3_Pos)
-            |(ETH_PUPD<<GPIO_PUPDR_PUPDR11_Pos)
+    mOR  =   (ETH_PUPD<<GPIO_PUPDR_PUPDR11_Pos)
             |(ETH_PUPD<<GPIO_PUPDR_PUPDR13_Pos)
             |(ETH_PUPD<<GPIO_PUPDR_PUPDR14_Pos);
     GPIOG->PUPDR   = (GPIOG->PUPDR&~mAND)|mOR;
 
-    mAND =   GPIO_OTYPER_OT3_Msk
-            |GPIO_OTYPER_OT11_Msk
+    mAND =   GPIO_OTYPER_OT11_Msk
             |GPIO_OTYPER_OT13_Msk
             |GPIO_OTYPER_OT14_Msk;
-    mOR  =   (ETH_OTYPE<<GPIO_OTYPER_OT1_Pos)
-            |(ETH_OTYPE<<GPIO_OTYPER_OT11_Pos)
+    mOR  =   (ETH_OTYPE<<GPIO_OTYPER_OT11_Pos)
             |(ETH_OTYPE<<GPIO_OTYPER_OT13_Pos)
             |(ETH_OTYPE<<GPIO_OTYPER_OT14_Pos);
     GPIOG->OTYPER  = (GPIOG->OTYPER&~mAND)|mOR;
@@ -741,7 +775,7 @@ const uint32_t ETH_RMIIRXER_MASK = (1<<2);
 
 void EXTI2_IRQHandler(void) {
 
-     // TBD
+     // TODO
 
 }
 
@@ -800,11 +834,11 @@ void ETH_DisableClock(uint32_t which) {
 /**
  * @brief  ETH_WritePHYRegister
  */
-static int ETH_WritePHYRegister( uint32_t reg, uint32_t val) {
+static int ETH_WritePHYRegister( uint32_t reg, uint16_t val) {
 uint32_t macmiiar = ETH->MACMIIAR;
 
     // Clear all fields except CR
-    macmiiar &= ~ETH_MACMIIAR_CR_Msk;
+    macmiiar &= ETH_MACMIIAR_CR_Msk;
 
     // Set PHY address
     macmiiar |= (ETH_PHY_ADDRESS<<ETH_MACMIIAR_PA_Pos);
@@ -816,14 +850,15 @@ uint32_t macmiiar = ETH->MACMIIAR;
     macmiiar |= ETH_MACMIIAR_MW;
 
     // Wait until PHY is ready
-    while( (ETH->MACMIIAR&ETH_MACMIIAR_MB) != 0 ) {} // TODO: Add timeout
+    while( (ETH->MACMIIAR&ETH_MACMIIAR_MB) == ETH_MACMIIAR_MB ) {}  // TODO: Add timeout
+
+    // Set data to be written
+    ETH->MACMIIDR = val;
+
 
     // Set busy flag
     macmiiar |= ETH_MACMIIAR_MB;
-
-    // Start write value
-    ETH->MACMIIDR = val;
-
+    
     // Write operation
     ETH->MACMIIAR = macmiiar;
 
@@ -838,11 +873,17 @@ uint32_t macmiiar = ETH->MACMIIAR;
 /**
  * @brief  ETH_ReadPHYRegister
  */
-static int ETH_ReadPHYRegister( uint32_t reg, uint32_t *val) {
+static int ETH_ReadPHYRegister( uint32_t reg, uint16_t *val) {
 uint32_t macmiiar = ETH->MACMIIAR;
 
+    // Set register to 0
+    *val = 0;
+
+    // Set data register to 0
+    ETH->MACMIIDR = 0;
+
     // Clear all fields except CR
-    macmiiar &= ~ETH_MACMIIAR_CR_Msk;
+    macmiiar &= ETH_MACMIIAR_CR_Msk;
 
     // Set PHY address
     macmiiar |= (ETH_PHY_ADDRESS<<ETH_MACMIIAR_PA_Pos);
@@ -850,11 +891,11 @@ uint32_t macmiiar = ETH->MACMIIAR;
     // Set PHY register
     macmiiar |= ((reg)<<ETH_MACMIIAR_MR_Pos);
 
-    // Set write operation
-    macmiiar |= ETH_MACMIIAR_MW;
+    // Set read operation
+    macmiiar &= ~ETH_MACMIIAR_MW;
 
     // Wait until PHY is ready
-    while( (ETH->MACMIIAR&ETH_MACMIIAR_MB) != 0 ) {}    // TODO: Add timeout
+    while( (ETH->MACMIIAR&ETH_MACMIIAR_MB) == ETH_MACMIIAR_MB  ) {}  // TODO: Add timeout
 
     // Set busy flag
     macmiiar |= ETH_MACMIIAR_MB;
@@ -879,15 +920,67 @@ uint32_t macmiiar = ETH->MACMIIAR;
  */
 
 static int ETH_ConfigurePHY(void) {
-uint32_t value;
+uint16_t value;
 int retries;
 int configured = 0;
 
     ETH_WritePHYRegister(ETH_PHY_BCR,ETH_PHY_BCR_RESET);
     delay(ETH_DELAY_AFTERRESET);
+    // Wait until Soft Reset bit self cleared
+    do { 
+        ETH_ReadPHYRegister(ETH_PHY_BCR,&value);
+        delay(ETH_DELAY_AFTERRESET);
+    } while ( value&ETH_PHY_BCR_RESET );
 
+    // Configure Auto-Negotiation Advertisement Register
+    // Should be done by MODE2_0 pins!!
+    ETH_WritePHYRegister(ETH_PHY_ANA,ETH_PHY_ANA_ALL);
+    delay(ETH_DELAY_BETWEENTESTS);
+
+    // It this needed?
+    //value &= ETH_PHY_BCR_LOOPBACK;
+
+    // Wait until connected (linked)
+    retries = ETH_RETRIES_LINK;
+    do {
+        value = 0;
+        ETH_ReadPHYRegister(ETH_PHY_BSR,&value);
+        ETH_ReadPHYRegister(ETH_PHY_BSR,&value);
+        ETH_ReadPHYRegister(ETH_PHY_BSR,&value);
+        delay(ETH_DELAY_BETWEENTESTS);
+    } while( (retries-->0)&&((value&ETH_PHY_BSR_LINKUP)==0) );
+
+    // If not connected, 
+    if( (value&ETH_PHY_BSR_LINKUP) == 0 ) {
+
+
+        return -1;
+    }
+
+    if( ETH_Config&ETH_CONFIG_AUTONEGOTIATE ) {
+       // Start autonegotiating
+        ETH_WritePHYRegister(ETH_PHY_BCR,ETH_PHY_BCR_AUTONEGOTIATIONENABLE);
+        delay(ETH_DELAY_AFTERREGISTERWRITE);
+    
+        // Wait until Auto Negotiation Completed
+        retries = ETH_RETRIES_AUTONEGOTIATION;
+        do {
+            value = 0;
+            ETH_ReadPHYRegister(ETH_PHY_BSR,&value);
+            delay(ETH_DELAY_BETWEENTESTS);
+        } while( (retries-->0)&&((value&ETH_PHY_BSR_AUTONEGOTIATIONCOMPLETED)==0) );
+
+        if( (value&ETH_PHY_BSR_AUTONEGOTIATIONCOMPLETED) == 0 ) {
+            // Autonegotiation failed
+
+        }           
+    } else {
+        // Manual configuration
+
+
+    }
     // Configure speed and connection
-    ETH_UpdateConfig();
+    ETH_UpdateConfigStatus();
 
     /*
      * This code sequence is identical to the one generated by
@@ -899,6 +992,10 @@ int configured = 0;
      * 
      * But this register is vendor-specific. Maybe it does not work
      * following the datasheet.
+     * 
+     * From oryx-embedded.com
+     * Any link failure condition is latched in the BMSR register. Reading
+     * the register twice will always return the actual link status
      */
     // Enable interrupt on link status 
     ETH_ReadPHYRegister(ETH_PHY_ISFR,&value);
@@ -908,8 +1005,6 @@ int configured = 0;
     ETH_ReadPHYRegister(ETH_PHY_ISFR,&value);
 
     return 0;
-
-
 }
 
 
@@ -1047,8 +1142,8 @@ static int ETH_ConfigureMAC(void) {
                 
 
     // Set configuration for Fast Ethernet and Full Duplex, when possible
-    if( ETH_Status&ETH_CONFIG_100BASET )   maccr |= ETH_MACCR_FES;
-    if( ETH_Status&ETH_CONFIG_FULLDUPLEX ) maccr |= ETH_MACCR_DM;
+    if( ETH_ConfigStatus&ETH_CONFIG_100BASET )   maccr |= ETH_MACCR_FES;
+    if( ETH_ConfigStatus&ETH_CONFIG_FULLDUPLEX ) maccr |= ETH_MACCR_DM;
 
     // Set configuration
     ETH->MACCR = maccr;
@@ -1252,9 +1347,9 @@ static int ETH_ConfigureDMA(void) {
 /**
  * @brief ETH ETH_InitTXDescriptors
  *
- * @note  desc must be an array of DMA Descriptor
+ * @note  desc must be an array of DMA Descriptors
  *
- * @note  area must be count*ETH_TXBUFFER_SIZE
+ * @note  area must be at least count*ETH_TXBUFFER_SIZE
  *
  * @note  desc and area must be static!!!
  */
@@ -1266,20 +1361,22 @@ uint32_t *a = (uint32_t *) area;
     ETH_TXDescriptors = desc;
     for(i=0;i<count;i++) {
         desc->Status    = ETH_TXDESC_CHAINED | ETH_TXDESC_CIC;
-        desc->ControlBufferSize = 0;
+        desc->ControlBufferSize = ETH_TXBUFFERSIZE_INT8UNITS;
         desc->Buffer1Addr = (uint32_t) (a + i*ETH_TXBUFFERSIZE_INT32UNITS);
-        desc->Buffer2NextDescAddr = (uint32_t) (desc+((i+1)%count));
+        desc->Buffer2NextDescAddr = (uint32_t) (ETH_TXDescriptors+((i+1)%count));
+        desc->ExtendedStatus = 0; 
+        desc->Reserved1 = 0;
+        desc->TimeStampLow = 0;
+        desc->TimeStampHigh = 0;
         desc++;
     }
 
     // Write table address to the ETH interface
-    ETH->DMATDLAR = (uint32_t) desc;
+    ETH->DMATDLAR = (uint32_t) ETH_TXDescriptors;
 
 #ifdef ETH_ALLOCATE_BUFFERS_DYNAMICALLY
     buffers_initialized |= TXBUFFER_INITIALIZED;
 #endif
-
-    ETH_TXDescToBeUsed = desc;
 
 }
 
@@ -1301,20 +1398,24 @@ uint32_t *a = (uint32_t *) area;
     ETH_RXDescriptors = desc;
     for(i=0;i<count;i++) {
         desc->Status    = ETH_RXDESC_OWN;
-        desc->ControlBufferSize = ETH_RXBUFFER_SIZE | ETH_RXDESC_CHAINED;
+        desc->ControlBufferSize = ETH_RXBUFFER_SIZE | ETH_RXDESC_CHAINED 
+                                | ETH_RXBUFFER_DIC;
         desc->Buffer1Addr =  (uint32_t) (a + i*ETH_RXBUFFERSIZE_INT32UNITS);
-        desc->Buffer2NextDescAddr =  (uint32_t) (desc + ((i+1)%count));
+        desc->Buffer2NextDescAddr =  (uint32_t) (ETH_RXDescriptors + ((i+1)%count));
+        desc->ExtendedStatus = 0; 
+        desc->Reserved1 = 0;
+        desc->TimeStampLow = 0;
+        desc->TimeStampHigh = 0;
         desc++;
     }
 
     // Write table address to the ETH interface
-    ETH->DMARDLAR = (uint32_t) desc;
+    ETH->DMARDLAR = (uint32_t) ETH_RXDescriptors;
 
 #ifdef ETH_ALLOCATE_BUFFERS_DYNAMICALLY
     buffers_initialized |= RXBUFFER_INITIALIZED;
 #endif
 
-    ETH_RXDescToBeUsed = desc;
 }
 
 #ifdef ETH_ALLOCATE_BUFFERS_DYNAMICALLY
@@ -1420,17 +1521,17 @@ void ETH_Init(void) {
     uint32_t cr = findCREncoding();
     ETH->MACMIIAR = (ETH->MACMIIAR&~ETH_MACMIIAR_CR_Msk)|cr;
 
-    // Configuring PHY
-    ETH_ConfigurePHY();
-
     // Clear the MAC configuration
     ETH_ConfigureMAC();
 
     // Configure DMA
     ETH_ConfigureDMA();
 
+    // Configuring PHY
+    ETH_ConfigurePHY();
+
     // Configuring interrupt
-    ETH->DMAIER |= (ETH_DMAIER_NISE|ETH_DMAIER_RIE);
+    //ETH->DMAIER |= (ETH_DMAIER_NISE|ETH_DMAIER_RIE);
 
 #ifdef ETH_USE_ETH_IRQ
     NVIC_SetPriority(ETH_IRQn,ETH_IRQLevel);
@@ -1487,10 +1588,43 @@ void ETH_Stop(void) {
     ETH_DisableReceptionDMA();
 }
 
+
+
 /**
- * @brief   Update configuration
+ * @brief   ETH_ManualConfig
  * 
- * @note    To be used when reconnecting
+ * @note    Configure PHY using configuration in ETH_Config
+ */
+
+static void
+ETH_ManualConfig(void) {
+uint16_t value;
+
+    value = 0;
+    if( ETH_Config&ETH_CONFIG_FULLDUPLEX ) {
+        if ( ETH_Config&ETH_CONFIG_100BASET )  {
+            value |= ETH_PHY_BSR_100BASET_FULLDUPLEX;
+        } else if ( ETH_Config&ETH_CONFIG_10BASET ) {
+            value |= ETH_PHY_BSR_10BASET_FULLDUPLEX;
+        }
+    } else if( ETH_Config&ETH_CONFIG_HALFDUPLEX ) {
+        if ( ETH_Config&ETH_CONFIG_100BASET )  {
+            value |= ETH_PHY_BSR_100BASET_HALFDUPLEX;
+        } else if ( ETH_Config&ETH_CONFIG_10BASET ) {
+            value |= ETH_PHY_BSR_10BASET_HALFDUPLEX;
+        }
+    }
+    // Write config
+    ETH_WritePHYRegister(ETH_PHY_BCR,value);
+    delay(ETH_DELAY_AFTERCONFIG);
+
+}
+
+
+/**
+ * @brief   Update configuration status when connected
+ * 
+ * @note    To be used when connecting
  * 
  * @returns 0 when link not up
  *          1  when configured by autonegotiation
@@ -1498,117 +1632,170 @@ void ETH_Stop(void) {
  * 
  * @note    ETH_Status is set according the speed and duplex mode 
  */
-int
-ETH_UpdateConfig(void) {
+static void
+ETH_UpdateConfigStatus(void) {
 int configured = 0;
 int retries = 0;
-uint32_t value;
+uint16_t value;
 
-    ETH_Status = 0;
+    MESSAGE("Entering UpdateConfigStatus\n");
+
+    // Get the result
+    ETH_ReadPHYRegister(ETH_PHY_BSR,&value);
+
+    if( (value&ETH_PHY_BSR_LINKUP) == 0 ) {
+        ETH_ConfigStatus = ETH_CONFIGSTATUS_LINKDOWN;
+        return;
+    }
+    ETH_ConfigStatus = ETH_CONFIGSTATUS_LINKUP;
+
+    int status = ETH_GetLinkStatus();   
+    
+    // Set status
+    switch(status) {
+    case ETH_LINKINFO_100BASET_FULLDUPLEX:
+        ETH_ConfigStatus |= ETH_CONFIG_100BASET;
+        ETH_ConfigStatus |= ETH_CONFIG_FULLDUPLEX;
+        break;
+    case ETH_LINKINFO_100BASET_HALFDUPLEX:
+        ETH_ConfigStatus |= ETH_CONFIG_100BASET;
+        ETH_ConfigStatus |= ETH_CONFIG_HALFDUPLEX;
+        break;
+    case ETH_LINKINFO_10BASET_FULLDUPLEX:
+        ETH_ConfigStatus |= ETH_CONFIG_10BASET;
+        ETH_ConfigStatus |= ETH_CONFIG_FULLDUPLEX;
+        break;
+    case ETH_LINKINFO_10BASET_HALFDUPLEX:
+        ETH_ConfigStatus |= ETH_CONFIG_10BASET;
+        ETH_ConfigStatus |= ETH_CONFIG_HALFDUPLEX;
+        break;
+    }
+
+    // Set MAC configuration for Fast Ethernet and Full Duplex
+    uint32_t maccr = ETH->MACCR;
+    maccr &= ~(ETH_MACCR_FES|ETH_MACCR_DM);
+    if( ETH_ConfigStatus&ETH_CONFIG_100BASET )   maccr |= ETH_MACCR_FES;
+    if( ETH_ConfigStatus&ETH_CONFIG_FULLDUPLEX ) maccr |= ETH_MACCR_DM;
+    ETH->MACCR = maccr;
+
+    MESSAGE("Exiting UpdateConfigStatus\n");
+}
+
+
+
+
+/**
+ * @brief   UpdateLinkStatus
+ * 
+ * @note    It must be called when there is a change in link status
+ */
+int
+ETH_UpdateLinkStatus(void) {
+int configured = 0;
+int retries = 0;
+uint16_t value;
+
+    MESSAGE("Entering UpdateLinkStatus\n");
     if( ETH_Config&ETH_CONFIG_AUTONEGOTIATE ) {
         // Autonegotiate set
         retries = ETH_RETRIES_LINK;
         do {
+            value = 0;
             ETH_ReadPHYRegister(ETH_PHY_BSR,&value);
             delay(ETH_DELAY_BETWEENTESTS);
             retries--;
         } while ((retries>0)&&(value&ETH_PHY_BSR_LINKUP)!=ETH_PHY_BSR_LINKUP);
-        if( (value&ETH_PHY_BSR_LINKUP) != ETH_PHY_BSR_LINKUP ) {
-            return 0;
+
+        if( (value&ETH_PHY_BSR_LINKUP) == 0 ) {
+            // Not connected
+            configured = 0;
+            goto end;
         }
 
         // Configure Autonegotiate
-        ETH_WritePHYRegister(ETH_PHY_BCR,ETH_PHY_BCR_AUTONEGOTIATION);
+        ETH_WritePHYRegister(   ETH_PHY_BCR,
+                                ETH_PHY_BCR_AUTONEGOTIATIONRESTART
+                                );
         delay(ETH_DELAY_AFTERAUTONEGOTIATION);
         retries = ETH_RETRIES_AUTONEGOTIATION;
+        MESSAGE("Starting Autonegotiation");
         do {
-            ETH_ReadPHYRegister(ETH_PHY_BSR,&value);
+            value = 0;
             delay(ETH_DELAY_BETWEENTESTS);
-        } while(    (retries>0)
-                 &&( (value&ETH_PHY_BSR_AUTONEGOTIATIONCOMPLETED)
-                   !=ETH_PHY_BSR_AUTONEGOTIATIONCOMPLETED) );
-
-        if( (value&ETH_PHY_BSR_AUTONEGOTIATIONCOMPLETED)==ETH_PHY_BSR_AUTONEGOTIATIONCOMPLETED ) {
-            // Get the result
             ETH_ReadPHYRegister(ETH_PHY_BSR,&value);
-            // Set status
-            if( value&(ETH_PHY_BSR_100BASET_FULLDUPLEX|ETH_PHY_BSR_10BASET_FULLDUPLEX) ) {
-                ETH_Status |= ETH_CONFIG_FULLDUPLEX;
-            } else {
-                ETH_Status |= ETH_CONFIG_HALFDUPLEX;
-            }
-            if( value&(ETH_PHY_BSR_100BASET_FULLDUPLEX|ETH_PHY_BSR_100BASET_HALFDUPLEX) ) {
-                ETH_Status |= ETH_CONFIG_100BASET;
-            } else {
-                ETH_Status |= ETH_CONFIG_10BASET;
-            }
+            ETH_ReadPHYRegister(ETH_PHY_BSR,&value);
+
+            message("BSR=%04X ",value);
+        } while(    (retries-->0)
+                 && ((value&ETH_PHY_BSR_AUTONEGOTIATIONCOMPLETED)==0) );
+
+        if( value&ETH_PHY_BSR_AUTONEGOTIATIONCOMPLETED ) {
+            MESSAGE("Success\n");
+            // Update config status
+            ETH_UpdateConfigStatus();
             configured = 1;
         }
     }
     if( ! configured ) {
+        MESSAGE("Failed\n");
         // Autonegotiation not set or not working
         // Configure Speed and Duplex Mode
-        value = 0;
-        if( ETH_Config&ETH_CONFIG_FULLDUPLEX ) {
-            if ( ETH_Config&ETH_CONFIG_100BASET )  {
-                value |= ETH_PHY_BSR_100BASET_FULLDUPLEX;
-                ETH_Status |= ETH_CONFIG_100BASET|ETH_CONFIG_FULLDUPLEX;
-            } else if ( ETH_Config&ETH_CONFIG_10BASET ) {
-                value |= ETH_PHY_BSR_10BASET_FULLDUPLEX;
-                ETH_Status |= ETH_CONFIG_10BASET|ETH_CONFIG_FULLDUPLEX;
-            }
-        } else if( ETH_Config&ETH_CONFIG_HALFDUPLEX ) {
-            if ( ETH_Config&ETH_CONFIG_100BASET )  {
-                value |= ETH_PHY_BSR_100BASET_HALFDUPLEX;
-                ETH_Status |= ETH_CONFIG_100BASET|ETH_CONFIG_HALFDUPLEX;
-            } else if ( ETH_Config&ETH_CONFIG_10BASET ) {
-                value |= ETH_PHY_BSR_10BASET_HALFDUPLEX;
-                ETH_Status |= ETH_CONFIG_10BASET|ETH_CONFIG_HALFDUPLEX;
-            }
-        }
-        // Write config
-        ETH_WritePHYRegister(ETH_PHY_BCR,value);
-        delay(ETH_DELAY_AFTERCONFIG);
+        ETH_ManualConfig();
 
+        ETH_UpdateConfigStatus();
         configured = 2;
     }
 
+end:
     // Post configuration actions
+    MESSAGE("Exiting UpdateLinkStatus\n");
 
     return configured;
+
 }
+
+
+
 /**
- * @brief   Transmit data in buffer (maximal ETH_TXBUFFER_SIZE*ETH_MAX_PACKET_SIZE)
- *
+ * @brief   Transmit data already in DMA buffer 
+ * 
  * @note    size must be smaller or equal to ETH_TXBUFFER_SIZE*ETH_MAX_PACKET_SIZE
+ * 
+ * @note    It uses a default (non OSF) mode, i.e., only one frame beeing
+ *          transmitted
  *
- * @note    Buffer can only be modified when there is no tx operation running
+ * @note    Buffer can only be modified when there is no TX DMA operation running
  *
  * @note    Procedure to transmit a multiple buffer frame
  *
- *          1. Setup the descriptors.
- *          2. Set OWN bit in all
- *          3. Set ST bit in DMAOMR register to start the DMA transmit engine
- *          4. Repeat
- *          5.    Copy data to transmission device (send it!)
- *          6.    If not the last one, get next descriptor
- *          7. Until all data is transmitted (No more descriptors with OWN bit set) or
+ *          1. Wait until descriptors are free (OWN=0)
+ *          2. Copy the data to the DMA buffers
+ *          3. Adjust descriptors flags
+ *          4. Set OWN bit in all descriptors
+ *          3. Set ST bit in DMAOMR to make DMA enter in Run state
+ *    Copy data to transmission device (send it!)
+ *          4.    If not the last one, get next descriptor
+ *          5. Until all data is transmitted (No more descriptors with OWN bit set) or
  *             a descriptor has the LS bit set.
- *
+
+ *          7. Set ST bit in DMAOMR register to start the DMA transmit engine*
+ * 
  * @note    To resume operation, write something to DMATPDR
  *
  */
 int
-ETH_TransmitFrame(unsigned size) {
+ETH_TransmitFrame(ETH_DMADescriptor *desc, unsigned size) {
 int nbuffers,lastbuffersize;
-ETH_DMADescriptor *desc;
+
 
     if( size == 0 )
         return 0;
 
-    desc = ETH_TXDescToBeUsed;
-    // Check OWN bit in the first descriptor
-    if( (desc->Status&ETH_TXDESC_OWN) == 0 ) {
+    MESSAGE("Entering ETH_TransmitFrame\n");
+
+    desc = ETH_TXDescriptors;
+    // Check OWN bit in the first descriptor. If it is set, DMA is using it
+    if( (desc->Status&ETH_TXDESC_OWN) != 0 ) {
         return -1;      // BUSY!!!!!!
     }
 
@@ -1621,6 +1808,7 @@ ETH_DMADescriptor *desc;
         desc->Status |= ETH_TXDESC_FIRST|ETH_TXDESC_LAST;
         desc->ControlBufferSize = lastbuffersize&ETH_TXDESC_BUFFER1SIZE_MSK;
         desc->Status |= ETH_TXDESC_OWN;
+        __DSB();
     } else {
         // Configure first descriptor
         desc->Status = (desc->Status&~ETH_TXDESC_LAST)|ETH_TXDESC_FIRST;
@@ -1639,16 +1827,20 @@ ETH_DMADescriptor *desc;
         desc->Status = (desc->Status&~ETH_TXDESC_FIRST)|ETH_TXDESC_LAST;
         desc->ControlBufferSize = lastbuffersize&ETH_TXDESC_BUFFER1SIZE_MSK;
         desc->Status |= ETH_TXDESC_OWN;
+        __DSB();
     }
 
     // Check Transmit buffer status
     if( ETH->DMASR&ETH_DMASR_TBUS ) {
         // Clear it and start transmission
-        ETH->DMASR = ETH_DMASR_TBUS;        //
-        ETH->DMATPDR = 0;                   // Resume transmission
+        ETH->DMASR = ETH_DMASR_TBUS;        // Clear
+        ETH->DMATPDR = 0;                   // Transmit poll demand
     }
 
-    ETH_TXDescToBeUsed = (ETH_DMADescriptor *) desc->Buffer1Addr;
+    // Place transmissition in the Run state (just in case)
+    ETH->DMAOMR |= ETH_DMAOMR_ST;
+
+    MESSAGE("Exiting ETH_TransmitFrame\n");
     return 0;
 }
 
@@ -1681,7 +1873,10 @@ int
 ETH_ReceiveFrame(ETH_DMAFrameInfo *RxFrameInfo) {
 int len;
 int bsize;
-ETH_DMADescriptor *desc;
+ETH_DMADescriptor *desc,*descfirst;
+uint32_t status;
+int first;
+int rc = 0;
 
     // Clean RxFrameInfo
     RxFrameInfo->SegmentCount = 0;
@@ -1689,44 +1884,88 @@ ETH_DMADescriptor *desc;
     RxFrameInfo->LastSegmentDesc = 0;
     RxFrameInfo->FrameLength = 0;
 
-    // Scan descriptors
-    desc = ETH_RXDescToBeUsed;
-    while( (desc->Status&ETH_RXDESC_OWN) == 0 )  {
-        len = (desc->Status&ETH_RXDESC_FIELDLENGTH_MASK)>>ETH_RXDESC_FIELDLENGTH_POS;
+    MESSAGE("Entering ETH_ReceiveFrame\n");
+
+    ETH_EnableReceptionDMA();
+
+    // Searching for First segment
+    desc = ETH_RXDescriptors;/*  */
+    status = desc->Status;
+    first = 0;
+    do {
+        uint32_t x = (status&ETH_RXDESC_OWN)?1:0;
+        message("Processing descriptor at %p (own=%d). ",desc,x);
+        first = ((status&ETH_RXDESC_OWN)==0)&&((status&ETH_RXDESC_FIRST)==1);
+        if( first ) {
+            // found a first segment
+            break;
+        }
+        desc = (ETH_DMADescriptor *) desc->Buffer2NextDescAddr;
+        message("Next is %p\n",desc);
+        status = desc->Status;
+    } while ( desc != ETH_RXDescriptors );
+
+
+    if( !first ) {
+        MESSAGE("A first segment not found\n");
+        rc = -1;
+        goto err;
+    }
+
+    MESSAGE("Found a first segment\n");
+    descfirst = desc;
+    status = desc->Status;
+
+    while( (status&ETH_RXDESC_OWN) == 0 )  {
+        message("processing descriptor at %p\n",desc);
+        len = (status&ETH_RXDESC_FRAMELENGTH_MASK)>>ETH_RXDESC_FRAMELENGTH_POS;
         bsize = (desc->ControlBufferSize&ETH_RXDESC_BUFFER1SIZE_MASK)>>ETH_RXDESC_BUFFER1SIZE_POS;
-        if( (desc->Status&ETH_RXDESC_FIRST) && (desc->Status&ETH_RXDESC_LAST) ) {
-            // Only one buffer
+
+        if( (status&ETH_RXDESC_FIRST) && (status&ETH_RXDESC_LAST) ) {
+            MESSAGE("Received only one frame\n");
+           // Only one buffer
             RxFrameInfo->FirstSegmentDesc = desc;
             RxFrameInfo->LastSegmentDesc  = 0;
             RxFrameInfo->SegmentCount = 1;
-            len = (desc->Status&ETH_RXDESC_FIELDLENGTH_MASK)>>ETH_RXDESC_FIELDLENGTH_POS;
+            len = (desc->Status&ETH_RXDESC_FRAMELENGTH_MASK)>>ETH_RXDESC_FRAMELENGTH_POS;
             RxFrameInfo->FrameLength = (len-4);      // exclude CRC
-            return 1;
-        } else if ( desc->Status&ETH_RXDESC_FIRST ) {
+            rc = 1;
+            break;
+        } else if ( status&ETH_RXDESC_FIRST ) {
+            MESSAGE("Received first frame\n");
             // first buffer
             RxFrameInfo->FirstSegmentDesc = desc;
             RxFrameInfo->LastSegmentDesc  = 0;
             RxFrameInfo->SegmentCount = 1;
             RxFrameInfo->FrameLength = bsize;
-        } else if ( desc->Status&ETH_RXDESC_LAST )  {
+        } else if ( status&ETH_RXDESC_LAST )  {
+            MESSAGE("Received last frame\n");
             // last buffer
             RxFrameInfo->LastSegmentDesc  = desc;
             RxFrameInfo->SegmentCount++;
+            len = (desc->Status&ETH_RXDESC_FRAMELENGTH_MASK)>>ETH_RXDESC_FRAMELENGTH_POS;
             RxFrameInfo->FrameLength += (len-4);     // exclude CRC
-            return 1;
+            rc = 1;
+            break;
         } else {
+            MESSAGE("Received middle frame\n");
             // intermediary
             RxFrameInfo->SegmentCount++;
             RxFrameInfo->FrameLength += bsize;
         }
-
+        MESSAGE("Next\n");
         desc = (ETH_DMADescriptor *) desc->Buffer2NextDescAddr;
         // Test if it returned to the start
-        if( desc == ETH_RXDescToBeUsed )
+        if( desc == descfirst )
             break;
+        status = desc->Status;
     }
-    ETH_RXDescToBeUsed = (ETH_DMADescriptor *) desc->Buffer1Addr;
-    return 0;
+
+err:
+    ETH_EnableReceptionDMA();
+    MESSAGE("Exiting ETH_ReceiveFrame\n");
+
+    return rc;
 }
 
 
@@ -1741,8 +1980,9 @@ ETH_CheckReception(void) {
 ETH_DMADescriptor *desc;
 uint32_t SegmentCount = 0;
 
-    desc = ETH_RXDescToBeUsed;
+    desc = ETH_RXDescriptors;
 
+    SegmentCount = 0;
     while(desc) {
         if( (desc->Status&ETH_RXDESC_OWN) != 0 )  {
             return 0;
@@ -1765,7 +2005,7 @@ uint32_t SegmentCount = 0;
         }
         desc = (ETH_DMADescriptor *) desc->Buffer2NextDescAddr;
         // Test if it returned to the start
-        if( desc == ETH_RXDescToBeUsed )
+        if( desc == ETH_RXDescriptors )
             break;
     }
     return 0;
@@ -1868,15 +2108,19 @@ void ETH_DisableReceptionMAC(void) {
  */
 int  ETH_IsConnected(void) {
 int retries = ETH_RETRIES_LINK;
-uint32_t value;
+uint16_t value;
 
-        do {
-            ETH_ReadPHYRegister(ETH_PHY_BSR,&value);
-            delay(ETH_DELAY_BETWEENTESTS);
-            retries--;
-        } while((retries>0)&&(value&ETH_PHY_BSR_LINKUP)!=ETH_PHY_BSR_LINKUP);
+    MESSAGE("Is connected?\n");
+    value = 0;
+    do {
+        ETH_ReadPHYRegister(ETH_PHY_BSR,&value);
+        delay(ETH_DELAY_BETWEENTESTS);
+    } while((retries-->0)&&((value&ETH_PHY_BSR_LINKUP)==0));
 
-        return (value&ETH_PHY_BSR_LINKUP) == ETH_PHY_BSR_LINKUP;
+    message("Connected = %04X = ",value);
+    value = (value&ETH_PHY_BSR_LINKUP)!=0;
+    message(" %d\n",value);
+    return value ;
 }
 
 /**
@@ -1889,6 +2133,27 @@ uint32_t value;
 int  ETH_IsLinkUp(void) {
 
     return ETH_IsConnected();
+}
+
+
+
+/**
+ * @brief   Return link status
+ * 
+ * @brief   Returns a merge of BCR and BSR registers of PHY
+ * 
+ * @return  higher 16 bits contains BCR and the lower 16 bits, BSR 
+ */
+unsigned ETH_GetLinkStatus(void) {
+uint16_t bcr,bsr;
+
+    ETH_ReadPHYRegister(ETH_PHY_BCR,&bcr);
+    delay(ETH_DELAY_BETWEENTESTS);
+
+    ETH_ReadPHYRegister(ETH_PHY_BSR,&bsr);
+    delay(ETH_DELAY_BETWEENTESTS);
+
+    return  (((uint32_t) bcr)<<16) | ((uint32_t) bsr);
 }
 
 ///////////////// Register callback functions ////////////////////////////////////////////////////
@@ -1917,4 +2182,107 @@ void ETH_RegisterCallback(unsigned which, void (*pFunction)(unsigned) ) {
     return;
 }
 
+struct pyregisternames {
+    int     index;
+    char *  name;
+} regtable[] = {
+  {  0, "Basic Control" },
+  {  1, "Basic Status" },
+  {  2, "PHY Identifier 1" },
+  {  3, "PHY Identifier 2" },
+  {  4, "Auto Negotiation Advertisement" },
+  {  5, "Auto Negotiation Partner Ability" },
+  {  6, "Auto Negotiation Expansion" },
+  {  7, "Auto Negotiation Next Page TX" },
+  {  8, "Auto Negotiation Next Page RX" },
+  { 13, "MMD Access Control" },
+  { 14, "MMD Access Address/Data" },
+  { 16, "EDPD NLP/Crossover Time*" },
+  { 17, "Mode Control/Status*" },
+  { 18, "Special Modes*" },
+  { 24, "TDR Patterns/Delay Control*" },
+  { 25, "TDR Control/Status*" },
+  { 26, "Symbol Error Counter*" },
+  { 27, "Special Control/Status Indications*" },
+  { 28, "Cable Length*" },
+  { 29, "Interrupt Source Flag*" },
+  { 30, "Interrupt Mask*" },
+  { 31, "PHY Special Control/Status" },
+  { 0,  0 } /* END MARKER */
+};
 
+void ETH_PHYRegisterDump(void) {
+struct pyregisternames *p = regtable;
+uint16_t value;
+#if 0
+    while( p->name ) {
+        ETH_ReadPHYRegister(p->index,&value);
+        message("%35s: %04X\n",p->name,value);
+        p++;
+    }
+#endif
+}
+
+
+/**
+ * @brief   ETH_GetLinkInfo
+ * 
+ * @note    returns the link info
+ * 
+ */
+
+static char const *linkinfo[] = {
+    /* 000 */       "Not connected ?",
+    /* 001 */       "10BaseT Half Duplex",
+    /* 010 */       "100BaseT Half Duplex",
+    /* 011 */       "Not connected?",
+    /* 100 */       "Not connected ?",
+    /* 101 */       "10BaseT Full Duplex",
+    /* 110 */       "100BaseT Full Duplex",
+    /* 111 */       "Not connected"
+};
+
+int
+ETH_GetLinkInfo(void) {
+uint16_t value;
+
+    ETH_ReadPHYRegister(ETH_PHY_SCSR,&value);
+
+    value >>= 2;
+    value &= 0x7;
+    return value;
+}
+
+char const *
+ETH_GetLinkInfoString(void) {
+uint16_t value;
+
+    value = ETH_GetLinkInfo();
+    return linkinfo[value];
+}
+
+
+/**
+ * @brief   ETH_DumpDescriptors
+ * 
+ */
+void ETH_DumpDescriptors(void) {
+ETH_DMADescriptor *desc,*next;
+char *buffer;
+
+    desc = ETH_TXDescriptors;
+    do {
+        next = (ETH_DMADescriptor *) (desc->Buffer2NextDescAddr);
+        buffer = (char *) (desc->Buffer1Addr);
+        message("TX descriptor = %p: next = %p buffer = %p\n",desc,next,buffer);
+        desc = next;
+    } while ( desc != ETH_TXDescriptors );
+
+    desc = ETH_RXDescriptors;
+    do {
+        next = (ETH_DMADescriptor *) (desc->Buffer2NextDescAddr);
+        buffer = (char *) (desc->Buffer1Addr);
+        message("RX descriptor = %p: next = %p buffer = %p\n",desc,next,buffer);
+        desc = next;
+    } while ( desc != ETH_RXDescriptors );
+}
