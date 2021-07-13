@@ -12,7 +12,7 @@
 #include <stdio.h>
 
 ///@{
-extern int verbose;
+int verbose  __attribute__((weak)) = 0;
 
 
 static void message(char *msg,...) {
@@ -27,14 +27,14 @@ static void message(char *msg,...) {
     va_end(args);
 }
 
-#define MESSAGE(text)  \
+#define MESSAGE(TEXT)  \
         do {\
-            if( verbose ) message(text); \
+            if( verbose ) message(TEXT); \
         } while(0)
 #if __STDC_VERSION__ >= 199901L
 #define MESSAGEV(TEXT,...) \
         do { \
-            if ( verbose ) message(text, __VA_ARGS__)); \
+            if ( verbose ) message(TEXT, __VA_ARGS__); \
         } while(0)
 #else
 #define MESSAGEV

@@ -414,7 +414,7 @@ err_t err;
     netif_set_link_callback(&netif, stnetif_link_callback);
     //netif_set_remove_callback(&netif,0);
     
-    //netif_set_link_up(&netif);
+    netif_set_link_up(&netif);
     netif_set_up(&netif);
 
 #if LWIP_DHCP
@@ -462,7 +462,7 @@ err_t err;
 void Network_Process(void) {
 
     // Print status (for debug)
-    //stnetif_printstatus();
+    stnetif_printstatus();
 
     //LWIP_CheckLink();
     stnetif_link(&netif);

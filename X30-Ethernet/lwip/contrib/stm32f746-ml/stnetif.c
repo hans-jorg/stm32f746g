@@ -262,7 +262,7 @@ static void low_level_init(struct netif *netif) {
     ETH_Init();
 
     // Set link status
-    //netif->flags |= NETIF_FLAG_LINK_UP;
+    netif->flags |= NETIF_FLAG_LINK_UP;
 
     // Check link status
     (void) low_level_get_link_status();
@@ -271,7 +271,7 @@ static void low_level_init(struct netif *netif) {
     ETH_Start();
 
     // Set flags accordingly
-    //stnetif_link(netif);
+    stnetif_link(netif);
 
     MESSAGE("Exiting low_level_init\n");
 }
@@ -683,8 +683,6 @@ void stnetif_link(struct netif *netif) {
 u8_t up;
 
     MESSAGE("stnet link\n");
-
-    // ETH_PHYRegisterDump();
 
     up = low_level_get_link_status();
 
