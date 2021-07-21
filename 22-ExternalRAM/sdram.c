@@ -143,8 +143,8 @@
 /*
  *  @brief  Refresh count
  *
- *  @note   All rows must be refreshed every 64 ms. This can be done distributed along this time
- *          or as a burst with an interval of 60 ns.
+ *  @note   All rows must be refreshed every 64 ms. This can be done distributed
+ *          along this time or as a burst with an interval of 60 ns.
  *
  *  @note   Refresh count depends on the SD_CLK signal
  *
