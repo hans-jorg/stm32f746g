@@ -29,7 +29,8 @@
 #include "lwip/init.h"
 #include "lwip/netif.h"
 #include "netif/ethernet.h"
-#include "lwip/dhcp.h"
+//#include "lwip/dhcp.h"
+#include "lwip/ip4_addr.h"
 #include "lwip/etharp.h"
 #include "lwip/timeouts.h"
 #include "arch/cc.h"
@@ -39,13 +40,18 @@
 #include "lwip/apps/tftp_server.h"
 #include "stnetif.h"
 
+#include "debugdump.h"
+#include "debugmessages.h"
+
 
 /**
  * @brief   verbose flag
  *
  * @note    Used in ethernetif
  */
-int verbose = 1;
+#ifdef VERBOSE
+int verbose = VERBOSE;
+#endif
 
 /** 
  * @brief Configuration
@@ -67,14 +73,12 @@ int verbose = 1;
 
 //////////////////// Network configuration /////////////////////////////////////
 
-#if LWIP_DHCP
-static ip4_addr_t       ipaddr;
-static ip4_addr_t       netmask;
-static ip4_addr_t       gateway;
-#else
-static ip4_addr_t       ipaddr    = { IPV4(192,168,0,201) };
-static ip4_addr_t       netmask   = { IPV4(255,255,255,1)   };
-static ip4_addr_t       gateway   = { IPV4(192,168,0,1) };
+static ip4_addr_t       ipaddr  = {0};
+static ip4_addr_t       netmask = {0};
+static ip4_addr_t       gateway = {0};
+
+#ifndef LWIP_DHCP
+// IP, Netmask, Gateway should be here but the lwip macros do not allow it
 #endif
 
 
@@ -162,33 +166,13 @@ convertbyte(uint8_t b, char *p) {
     return p;
 
 }
-/**
- * @brief   convert IPv4 Address to (point separated) string
- *
- * @note
- */
-int
-ip2str(uint32_t ip, char *s) {
-char *p = s;
-
-    p = convertbyte((ip>>24)&0xFF,p);
-    *p++ = '.';
-    p = convertbyte((ip>>16)&0xFF,p);
-    *p++ = '.';
-    p = convertbyte((ip>>8)&0xFF,p);
-    *p++ = '.';
-    p = convertbyte((ip)&0xFF,p);
-    *p = 0;
-
-    return 0;
-}
 
 /**
  * @brief   int2str
  *
   * @brief  Convert an integer to a string, avoiding string overflow
  *
- * @note    When an overflow is detected, the field is filled with astarisks
+ * @note    When an overflow is detected, the field is filled with asterisks
  *
  * @note    len must account for the null terminator
  */
@@ -231,64 +215,8 @@ int e10 = 1;
     return 0;
 }
 
-/**
- * @brief   hexdump
- *
- * @note    print a memory dump
- */
-void
-hexdump(void *area, int size, unsigned addr) {
-unsigned offset;
-unsigned a = addr;
-unsigned char *c;
-int i;
-
-    for(offset=0; offset<size; offset+=16) {
-        printf("%04X ",a);
-        c = ((unsigned char *) area) + offset;
-        for(i=0;i<16;i++) {
-            if( i == 8 )
-                printf("  ");
-            printf("%02X",c[i]);
-        }
-        printf("  ");
-        for(i=0;i<16;i++) {
-            if( i == 8 )
-                printf(" ");
-            if( isprint(c[i])) {
-                putchar(c[i]);
-            } else {
-                putchar('.');
-            }
-        }
-        putchar('\n');
-        a += 16;
-    }
-    return;
-}
 
 
-/**
- * @brief message
- *
- * @note  This version uses the standard library vprintf function.
- *
- *
- * @note  Another version using a macro with variable number of arguments was
- *        tried. But such macros must have at least two arguments. Dismissed!!!!
- */
-
-static void message(char *msg,...) {
-
-    va_list args;
-
-    va_start(args,msg);
-
-    if( verbose ) {
-        vprintf(msg,args);
-    }
-    va_end(args);
-}
 
 ///////////////////// TFTP Functions ///////////////////////////////////////////
 
@@ -367,10 +295,6 @@ static struct netif     netif;
 
 ///////////////////// Network Functions ////////////////////////////////////////
 
-#define MESSAGE(text)  message(text)
-
-
-
 /**
  * @brief   Initialize lwIP
  * 
@@ -385,10 +309,10 @@ err_t err;
 
     MESSAGE("Initializing interface\n");
 
-#if LWIP_DHCP
-    ipaddr.addr  = 0;
-    netmask.addr = 0;
-    gateway.addr = 0;
+#if ! LWIP_DHCP
+    IP4_ADDR(&ipaddr,192,168,0,190);
+    IP4_ADDR(&netmask,255,255,255,0);
+    IP4_ADDR(&gateway,192,168,0,1);
 #endif
     netif_add(  &netif, 
                 &ipaddr, 
@@ -426,17 +350,17 @@ err_t err;
 #endif
 
     MESSAGE("Ethernet interface up\n");
-    if( verbose ) {
-        if( ip4_addr_isany_val(ipaddr) ) {
+   // if( verbose ) {
+   //     if( ip4_addr_isany_val(ipaddr) ) {
             char s[20];
-            ip2str(ipaddr.addr,s);
+            ipaddr_ntoa_r(&ipaddr,s,20);
             printf("IP Address = %s\n",s);
-            ip2str(netmask.addr,s);
+            ipaddr_ntoa_r(&netmask,s,20);
             printf("IP Network Mask = %s\n",s);
-            ip2str(gateway.addr,s);
+            ipaddr_ntoa_r(&gateway,s,20);
             printf("IP Gateway = %s\n",s);
-        }
-    }
+    //    }
+    // }
 
 
 #if USE_TFTP 
@@ -481,6 +405,19 @@ void Network_Process(void) {
     netif_poll_all();
 #endif
 
+    if( ip4_addr_isany_val(ipaddr) ) {
+        char s[20];
+        ipaddr_ntoa_r(&ipaddr,s,20);
+        printf("IP Address = %s\n",s);
+        #if 0
+        ip2str(netmask.addr,s);
+        printf("IP Network Mask = %s\n",s);
+        ip2str(gateway.addr,s);
+        printf("IP Gateway = %s\n",s);
+        #endif
+    }
+
+
 }
 
 ///////////////////// Main Function ///////////////////////////////////////////////////////////////
@@ -510,6 +447,9 @@ err_t rc;
     printf("Starting SDRAM\n");
     SDRAM_Init();
 
+    memset((uint8_t *) 0xC0000000, 0x12345678, 0x1000 );
+    memcpy((uint8_t *) 0xC0000000, (uint8_t *) 0x20000000, 0x1000);
+
 #if 1
     message("Initializing LWIP\n");
     Network_Init();
@@ -519,9 +459,14 @@ err_t rc;
     while(1) {
 
         Network_Process();
-        int x = 1<<24;
-        while(x--) {}
-        printf("%d\n",cnt++);
+
         // Application code here
+        cnt++;
+        if( cnt == 20 ) {
+            char line[20];
+            MESSAGE("PAUSE\n");
+            fgets(line,20,stdin);
+            cnt = 0;
+        }
     }
 }

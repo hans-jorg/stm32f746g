@@ -47,15 +47,15 @@
  *
  */
 typedef struct {
-    uint32_t   Status;                      /*!< Status */
-    uint32_t   ControlBufferSize;           /*!< Control, lengths of buffer 1 and 2 */
-    uint32_t   Buffer1Addr;                 /*!< Buffer 1 address */
-    uint32_t   Buffer2NextDescAddr;         /*!< Buffer 2 address/Nex descriptor address */
+    volatile uint32_t   Status;                 /*!< Status */
+    volatile uint32_t   ControlBufferSize;      /*!< Control flags and lengths */
+    volatile uint32_t   Buffer1Addr;            /*!< Buffer 1 address */
+    volatile uint32_t   Buffer2NextDescAddr;    /*!< Buffer 2 address/Next */
     /* Fields for enhanced descriptor format (includes PTP Info) */
-    uint32_t   ExtendedStatus;              /*!< Extended status for PTP receive descriptor */
-    uint32_t   Reserved1;                   /*!< Reserved */
-    uint32_t   TimeStampLow;                /*!< Time Stamp Low  */
-    uint32_t   TimeStampHigh;               /*!< Time Stamp High */
+             uint32_t   ExtendedStatus;         /*!< Extended status for PTP  */
+             uint32_t   Reserved1;              /*!< Reserved */
+             uint32_t   TimeStampLow;           /*!< Time Stamp Low  */
+             uint32_t   TimeStampHigh;          /*!< Time Stamp High */
 } ETH_DMADescriptor;
 
 /**
@@ -105,7 +105,7 @@ extern ETH_DMAFrameInfo  ETH_RXFrameInfo;
  */
 ///@{
 #ifndef ETH_TXBUFFER_COUNT
-    #define ETH_TXBUFFER_COUNT      (5)
+    #define ETH_TXBUFFER_COUNT      (4)
 #endif
 #ifndef ETH_RXBUFFER_COUNT
     #define ETH_RXBUFFER_COUNT      (4)
@@ -189,14 +189,6 @@ void ETH_Start(void);
 void ETH_Stop(void);
 void ETH_EnableClock(uint32_t which);
 void ETH_DisableClock(uint32_t which);
-void ETH_EnableTransmissionDMA(void);
-void ETH_DisableTransmissionDMA(void);
-void ETH_EnableReceptionDMA(void);
-void ETH_DisableReceptionDMA(void);
-void ETH_EnableTransmissionMAC(void);
-void ETH_DisableTransmissionMAC(void);
-void ETH_EnableReceptionMAC(void);
-void ETH_DisableReceptionMAC(void);
 
 // Callback routines 
 void ETH_RegisterCallback(unsigned, void (*)(unsigned));
@@ -220,4 +212,4 @@ int ETH_GetLinkInfo(void);
 char const * ETH_GetLinkInfoString(void);
 #endif
 
-void ETH_DumpDescriptors(void);
+void ETH_DumpDescriptors(uint32_t); // which = 1: TX, 2:RX, 3:both

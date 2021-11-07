@@ -113,7 +113,7 @@
 #define SDRAM_TRP               2
 #define SDRAM_TWR               3
 #define SDRAM_TRC               7
-#define SDRAM_TRAS              7
+#define SDRAM_TRAS              4
 #define SDRAM_TXSR              7
 #define SDRAM_TMRD              2
 
@@ -185,7 +185,7 @@
  *      11 1100 0000 0000
  *      32 1098 7654 3210
  *      --------------
- *      00 0010 0011 0000 = 0x230
+ *      00 0010 0010 0000 = 0x220
  */
 
 #define SDRAM_MODE   0x230

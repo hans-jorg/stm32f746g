@@ -22,7 +22,7 @@ There is only one routine.
 
 int SDRAM_Init();
 
-If it returns zero, the SDRAM can be accessed in the 0xC000\_0000-0x007F_FFFF address range.
+If it returns zero, the SDRAM can be accessed in the 0xC000\_0000-0xC07F\_FFFF address range.
 
 
 Configuration
@@ -193,8 +193,7 @@ TE: There is an error in Figure  of RM!!! Bank 4 is not used?
 
 It uses Bank 4 and 5 for FMC SDRAM. This board is hardwired to use the Bank 4,
       a.k.a, SDRAM Bank1 due to the use of SDCKE0 and SDNE0
-      
-      
+
 |  Bank |SDRAM Bank |  Size   |         | Address range
 |-------|-----------|---------|--------------------------
 |   4   |     1     | 256 MB  | 4x64 MB | 0xC000_0000-0xCFFF_FFFF
@@ -379,7 +378,7 @@ the Target Bank bits CTB1 and CTB2 in the FMC_SDCMR register:
 ### SDRAM
 
 
-The SDRAM device used is a MT48LC4M32B2B5-6A, manufactured by Micron.
+The SDRAM device used is a 16-MByte IS42S32400F, manufactured by ISSI. It has a 32 bit data bus, but only 16 pins are used. This reduces the usable capacity to 8 MBytes.
 
 Only 16 bits of data bus (DQ15..0) )are used. So it is then not neccessary to
 use full DQM. Only DQM0 and DQM1 need to be used.
@@ -625,7 +624,7 @@ References
 
 
 1. [https://www.micron.com/products/dram/sdram/part-catalog/mt48lc4m32b2b5-6a-it](https://www.micron.com/products/dram/sdram/part-catalog/mt48lc4m32b2b5-6a-it)
-2. [](https://media-www.micron.com/-/media/client/global/documents/products/data-sheet/dram/128mb_x32_sdram.pdf?rev=a4b9962d86784413b3cfa348b78a1360)
+2. [Micron mt48lc4m32b2b5 datasheet](https://media-www.micron.com/-/media/client/global/documents/products/data-sheet/dram/128mb_x32_sdram.pdf?rev=a4b9962d86784413b3cfa348b78a1360)
 3. [STM32F75xxx and STM32F74xxx advanced Arm ® -based 32-bit MCUs Reference Manual - RM0385](https://www.st.com/resource/en/reference_manual/dm00124865-stm32f75xxx-and-stm32f74xxx-advanced-arm-based-32-bit-mcus-stmicroelectronics.pdf)
 
 

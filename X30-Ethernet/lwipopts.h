@@ -27,7 +27,7 @@
 /*-----------------------------------------------------------------------------*/
 /* LwIP Stack Parameters (modified compared to initialization value in opt.h) -*/
 /*----- Value in opt.h for LWIP_DHCP: 0 -----*/
-#define LWIP_DHCP 1
+#define LWIP_DHCP 0
 
 ////
 /*----- Value in opt.h for NO_SYS: 0 -----*/
@@ -99,10 +99,10 @@
 //#define API_LIB_DEBUG                   LWIP_DBG_OFF
 //#define API_MSG_DEBUG                   LWIP_DBG_OFF
 //#define SOCKETS_DEBUG                   LWIP_DBG_OFF
-//#define ICMP_DEBUG                      LWIP_DBG_OFF
+#define ICMP_DEBUG                      LWIP_DBG_OFF
 //#define IGMP_DEBUG                      LWIP_DBG_OFF
 //#define INET_DEBUG                      LWIP_DBG_OFF
-//#define IP_DEBUG                        LWIP_DBG_OFF
+#define IP_DEBUG                        LWIP_DBG_OFF
 //#define IP_REASS_DEBUG                  LWIP_DBG_OFF
 //#define RAW_DEBUG                       LWIP_DBG_OFF
 //#define MEM_DEBUG                       LWIP_DBG_OFF
@@ -150,4 +150,7 @@
 /* halt after printing this debug message */
 #define LWIP_DBG_HALT          0x08U
 
+
+
+#define ETHARP_FLAG_TRY_HARD  1
 #endif

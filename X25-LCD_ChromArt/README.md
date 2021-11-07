@@ -100,7 +100,7 @@ The Chrom-ART interface, also known as DMA2D, can operate in the following modes
 • Memory-to-memory with Pixel Format Conversion (PFC)
 • Memory-to-memory with Pixel Format Conversion (PFC) and Blending
 
-It incorporates dedicated memoryu for CLUT (color look-up tables).
+It incorporates dedicated memory for CLUT (color look-up tables).
 
 It has two ports:
 

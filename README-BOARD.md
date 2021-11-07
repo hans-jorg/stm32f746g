@@ -13,6 +13,7 @@ The main features of the STM32F74GDISCOVERY board are:
     - 1 MByte of Flash memory
     - 340 KBytes of RAM memory
 
+
 * Color 4.3" LCD display with 480x272 resolution with capacitive touch screen
 * Ethernet with RJ45 connector
 * USB Full Speed with OTG
@@ -216,7 +217,7 @@ To use it, one must call the following routines:
 
 ### External RAM
 
-The board uses a MT48LC4M32B2B5-6A SDRAM integrated circuit to expand its RAM using the Flexible Memory Controller.
+The board uses a 16-MByte MT48LC4M32B2B5-6A SDRAM device to expand its RAM using the Flexible Memory Controller. In recent version of the board, the fully compatible ISSI IS42S32400F-6BL device is used instead.
 
 The device is a PC133 compatible SDRAM and it has four banks of 1 M cell with 32 bits. In total, it has then 128 MBits (=16 Mbytes) but only half of them will be reached due to limitations in the MCU.
 
@@ -423,20 +424,38 @@ occupies a region in the address space of microcontroller.
 
 #### Micro SD Card interface
 
-The board has micro SD connector.
+The board has micro SD connector, directly connected to the MCU. The MCU has a on chip SDMMC1 port controlled by the SDMMC host interface.
 
-Signal |   Description
--------|------------------
-D0     |   Data lane (LSB)
-D1     |   Data lane
-D2     |   Data lane
-D3     |   Data lane (MSB)
-CMD    |   Command
-CLK    |   Clock
-3V3    |   VDD
-GND    |   VSS
 
-The microcontroller has a SDMMC1 port controlled by the SDMMC host interface. 
+
+|Board signal | MCU Pin | microSD Pin   | AF#  | Description             |
+|-------------|---------|---------------|------|-------------------------|
+| uSD_D0      |  PC8    |      7        | AF12 | SDMMC1_D0               |
+| uSD_D1      |  PC9    |      8        | AF12 | SDMMC1_D1               |
+| uSD_D2      |  PC10   |      1        | AF12 | SDMMC1_D2               |
+| uSD_D3      |  PC11   |      2        | AF12 | SDMMC1_D3               |
+| uSD_CMD     |  PD2    |      3        | AF12 | SDMMC1_CMD              |
+| uSD_CLK     |  PC12   |      5        | AF12 | SDMMC1_CK               |
+| uSD_Detect  |  PC13   |     10        | AF0  | Tamper detect (GPIO)    |
+| 3V3         |         |      4        |      | VDD                     |
+| GND         |         |     6,9       |      | VSS                     |
+
+
+
+#### External flash
+
+The board has a 16-MBytes Micron N25Q128A13EF840E NOR Flash with a Quad SPI interface.
+In recent version, the fully compatible MT25QL128ABA1EW9-0SIT device is used instead.
+
+|Board signal	 | MCU Pin | NOR Flash Pin   | AF#  | Description           |
+|----------------|---------|-----------------|------|=----------------------|
+| QSPI_NCS       |   PB6   | S#              | AF10 | QUADSPI_BK1_NCS       |
+| QSPI_CLK       |   PB2   | C               | AF9  | QUADSPI_CLK           |
+| QSPI_D0        |   PD11  | DQ0             | AF9  | QAUDSPI_BK1_IO0       |
+| QSPI_D1        |   PD12  | DQ1             | AF9  | QAUDSPI_BK1_IO1       |
+| QSPI_D2        |   PE2   | DQ2/Vpp/W#      | AF9  | QAUDSPI_BK1_IO2       |
+| QSPI_D3        |   PD13  | DQ3/HOLD#       | AF9  | QAUDSPI_BK1_IO3       |
+
 
 #### I2C
 
@@ -579,10 +598,10 @@ The E5V line is powered by a LD1117S50TR regulator with 800 mA current capacity 
 
 The STM32F746NG MCU is powered by a 3.3 V line, obtained from the 5V USB line thru a LD39050PU33R regulator with 500 mA maximal current. This 5V line is configured by the JP1 connector to use one of the USB connector or the E5V. By default, it is energized by the ST_LINK USB connector. Furthermore, the powering of the STM32F746 is controlled by the ST-LINK MCU thru a ST890CDR switch. It asks the host to deliver 500 mA and only after confirmation, the rest of the board including the STM32F746NG is powered.
 
-E5V ---------| 1   2 |
-5V-ST_LINK---| 3<->4 |------ 5V
-5V-USB-FS----| 5   6 |
-5V_USB-HS----| 7   8 |
+    E5V ---------| 1   2 |
+    5V-ST_LINK---| 3<->4 |------ 5V
+    5V-USB-FS----| 5   6 |
+    5V_USB-HS----| 7   8 |
 
 There is LD3985M33R regulator (150 mA maximal current) to power the ST-LINK MCU, a STM32F103CBT6. It is powered automatically by one of the USB connectors or the E5V line. No jumps required.
 
@@ -718,6 +737,19 @@ The jumpers SB12 and SB13 can disconnect the STLINK serial lines from STLINK_Con
 
 The T_JTDO, T_JTDI and T_JRST are not connected.
 
+Entering DFU mode
+-----------------
+
+Device Firmware Upgrade Standard [8] is a mechanism for upgrading the onboard firmware.
+
+The Micropython Wiki [9] has information on how to enable it on the STM32F746 Discovery Board. It should be noted that "The board doesn't provide a convenient way to enter DFU mode". But. there are some ways to enable it on the USBFS connector (ĆN13).
+
+* Short the pads where R42 would be installed (it isn't installed by default) and press the reset button. You should now be able see the board when using dfu-util -l
+* Install a switch between the MCU side of R42 and 3.3 V.
+* Install the initial micropython image using the STLINK interface, and then use pyb.bootloader() to enter DFU mode from the REPL.
+
+
+
 
 References
 ----------
@@ -735,3 +767,7 @@ References
 6 - [STM32CubeF7](https://github.com/STMicroelectronics/STM32CubeF7)
 
 7 - [STM32 Firmware Upgrade](https://www.st.com/content/st_com/en/products/development-tools/software-development-tools/stm32-software-development-tools/stm32-programmers/stsw-link007.html)
+
+8 - [USB DFU - The USB Device Firmware Upgrade standard](https://www.usb.org/sites/default/files/DFU_1.1.pdf)
+
+9 - [Micropython - Board STM32F746 Discovery](https://github.com/micropython/micropython/wiki/Board-STM32F746-Discovery)

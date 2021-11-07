@@ -1,6 +1,6 @@
 
 
-PROJECTS=`ls -d [012]*`
+PROJECTS=`ls -d [012]*  X[012]*`
 .SILENT:
 
 default: build

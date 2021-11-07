@@ -42,12 +42,7 @@ void Default_Handler(void)                WEAK_ATTRIBUTE;
 /* Devem poder ser redefinidos */
 void Reset_Handler(void)                  WEAK_ATTRIBUTE;           /* M0/M0+/M3/M4/M7 */
 void NMI_Handler(void)                    WEAK_DEFAULT_ATTRIBUTE;   /* M0/M0+/M3/M4/M7 */
-#if 1
-void HardFault_Handler(void);                                       /* M0/M0+/M3/M4/M7 */
-void HardFault2_Handler(uint32_t *pnt);                             
-#else
 void HardFault_Handler(void)              WEAK_DEFAULT_ATTRIBUTE;   /* M0/M0+/M3/M4/M7 */
-#endif
 void SVC_Handler(void)                    WEAK_DEFAULT_ATTRIBUTE;   /* M0/M0+/M3/M4/M7 */
 void PendSV_Handler(void)                 WEAK_DEFAULT_ATTRIBUTE;   /* M0/M0+/M3/M4/M7 */
 void SysTick_Handler(void)                WEAK_DEFAULT_ATTRIBUTE;   /* M0/M0+/M3/M4/M7 */
@@ -399,26 +394,3 @@ unsigned long *pDest;
 
     _stop();
 }
-
-
-#if 1
-
-void HardFault_Handler(void) {
-
-    __asm volatile
-    (
-        " tst        lr,#4                          \n"
-        " ite        eq                             \n"
-        " mrseq      r0,msp                         \n"
-        " mrsne      r0,psp                         \n"
-        " ldr        r1,[r0,#24]                    \n"
-        " ldr        r2,hardfault2                  \n"
-        " bx         r2                             \n"
-        "hardfault2: .word   HardFault2_Handler     \n"
-    );
-}
-
-void HardFault2_Handler(uint32_t *pnt) {
-
-}
-#endif

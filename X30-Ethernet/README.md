@@ -26,6 +26,28 @@ The Light-Weight IP (lwIP) library is a library tailored for such systems.
 > (DMA). Writing to a memory position or reading from it do not mean that you 
 > get the memory contents. See below for the cache handling.
 
+
+> NOTE: 2.1.10 Ethernet DMA bus
+> This bus connects the Ethernet DMA master interface to the BusMatrix. This 
+> bus is used by the Ethernet DMA to load/store data to a memory. The targets 
+> of this bus are data memories: internal SRAM1, SRAM2 and DTCM (through the 
+> AHBS bus of Cortex ® -M7) internal Flash memory, and external memories 
+> through the FMC or Quad SPI.
+
+>NOTE: Memory system ordering of memory accesses describes the cases where 
+> the memory system guarantees the order of memory accesses. Otherwise, if 
+> the order of memory accesses is critical, software must include memory 
+> barrier instructions to force that ordering. The processor provides the 
+> following memory barrier instructions:  
+> DMB: The Data Memory Barrier (DMB) instruction ensures that outstanding 
+> memory transactions complete before subsequent memory transactions.  
+> DSB: The Data Synchronization Barrier (DSB) instruction ensures that 
+> outstanding memory transactions complete before subsequent instructions
+> execute.  
+> ISB: The Instruction Synchronization Barrier (ISB) ensures that the effect 
+> of all completed memory transactions is recognizable by subsequent 
+> instructions.
+
 Initialization
 --------------
 
@@ -119,13 +141,13 @@ Different memory regions have
 
 
 
-> NOTE: The two default regions of SDRAM banks are not cacheable. So even if the cache is
+> NOTE: "The two default regions of SDRAM banks are not cacheable. So even if the cache is
 enabled, the data or instructions will not go through the cache. To benefit from the cache
 acceleration, the SDRAM banks can be remapped from 0xC000 0000 and 0xD000 0000 to
 0x6000 0000 and 0x7000 0000 respectively, which are, by default, cacheable regions. This
 is done by setting the field SWP_FMC [1:0] = 01 in the SYSCFG_MEMRMP register. If the
 remapping is not suitable for the application, the Cortex ® -M7 MPU can be used to modify
-the propriety of the default SDRAM memory region to be cacheable. (AN4667)
+the propriety of the default SDRAM memory region to be cacheable." (AN4667)
 
 The cache coherency problem consists of one device (CPU) accessing one content 
 and other device (DMA) accessing other content from the same memory address. 
@@ -671,3 +693,4 @@ References
 12. [AN4667-STM32F7 Series system architecture and performance](https://www.st.com/resource/en/application_note/dm00169764-stm32f7-series-system-architecture-and-performance-stmicroelectronics.pdf)
 13. [Web Server with a STM32F746](https://github.com/khoih-prog/EthernetWebServer_STM32)
 14. [Level 1 cache on STM32F7 Series and STM32H7 Series](http://www.st.com/content/ccc/resource/technical/document/application_note/group0/08/dd/25/9c/4d/83/43/12/DM00272913/files/DM00272913.pdf/jcr:content/translations/en.DM00272913.pdf)
+15. [Software ordering of memory accesses](https://developer.arm.com/documentation/dui0646/a/CHDHHFCC)
