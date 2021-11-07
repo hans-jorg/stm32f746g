@@ -48,14 +48,14 @@ The UGUI Library
 
 The UGUI library consists of 3 files:
 
-* ugui.c: implementation
-* ugui.h: interface
-* ugui_config.h: configuration and compatibility layer
+* *ugui.c*: implementation
+* *ugui.h*: interface
+* *ugui_config.h*: configuration and compatibility layer
 
 Its demands are very simple:
 
 * a function to set a pixel
-* a periodical call to a function called UG_Update.
+* a periodical call to a function called *UG_Update*.
 
 The *ugui_config.h* permits the definition of
 
