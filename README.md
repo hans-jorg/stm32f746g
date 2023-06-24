@@ -135,38 +135,59 @@ by using the Cortex-Debug extension.
 Projects                
 --------
 
-|  #  |  Project            |  Description                         | Status
-|-----|---------------------|--------------------------------------|------------
-| 01  | Blinker-Simple      | A very simple LED blinker            | OK
-| 02  | Blinker-GPIO-HAL    | Simple blinker with a GPIO HAL       | OK 
-| 03  | Blinker-LED-HAL     | Simple blinker with a LED HAL        | OK 
-| 04  | Blinker-LED-HAL-V2  | Simple blinker with a better LED HAL | OK 
-| 05  | Blinker-LED-GPIO-HAL| Simple blinker with a LED/GPIO HAL   | OK 
-| 06  | Blinker-SysTick     | Simple blinker using SysTick         | OK 
-| 07  | Blinker-200MHz      | Changing the CPU clock frequency     | OK
-| 08  | Button              | Reading button status                | OK
-| 09  | UART-Polling        | UART interface with polling          | OK
-| 10  | UART-Interrupts     | UART interface with interrupts       | OK
-| 11  | Infos               | Show MCU Info                        | OK
-| 12  | Ministdio           | A minimal stdio (printf)             | OK
-| 13  | ----                | -----                                | -
-| 14  | Newlib              | Using newlib (already in ARM GNU C)  | OK
-| 15  | TimeTriggered-v1    | Pont's time triggered system (old)   | OK 
-| 16  | TimeTriggered-v2    | Pont's time triggered system (new)   | OK
-| 17  | ucos2               | Using uC/OS-II                       | OK 
-| 18  | ----                | ----                                 | -
-| 19  | ----                | ----                                 | -
-| 20  | ----                | ----                                 | -
-| 21  | ----                | ----                                 | -
-| 22  | ExternalRAM         | External RAM                         | OK
-| 23  | Buddy               | Using buddy allocator on external RAM| OK
-| 24  | LCD                 | Using the on board LCD               | OK
-| X25 | LCD-ChromeArt       | Using DMA2D to manipulate display    | ?
-| X27 | Touch               | Getting touch information (I2C)      | ?
-| X28 | MicroSD             | Using the on board MicroSD           | ?
-| X29 | Flash               | Using the on board flash memory      | ?
-| X30 | Ethernet            | Using the on board Ethernet and lwIP | ?
-
+|  #   |  Project            |  Description                         | Status |
+|------|---------------------|--------------------------------------|--------|
+|   01 | Blinker-Simple      | A very simple LED blinker            |   OK   |
+|   02 | Blinker-GPIO-HAL    | Simple blinker with a GPIO HAL       |   OK   |
+|   03 | Blinker-LED-HAL     | Simple blinker with a LED HAL        |   OK   |
+|   04 | Blinker-LED-HAL-V2  | Simple blinker with a better LED HAL |   OK   |
+|   05 | Blinker-LED-GPIO-HAL| Simple blinker with a LED/GPIO HAL   |   OK   |
+|   06 | Blinker-SysTick     | Simple blinker using SysTick         |   OK   |
+|   07 | Blinker-200MHz      | Changing the CPU clock frequency     |   OK   |
+|   08 | Button              | Reading button status                |   OK   |
+|   09 | UART-Polling        | UART interface with polling          |   OK   |
+|   10 | UART-Interrupts     | UART interface with interrupts       |   OK   |
+|   11 | Conversions         | Show MCU Info                        |   OK   |
+|   12 | Ministdio           | A minimal stdio (printf)             |   OK   |
+|   14 | Newlib              | Using newlib (libc replacement)      |   OK   |
+|   15 | TimeTriggered-v1    | Pont's time triggered system (old)   |   OK   |
+|   16 | TimeTriggered-v2    | Pont's time triggered system (new)   |   OK   |
+|   17 | ucos2               | Using uC/OS-II                       |   OK   |
+|  X18 | ----                | ----                                 |   -    |
+|  X19 | ----                | ----                                 |   -    |
+|  X20 | ----                | ----                                 |   -    |
+|  X21 | ----                | ----                                 |   -    |
+|   22 | ExternalRAM         | Using External (to MCU) RAM          |   -    |
+|   23 | Buddy               | Using a Buddy Allocator for RAM      |   -    |
+|   24 | LCD                 | Using the LCD (barebones)            |   -    |
+|  X25 | I2C-Polling         | ----                                 |   -    |
+|  X26 | I2C-Interrupt       | ----                                 |   -    |
+|  X27 | I2C-DMA             | ----                                 |   -    |
+|  X28 | Touch               | Accessing the touch controller (I2C) |  TBD   |
+|  X29 | ----                | ----                                 |   -    |
+|  X30 | LCD-LVGL-v1         | Using LVGL library to LCD            |  TBD   |
+|  X31 | LCD_ChromArt        | Using ChromArt for LCD (barebones)   |  TBD   |
+|  X32 | LCD-LVGL-v2         | Using ChromArt for LVGL/LCD          |  TBD   |
+|  X33 | ----                | ----                                 |   -    |
+|  X34 | ----                | ----                                 |   -    |
+|  X35 | LCD-UGUI            | Using UGUI library for LCD           |  TBD   |
+|  X36 | ----                | ----                                 |   -    |
+|  X37 | ----                | ----                                 |   -    |
+|  X38 | ----                | ----                                 |   -    |
+|  X39 | ----                | ----                                 |   -    |
+|  X40 | MicroSD             | Accessing uSD card                   |  TBD   |
+|  X41 | NORFlash            | Accessing onboard Flash              |  TBD   |
+|  X42 | ----                | ----                                 |   -    |
+|  X43 | ----                | ----                                 |   -    |
+|  X44 | ----                | ----                                 |   -    |
+|  X45 | USB-FS_Device       | Board as a USB device                |  TBD   |
+|  X46 | ----                | ----                                 |   -    |
+|  X47 | ----                | ----                                 |   -    |
+|  X48 | ----                | ----                                 |   -    |
+|  X49 | ----                | ----                                 |   -    |
+|  X50 | Ethernet            | Using the Ethernet interface         |  TBD   |
+| ...  | ...                 | ...                                  |  ...   |
+| XX60 | Linux               | Using ucLinux                        |  TBD   |
 
 
 Notes
