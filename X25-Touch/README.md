@@ -205,7 +205,7 @@ Using a self developed python script, the table is a little bit different!!!
 
 
 
-I2CCLK frequency 
+I2C
    
 I2CCLK Clock is configured in the RCC->DCKCFGR2 register.
        They are I2CxSEL fields, one for each I2C unit

@@ -1,6 +1,7 @@
 
 
 PROJECTS=`ls -d [012]*  X[012]*`
+MAKEFLAGS=--no-print-directory
 .SILENT:
 
 default: build
@@ -13,7 +14,7 @@ all: build
 
 clean:
 	@echo "Cleaning ..."
-	for i in $(PROJECTS); do if [ -d "$$i" ]; then echo "Cleaning $$i ..." ; rm -f $$i.zip  ; ( cd $$i;  make clean ); fi; done
+	@for i in $(PROJECTS); do if [ -d "$$i" ]; then echo "Cleaning $$i ..." ; rm -f $$i.zip  ; ( cd $$i;  make clean ); fi; done
 
 zip: clean
 	@echo "Zipping ..."
