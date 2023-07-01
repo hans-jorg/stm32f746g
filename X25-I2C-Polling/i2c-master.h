@@ -58,6 +58,19 @@
 #define I2C_CONF_CLOCK_APB1CLK       (2<<I2C_CONF_CLOCK_Pos)
 #define I2C_CONF_CLOCK_MASK          (3<<I2C_CONF_CLOCK_Pos)
 
+
+/**
+ * @brief I2C Status
+ */
+typedef enum {
+        I2C_UNINITIALIZED = 0,
+        I2C_READY = 3,
+        I2C_READING = 4,
+        I2C_WRITING = 5,
+        I2C_DISABLED = 6,
+        I2C_ERROR = 7
+     } I2C_Status_t;
+
 /* Function prototypes */
 
 int I2CMaster_Init(         I2C_TypeDef *i2c,
@@ -82,5 +95,12 @@ int I2CMaster_WriteAndRead( I2C_TypeDef *i2c,
                             uint8_t *writedata, int nwrite,
                             uint8_t *readdata,  int nread
                             );
+
+int I2CMaster_Detect(       I2C_TypeDef *i2c,
+                            uint16_t addr );
+
+I2C_Status_t
+I2CMaster_GetStatus(        I2C_TypeDef *i2c );
+
 
 #endif // I2C_MASTER_H

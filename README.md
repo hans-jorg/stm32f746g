@@ -5,7 +5,7 @@ Developing for the STM32F746G using GCC on Linux
 them are not tested. Specially, the Xnn projects are not tested and may not even
 compile.
 
-> NOTE 2: Only open source st-link (st-flash and st-utils) is fully tested.
+> NOTE 2: Only open source *st-link* (st-flash and st-utils) is fully tested.
 
 
 Introduction
@@ -39,8 +39,7 @@ Requisites
 ----------
 
 
-> NOTE: It is recommend to upgrade the firmware in the STM32F746G Discovery 
-> board using the software in [8]
+> NOTE: It is recommend to upgrade the firmware in the STM32F746G Discovery as described in oard using the software in [8]
 
 
 These software are needed to build embedded applications on a STM32F7
@@ -482,29 +481,82 @@ In Ubuntu systems, the udev rules in the udev folder must be installed by copyin
 It is unstable. The GDB server must oft be restarted. There is no way to 
 reset the board or to detect that the board was reset.
 
+Annex B - Initialization 
+------------------------
+
+The initialization procedure used in the SMT32 HAL library do certain tasks, that can be helpful.
+
+### ART Enable
+
+	FLASH->ACR |= FLASH_ACR_ARTEN;
+	
+#### Flash Prefetch Buffer Enable
+
+	FLASH->ACR |= FLASH_ACR_PRFTEN;
+
+### NVIC Priority Grouping
+
+	NVIC_SetPriorityGrouping
+
+It is possible to divide the 4-bit priority in preemption and subpriority priorities.
+
+### Initialize Tick
+
+	uint32_t lowestprio = (1<<__MVIC_PRIO_BITS)-1;
+	SysTick_Config(SystemCoreClock/1000);
+	NVIC_SetPriority*SysTick_IRQn,15,0);
+
+Set to the lowest priority
+
+### Disable MPU (Memory Protection Unit)
+
+	__DMB();
+	SCB->SHCSR &= ~SCB_SHCSR_MEMFAULTENA_Msk;
+  	MPU->CTRL = 0;
+	
+### Enable MPU (Memory Protection Unit)
+
+  	MPU->CTRL = MPU_Control|MPU_CTRL_ENABLE_Msk;
+	SCB->SHCSR |= SCB_SHCSR_MEMFAULTENA_Msk;
+	__DSB();
+	__ISB();
+
+### Enable caches
+
+	SCB_EnableICache();
+	SCB_EnableDCache();
+	
+
+### FPU Settings
+
+  	#if (__FPU_PRESENT == 1) && (__FPU_USED == 1)
+    		SCB->CPACR |= ((3UL << 10*2)|(3UL << 11*2));
+	#endif
+
+ 
 
 References
 ----------
 
-1 - [Discovery Kit with STM32F746NG MCU](https://www.st.com/en/evaluation-tools/32f746gdiscovery.html)
-2 - [GNU Arm Embedded Toolchain](https://developer.arm.com/tools-and-software/open-source-software/developer-tools/gnu-toolchain/gnu-rm)
-3 - [STM32Cube MCU Package for STM32F7 series](https://www.st.com/en/embedded-software/stm32cubef7.html)
-4 - [Open source version of the STMicroelectronics STlink Tools](https://github.com/stlink-org/stlink)
-5 - [Integrated Development Environment for STM32](https://www.st.com/en/development-tools/stm32cubeide.html)
-6 - [STM32 ST-LINK utility (replaced by STM32CubeProgrammer)](https://www.st.com/content/st_com/en/products/development-tools/software-development-tools/stm32-software-development-tools/stm32-programmers/stsw-link004.html)
-7 - [STM32CubeProgrammer software for all STM32](https://www.st.com/en/development-tools/stm32cubeprog.html)
-8 - [ST-LINK, ST-LINK/V2, ST-LINK/V2-1, STLINK-V3 boards firmware upgrade](https://www.st.com/content/st_com/en/products/development-tools/software-development-tools/stm32-software-development-tools/stm32-programmers/stsw-link007.html)
-9 - [ST-LINK server software module ](https://www.st.com/content/st_com/en/products/development-tools/software-development-tools/stm32-software-development-tools/stm32-performance-and-debuggers/st-link-server.html)
-10 - [GNU Make](https://www.gnu.org/software/make/)
-11 - [Make for Windows](http://gnuwin32.sourceforge.net/packages/make.htm)
-12 - [Visual Studio Code](https://code.visualstudio.com/)
-13 - [Eclipse IDE](https://www.eclipse.org/eclipseide/)
-14 - [TrueStudio IDE](https://www.st.com/content/st_com/en/products/development-tools/software-development-tools/stm32-software-development-tools/stm32-ides/truestudio.html)
-15 - [PyOCD](https://github.com/pyocd/pyOCD)
-16 - [STM32CubeIDE programmer and ST-LINK GDB server on Linux](http://pacinispace.blogspot.com/2020/02/stm32cubeide-st-link-gdb-server-on-linux.html)
-17 - [STLink Releases](https://github.com/stlink-org/stlink/releases)
-18 - [XPack OpenOCD Repository](https://github.com/xpack-dev-tools/openocd-xpack/releases)
-19 - [UM2576 - STM32CubeIDE ST-LINK GDB server](https://www.st.com/resource/en/user_manual/dm00613038-stm32cubeide-stlink-gdb-server-stmicroelectronics.pdf)
-20 - [STM32CubeProg - STM32CubeProgrammer software for all STM32](https://www.st.com/en/development-tools/stm32cubeprog.html)
-21 - [STM32CubeIDE - Integrated Development Environment for STM32](https://www.st.com/content/st_com/en/products/development-tools/software-development-tools/stm32-software-development-tools/stm32-ides/stm32cubeide.html)
-22 - [STSW-LINK004 - STM32 ST-LINK utility](https://www.st.com/en/development-tools/stsw-link004.html)
+1 - [Discovery Kit with STM32F746NG MCU](https://www.st.com/en/evaluation-tools/32f746gdiscovery.html)  
+2 - [GNU Arm Embedded Toolchain](https://developer.arm.com/tools-and-software/open-source-software/developer-tools/gnu-toolchain/gnu-rm)  
+3 - [STM32Cube MCU Package for STM32F7 series](https://www.st.com/en/embedded-software/stm32cubef7.html)  
+4 - [Open source version of the STMicroelectronics STlink Tools](https://github.com/stlink-org/stlink)  
+5 - [Integrated Development Environment for STM32](https://www.st.com/en/development-tools/stm32cubeide.html)  
+6 - [STM32 ST-LINK utility (replaced by STM32CubeProgrammer)](https://www.st.com/content/st_com/en/products/development-tools/software-development-tools/stm32-software-development-tools/stm32-programmers/stsw-link004.html)  
+7 - [STM32CubeProgrammer software for all STM32](https://www.st.com/en/development-tools/stm32cubeprog.html)  
+8 - [ST-LINK, ST-LINK/V2, ST-LINK/V2-1, STLINK-V3 boards firmware upgrade](https://www.st.com/content/st_com/en/products/development-tools/software-development-tools/stm32-software-development-tools/stm32-programmers/stsw-link007.html)  
+9 - [ST-LINK server software module ](https://www.st.com/content/st_com/en/products/development-tools/software-development-tools/stm32-software-development-tools/stm32-performance-and-debuggers/st-link-server.html)  
+10 - [GNU Make](https://www.gnu.org/software/make/)  
+11 - [Make for Windows](http://gnuwin32.sourceforge.net/packages/make.htm)  
+12 - [Visual Studio Code](https://code.visualstudio.com/)  
+13 - [Eclipse IDE](https://www.eclipse.org/eclipseide/)  
+14 - [TrueStudio IDE](https://www.st.com/content/st_com/en/products/development-tools/software-development-tools/stm32-software-development-tools/stm32-ides/truestudio.html)  
+15 - [PyOCD](https://github.com/pyocd/pyOCD)  
+16 - [STM32CubeIDE programmer and ST-LINK GDB server on Linux](http://pacinispace.blogspot.com/2020/02/stm32cubeide-st-link-gdb-server-on-linux.html)  
+17 - [STLink Releases](https://github.com/stlink-org/stlink/releases)  
+18 - [XPack OpenOCD Repository](https://github.com/xpack-dev-tools/openocd-xpack/releases)  
+19 - [UM2576 - STM32CubeIDE ST-LINK GDB server](https://www.st.com/resource/en/user_manual/dm00613038-stm32cubeide-stlink-gdb-server-stmicroelectronics.pdf)  
+20 - [STM32CubeProg - STM32CubeProgrammer software for all STM32](https://www.st.com/en/development-tools/stm32cubeprog.html)  
+21 - [STM32CubeIDE - Integrated Development Environment for STM32](https://www.st.com/content/st_com/en/products/development-tools/software-development-tools/stm32-software-development-tools/stm32-ides/stm32cubeide.html)  
+22 - [STSW-LINK004 - STM32 ST-LINK utility](https://www.st.com/en/development-tools/stsw-link004.html)  

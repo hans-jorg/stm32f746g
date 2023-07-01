@@ -3,6 +3,7 @@ TODO.md
 null.d
 copyfilestoprojects
 updatefilesinprojects
+*.backup
 
 # Work files
 *.BAK

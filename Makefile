@@ -1,6 +1,6 @@
 
 
-PROJECTS=`ls -d [012]*  X[012]*`
+PROJECTS=`ls -d [0123]*  X[0123456]*`
 MAKEFLAGS=--no-print-directory
 .SILENT:
 
