@@ -28,10 +28,19 @@
 #define FTXXXX_NPOINTS                      5
 #endif
 
+int FTXXXX_Init(void);
+int FTXXXX_ReadInterruptPinStatus(void);
 int FTXXXX_WriteRegister(uint8_t reg, uint8_t data);
 int FTXXXX_ReadRegister(uint8_t reg, uint8_t *pdata);
 int FTXXXX_WriteSequentialRegisters( uint8_t startreg, uint8_t *pdata, int num);
 int FTXXXX_ReadSequentialRegisters( uint8_t startreg, uint8_t *pdata, int num);
+void FTXXXX_ProcessInterrupt(void);
+
+
+typedef struct {
+    uint16_t    x;      // X-pos
+    uint16_t    y;      // Y-pos
+} FTXXXX_Info;
 
 /*
  * Registers of the FT5336 controller. From the FT5x16 documentation

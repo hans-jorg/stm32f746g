@@ -1,18 +1,19 @@
 /**
  * @file    i2c-master.c
  *
- * @brief   I2C implementation of a master interface for STM32F746
+ * @brief   I2C implementation of a master interface for STM32F746 using polling
  *
  * @note    Simple implementation. Configured to use 16 MHz HSI as clock source
  *
  * @note    The are three alternatives for the implementation:
- *          * Polling
+ *          * Polling   <- This module
  *          * Interrupt
  *          * Direct Memory Access (DMA)
  *
- * @note    For now, one can use Polling or Interrupt, by defining
- *          USE_POLLING or USE_INTERRUPT at the beginning
+ * @note    This module uses the gpio module to configure pins.
+ *
  * @author  Hans
+ * @date    2023/06/04
  */
 
 #include "stm32f746xx.h"
@@ -20,24 +21,6 @@
 #include "i2c-master.h"
 #include "gpio.h"
 
-
-/**
- * @brief Implementation
- *
- * @note  Uncomment only one
- */
-//#define USE_POLLING
-#define USE_INTERRUPT
-
-
-/**
- *  @brief  Data structure to store information about I2C Configuration
- */
-typedef struct {
-    I2C_TypeDef             *i2c;
-    GPIO_PinConfiguration   sclpin;
-    GPIO_PinConfiguration   sdapin;
-} I2C_Configuration_t;
 
 
 /**
@@ -147,6 +130,80 @@ typedef struct {
  *
  */
 
+/**
+ *  @note   Using HSI as I2CCLK clock source (=16 MHz)
+ *          Alternatives are:
+ *              0: APB1CLK
+ *              1: SYSCLK
+ *              2: HSICLK
+ */
+#define I2CCLKSRC (2)
+
+/**
+ * @brief
+ *
+ * The calculation of the timing parameters (PRESC,SCLDEL,SDADEL,SCLH,SCLL)
+ * is a PITA.
+ *
+ * The easiest way is to use STM32CubeMX.
+ * Do not forget to specify tr and tf, because they have a bit impact on the
+ * timing parameters
+ *
+ * Below there are some precalculated values for timing according the some combination of speed
+ * and the filters used.
+ *
+ * This can be overided by specifying a non zero timing parameter
+ *
+ * It is not a good idea to calculate this (constant) parameter during execution.
+ * This will demand unnecessarily RAM, Flash and floating point (or at least, a boring
+ * fixed point) calculation.
+ */
+
+/**
+ * Data structure to store precalculated TIMINGR values;
+ * They are ordered from largest to smallest sizes.
+ */
+
+struct Default_Timing_t {
+    uint32_t    timingr;
+    uint32_t    freq;           // Frequency (in KHz!!!!)
+    uint32_t    speed;
+    unsigned    analog:1;       // a bit
+    unsigned    digital:1;      // bit field with width = 1 (=bit)
+    unsigned    dnf:4;          // bit field with widht = 4 (0-15 value);
+};
+
+/**
+ * Table of precalculated TIMINGR values;
+ */
+
+static struct Default_Timing_t default_timing[] = {
+/*      TIMINGR     Freq     Speed   Analog  Digital DNF  */
+    {  0x00503D5A,  16000,   100000,   0,      0,     0  },
+    {  0x00503D58,  16000,   100000,   1,      0,     0  },
+    {  0x00503C59,  16000,   100000,   0,      1,     1  },
+    {  0x00503B58,  16000,   100000,   0,      1,     2  },
+    {  0x00300718,  16000,   400000,   0,      0,     0  },
+    {  0x00300617,  16000,   400000,   1,      0,     0  },
+    {  0x00300617,  16000,   400000,   0,      1,     1  },
+    {  0x00300912,  16000,   400000,   0,      1,     2  },
+    {  0x00200205,  16000,  1000000,   0,      0,     0  },
+    {  0x00200105,  16000,  1000000,   1,      0,     0  },
+    {  0x00200004,  16000,  1000000,   0,      1,     1  },
+    {  0x00200003,  16000,  1000000,   0,      1,     2  },
+    {           0,      0,        0,   0,      0,     0  }  // END OF TABLE
+};
+
+/**
+ *
+ *  @brief  Data structure to store information about I2C Pin Configuration
+ */
+typedef struct {
+    I2C_TypeDef             *i2c;
+    GPIO_PinConfiguration   sclpin;
+    GPIO_PinConfiguration   sdapin;
+} I2C_Configuration_t;
+
 
 /**
  * @brief   Configuration for STM32F746G Discovery Boardd
@@ -163,145 +220,116 @@ typedef struct {
  * Only I2C1 and I2C3 in the table above are free to use
  * I2C1 at PB8 and PB9 used for EXT I2C (Arduino connectors)
  * I2C3 at PH7 and PH* used for LCD Touch and AUDIO I2C
- * Other I2C has pin usage conflicts
+ * Other I2Cs have pin usage conflicts
  *
  * @note All SCL and SDA pins must be configured as
- *                     ALTERNATE FUNCTION (=4)
- *                     OPEN DRAIN
- *                     HIGH SPEED
- *                     PULL-UP
+ *        ALTERNATE FUNCTION = 4, OPEN DRAIN, HIGH SPEED, PULL-UP
+ *        This corresponds to the following values in the table below
+ *                    AF  mode otype ospeed pupd initial
+ *                     4    2     1      2    1     1
+ *        The pupd and initial must be verified!
+ *        ospeed = high speed or very high speed.
+ *        Maybe there is a need to use SYSCFG->PMC fields as in others MCUs of the family
  */
-static I2C_Configuration_t i2c_configuration[] = {
-    //          SCL            SDA
-    //      GPIO  Pin AF   GPIO  Pin AF
+static const I2C_Configuration_t i2c_configuration[] = {
+//    I2Cx   GPIO   Pin   AF  mode otype ospeed pupd initial
     { I2C1,
-            {GPIOB,  8, 4, 2, 1, 3, 1}, // SCL
-            {GPIOB,  9, 4, 2, 1, 3, 1}, // SDA
+            {GPIOB,  8,   4,    2,   1,    3,    1}, // SCL
+            {GPIOB,  9,   4,    2,   1,    3,    1}, // SDA
     },
     { I2C3,
-            {GPIOH,  7, 4, 2, 1, 3, 1}, // SCL
-            {GPIOH,  8, 4, 2, 1, 3, 1}, // SDA
+            {GPIOH,  7,   4,    2,   1,    3,    1}, // SCL
+            {GPIOH,  8,   4,    2,   1,    3,    1}, // SDA
     },
     { 0,
-            {    0,  0, 0, 0, 0, 0, 0}, // SCL
-            {    0,  0, 0, 0, 0, 0, 0}, // SDA
+            {    0,  0,   0,    0,   0,    0,    0}, // SCL
+            {    0,  0,   0,    0,   0,    0,    0}, // SDA
     }
 };
 
-
-#ifdef USE_INTERRUPT
 /**
- * @brief  Interrupt routines and data structures for I2C
- *
+ * @brief Data structure to store run time info. For now, only status
  */
 ///@{
-
-#define I2C_OPERATION_WRITE             0
-#define I2C_OPERATION_READ              1
-#define I2C_OPERATION_WRITE_READ        2
-
 typedef struct {
-    unsigned char *pointer;
-    int           operation;
-    int           count;
-    int           status;
-} I2C_Info;
+    I2C_TypeDef                *i2c;
+    I2C_Status_t                status;
+} RunTimeInfo_t;
 
-static I2C_Info     i2c1_info;  // Info for I2C1
-static I2C_Info     i2c2_info;  // Info for I2C2
-static I2C_Info     i2c3_info;  // Info for I2C3
-static I2C_Info     i2c4_info;  // Info for I2C4
-
-/**
- * @brief Process I2C Error Interrupts
- *
- * @param i2c
- * @param i2cinfo
- */
-void I2C_ProcessErrorInterrupt(I2C_TypeDef *i2c, I2C_Info *i2cinfo) {
-
-    // TODO
-
-}
-
-/**
- * @brief Process I2C Event Interrupt
- *
- * @param i2c
- * @param i2cinfo
- */
-void I2C_ProcessEventInterrupt(I2C_TypeDef *i2c, I2C_Info *i2cinfo) {
-
-    // TODO
-
-}
-
-/**
- * @brief I2C1 Event interrupt
- */
-void I2C1_EV_IRQHandler(void) {
-
-    I2C_ProcessEventInterrupt(I2C1,&i2c1_info);
-}
-
-/**
- * @brief I2C1 Error interrupt
- */
-void I2C1_ER_IRQHandler(void) {
-
-    I2C_ProcessErrorInterrupt(I2C1,&i2c1_info);
-}
-
-/**
- * @brief I2C2 Event interrupt
- */
-void I2C2_EV_IRQHandler(void) {
-
-    I2C_ProcessEventInterrupt(I2C2,&i2c2_info);
-}
-
-/**
- * @brief I2C2 Error interrupt
- */
-void I2C2_ER_IRQHandler(void) {
-
-    I2C_ProcessErrorInterrupt(I2C2,&i2c2_info);
-}
-
-/**
- * @brief I2C3 Event interrupt
- */
-void I2C3_EV_IRQHandler(void) {
-
-    I2C_ProcessEventInterrupt(I2C3,&i2c3_info);
-}
-
-/**
- * @brief I2C3 Error interrupt
- */
-void I2C3_ER_IRQHandler(void) {
-
-    I2C_ProcessErrorInterrupt(I2C3,&i2c3_info);
-}
-
-/**
- * @brief I2C4 Event interrupt
- */
-void I2C4_EV_IRQHandler(void) {
-
-    I2C_ProcessEventInterrupt(I2C4,&i2c4_info);
-}
-
-/**
- * @brief I2C1 Error interrupt
- */
-void I2C4_ER_IRQHandler(void) {
-
-    I2C_ProcessErrorInterrupt(I2C4,&i2c4_info);
-}
+static RunTimeInfo_t  RunTimeInfo[] = {
+    { I2C1,  I2C_UNINITIALIZED },
+    { I2C3,  I2C_UNINITIALIZED },
+    {    0,  I2C_UNINITIALIZED }
+};
 ///@}
 
-#endif // USE_INTERRUPT
+/**
+ * @brief  Find run time info for a specific I2C
+ *
+ * @note   Since i2c is referenced as a pointer to its registers, a search is needed to
+ *         find the corresponding index in the Run Time Info table.
+           It uses a very simple search algorithm (Linear search). It is possible to hash the
+           pointer or to do some pointer arithmetic to find the index, but it is highly non
+           portable.
+ *
+ * @param  Description of parameter
+ *
+ * @return Description of return parameters
+ */
+
+static RunTimeInfo_t *FindRunTimeInfo( I2C_TypeDef *i2c ) {
+RunTimeInfo_t *p = RunTimeInfo;
+
+    while( p->i2c && p->i2c != i2c ) {
+        p++;
+    }
+
+    if( p->i2c )
+        return p;
+    else
+        return 0;
+}
+
+/**
+ * @brief  Set I2C Status
+ *
+ * @param  I2C Pointer
+ *
+ * @return 0 if OK, negative in case of error
+ */
+
+static int I2CMaster_SetStatus( I2C_TypeDef *i2c, I2C_Status_t status ) {
+RunTimeInfo_t *p;
+
+    p = FindRunTimeInfo(i2c);
+    if( !p )
+        return -1;
+
+    p->status = status;
+    return 0;
+}
+
+/**
+ * @brief  Get I2C Status
+ *
+ * @param  I2C Pointer
+ *
+ * @return Status stored in RunTimeInfo or I2C_ERROR
+ */
+
+I2C_Status_t  I2CMaster_GetStatus( I2C_TypeDef *i2c ) {
+RunTimeInfo_t *p;
+I2C_Status_t  t;
+
+    p = FindRunTimeInfo(i2c);
+    if( !p )
+        return I2C_ERROR;
+
+    t = p->status;
+    if( t == I2C_ERROR )
+        p->status = I2C_READY;
+    return t;
+}
 
 /**
  *  @brief  ConfigurePins
@@ -309,7 +337,7 @@ void I2C4_ER_IRQHandler(void) {
  *  @note   For now, uses GPIO library
  */
 static int I2CMaster_ConfigurePins( I2C_TypeDef *i2c ) {
-I2C_Configuration_t *p;
+const I2C_Configuration_t *p;
 
     // Lookup configuration information on table
     p = i2c_configuration;
@@ -329,7 +357,7 @@ I2C_Configuration_t *p;
 
 
 /**
- *  @brief  I2CMaster_PeripheralClockEnable
+ *  @brief  Peripheral Clock Enable for I2C
  *
  *  @note   Using HSI as I2CCLK clock source (=16 MHz)
  */
@@ -350,29 +378,32 @@ I2CMaster_PeripheralClockEnable( I2C_TypeDef *i2c ) {
 }
 
 /**
- *  @brief  I2CMaster_PeripheralClockEnable
+ *  @brief  Kernel Clock Enable for I2C
  *
- *  @note   Using HSI as I2CCLK clock source (=16 MHz)
+ *  @note   It uses the I2CCLKSRC symbol define abo
  */
-#define I2CLKSRC (2)
-
 
 static void
-I2CMaster_I2CClockEnable( I2C_TypeDef *i2c ) {
+I2CMaster_KernelClockConfig( I2C_TypeDef *i2c ) {
+
+#if I2CCLKSRC == (2)
+    RCC->CR |= RCC_CR_HSION;
+    // Should I wait for HSIRDY?
+#endif
 
     // Enable I2C clocks
     if ( i2c == I2C1 ) {
-        RCC->DCKCFGR2 =  (RCC->DCKCFGR2&~(3<<RCC_DCKCFGR2_I2C1SEL_Pos))
-                        |(I2CLKSRC<<RCC_DCKCFGR2_I2C1SEL_Pos);
+        RCC->DCKCFGR2 =  (RCC->DCKCFGR2&~RCC_DCKCFGR2_I2C1SEL_Msk)
+                        |(I2CCLKSRC<<RCC_DCKCFGR2_I2C1SEL_Pos);
     } else if ( i2c == I2C2 ) {
-        RCC->DCKCFGR2 =  (RCC->DCKCFGR2&~(3<<RCC_DCKCFGR2_I2C2SEL_Pos))
-                        |(I2CLKSRC<<RCC_DCKCFGR2_I2C2SEL_Pos);
+        RCC->DCKCFGR2 =  (RCC->DCKCFGR2&~RCC_DCKCFGR2_I2C2SEL_Msk)
+                        |(I2CCLKSRC<<RCC_DCKCFGR2_I2C2SEL_Pos);
     } else if ( i2c == I2C3 ) {
-        RCC->DCKCFGR2 =  (RCC->DCKCFGR2&~(3<<RCC_DCKCFGR2_I2C3SEL_Pos))
-                        |(I2CLKSRC<<RCC_DCKCFGR2_I2C3SEL_Pos);
+        RCC->DCKCFGR2 =  (RCC->DCKCFGR2&~RCC_DCKCFGR2_I2C3SEL_Msk)
+                        |(I2CCLKSRC<<RCC_DCKCFGR2_I2C3SEL_Pos);
     } else if ( i2c == I2C4 ) {
-        RCC->DCKCFGR2 =  (RCC->DCKCFGR2&~(3<<RCC_DCKCFGR2_I2C4SEL_Pos))
-                        |(I2CLKSRC<<RCC_DCKCFGR2_I2C4SEL_Pos);
+        RCC->DCKCFGR2 =  (RCC->DCKCFGR2&~RCC_DCKCFGR2_I2C4SEL_Msk)
+                        |(I2CCLKSRC<<RCC_DCKCFGR2_I2C4SEL_Pos);
     }
 
 }
@@ -399,10 +430,17 @@ uint32_t mask;
     } else if ( i2c == I2C4 ) {
         mask =  RCC_APB1RSTR_I2C4RST;
     }
-    // Set reset pin
+    // Set reset
     RCC->APB1RSTR |=  mask;
-    // Clear reset pin
+
+    __NOP();
+
+    // Clear reset
     RCC->APB1RSTR &= ~mask;
+
+    // Set flag to uninitialized
+    I2CMaster_SetStatus(i2c,I2C_UNINITIALIZED);
+
 
 }
 
@@ -429,7 +467,94 @@ static void I2CMaster_Disable( I2C_TypeDef *i2c ) {
     i2c->CR1 &= ~I2C_CR1_PE;
     i2c->CR1 &= ~I2C_CR1_PE;
     i2c->CR1 &= ~I2C_CR1_PE;
+
+    // Set flag to disabled
+    I2CMaster_SetStatus(i2c,I2C_DISABLED);
+
 }
+
+
+/**
+ *  @brief  I2CMaster_Enable
+ *
+ *  @note   Enable I2C and at the same time, reset it
+ *          See RM 30.4.4
+ *
+ *  @note   When set, PE must be kept high for at
+ *          least 3 APB clock cycles. (RM Section 30.7.1)
+ *
+ *  @note   This is ensured by writing the following software sequence:
+ *           - Write PE=1
+ *           - Check PE=1
+ *           - Write PE=1
+ *          (RM Section 30.4.5)
+ */
+static void I2CMaster_Enable( I2C_TypeDef *i2c ) {
+
+    // Turn off device (Three times, see Note in RM Section 30.7.1 */
+    i2c->CR1 |= I2C_CR1_PE;
+    i2c->CR1 |= I2C_CR1_PE;
+    i2c->CR1 |= I2C_CR1_PE;
+
+    // Set flag to enabled
+    I2CMaster_SetStatus(i2c,I2C_READY);
+
+}
+
+
+/**
+ * @brief  Get Default Filter Parameter
+ *
+ * @note   Returns precalculated TIMINGR for certain combinations of clock source, speed and
+ *         filter settings.
+ *
+ * @note   A simple sequential search is used. If the table grows larger, use hash.
+ *
+ * @param  conf as used by the I2CMaster_Init function.
+ *
+ * @return TIMINGR register. returns 0 when the right parameter could not be found.
+ */
+
+
+
+static uint32_t GetPreCalculatedTiming(uint32_t conf) {
+uint32_t freq;
+uint32_t timingr;
+struct Default_Timing_t *pTiming = &default_timing[0];
+
+    int clksrc = conf&I2C_CONF_CLOCK_MASK;
+    int dnf = (conf&I2C_CONF_FILTER_DNF_MASK)>>I2C_CONF_FILTER_DNF_Pos;
+    int analog = (conf&I2C_CONF_FILTER_ANALOG)||(conf&I2C_CONF_FILTER_BOTH);  // 0 or 1
+    int digital = (conf&I2C_CONF_FILTER_DIGITAL)||(conf&I2C_CONF_FILTER_BOTH);;// 0 or 1
+
+
+
+    freq = 0;
+    switch(clksrc) {
+    case I2C_CONF_CLOCK_HSICLK:
+        freq = HSI_FREQ;
+        break;
+    case I2C_CONF_CLOCK_SYSCLK:
+        freq = SystemGetSYSCLKFrequency();
+        break;
+    case I2C_CONF_CLOCK_APB1CLK:
+        freq = SystemGetAPB1Frequency();
+        break;
+    }
+    if( freq == 0 )
+        return 0;
+
+    timingr = 0;
+    while( pTiming->freq ) {
+        if(   (freq == pTiming->freq) && (dnf == pTiming->dnf) && (analog == pTiming->analog)
+            && (digital == pTiming->digital) ) {
+            timingr = pTiming->timingr;
+            break;
+        }
+    }
+    return timingr;
+}
+
 
 /**
  *  @brief  I2CMaster_Init
@@ -442,17 +567,32 @@ int
 I2CMaster_Init( I2C_TypeDef *i2c, uint32_t conf, uint32_t timing) {
 int index;
 
-    // In the example in CubeF7, there is a 200 ms delay here
 
-    // Enable peripheral clock to use registers
+    // Enable peripheral clock for the I2C
     I2CMaster_PeripheralClockEnable(i2c);
 
-    // Disable I2C (It resets too)
+    // Configure clock for the I2C kernel
+    I2CMaster_KernelClockConfig(i2c);
+
+    // Is a reset needed?
+    I2CMaster_Reset(i2c);
+
+    // Disable I2C
     I2CMaster_Disable(i2c);
+
+    // In the example in CubeF7, there is a 200 ms delay here
 
     // Configure pins
     I2CMaster_ConfigurePins(i2c);
 
+    // If timing parameter = 0, try to find one in the table
+    if( timing == 0 ) {
+        timing = GetPreCalculatedTiming(conf);
+        if( timing == 0 )
+            return 0;  /* Could not find a pre calculated timing */
+    }
+
+    uint32_t dnf = (conf&I2C_CONF_FILTER_DNF_MASK)>>I2C_CONF_FILTER_DNF_Pos;
     // Configure filters
     if( (conf&I2C_CONF_FILTER_NONE)!=0 ) {
         // Using no filter
@@ -464,43 +604,123 @@ int index;
         i2c->CR1 &= ~I2C_CR1_ANFOFF;                // Turn on analog filter
         i2c->CR1 = (i2c->CR1&~(I2C_CR1_DNF_Msk));   // Turn off digital filter
         index = 1;
-    } else if( (conf&I2C_CONF_FILTER_DIGITAL_MASK)!=0 ) {
+    } else if( (conf&I2C_CONF_FILTER_DIGITAL)!=0 ) {
+        // Disabling analog filter
         i2c->CR1 |= I2C_CR1_ANFOFF;                 // Turn off analog filter
         // Using digital filter
-        uint32_t dnf = (conf&I2C_CONF_FILTER_DIGITAL_MASK)>>I2C_CONF_FILTER_DIGITAL_Pos;
-        // Limit dnf to 2
-        if( dnf > 2 ) dnf = 2;
+        i2c->CR1 = (i2c->CR1&~(I2C_CR1_DNF_Msk))|(dnf<<I2C_CR1_DNF_Pos);
+    } else if ( (conf&I2C_CONF_FILTER_BOTH)!=0 ) {
+        // Using analog filter
+        i2c->CR1 &= ~I2C_CR1_ANFOFF;                // Turn on analog filter
+        // Using digital filter
         i2c->CR1 = (i2c->CR1&~(I2C_CR1_DNF_Msk))|(dnf<<I2C_CR1_DNF_Pos);
     }
-
     i2c->TIMINGR = timing;
 
+    // Disable interrupts
+    i2c->CR1 &= ~(I2C_CR1_ERRIE
+                 |I2C_CR1_TCIE
+                 |I2C_CR1_STOPIE
+                 |I2C_CR1_NACKIE
+                 |I2C_CR1_ADDRIE
+                 |I2C_CR1_RXIE
+                 |I2C_CR1_TXIE
+                 );
 
-    // Turn Peripheral Clock for the I2C interface
-    I2CMaster_I2CClockEnable(i2c);
+    // Enable stretch mode, disable SMB mode,
+    i2c->CR1 &= ~(I2C_CR1_PE
+                 |I2C_CR1_DNF
+                 |I2C_CR1_ANFOFF
+                 |I2C_CR1_TXDMAEN
+                 |I2C_CR1_RXDMAEN
+                 |I2C_CR1_SBC
+                 |I2C_CR1_NOSTRETCH
+                 |I2C_CR1_GCEN
+                 |I2C_CR1_SMBHEN
+                 |I2C_CR1_SMBDEN
+                 |I2C_CR1_ALERTEN
+                 |I2C_CR1_PECEN
+                 );
 
-    // Turn on device. Three times, just in case. See above */
-    i2c->CR1 |= I2C_CR1_PE;
-    i2c->CR1 |= I2C_CR1_PE;
-    i2c->CR1 |= I2C_CR1_PE;
+    // Only 7 bit address
+    i2c->CR2 &= ~(I2C_CR2_ADD10|I2C_CR2_HEAD10R|I2C_CR2_START|I2C_CR2_STOP|I2C_CR2_NACK
+                 |I2C_CR2_NBYTES_Msk|I2C_CR2_RELOAD|I2C_CR2_PECBYTE);
+
+    // Enable auto end and
+    i2c->CR2 |= (I2C_CR2_AUTOEND | I2C_CR2_NACK);
+
+
+    // Configure addresses. It is a master. It does not need one.
+    i2c->OAR1 &= ~(I2C_OAR1_OA1EN|I2C_OAR1_OA1MODE|I2C_OAR1_OA1_Msk);
+    i2c->OAR2 &= ~(I2C_OAR2_OA2EN|I2C_OAR2_OA2_Msk);
+
+    // Turn on device. */
+    I2CMaster_Enable(i2c);
+
+    // Set flag to Ready
+    I2CMaster_SetStatus(i2c,I2C_READY);
 
     return 0;
 }
 
+
 /**
- * @brief I2CMaster_Write
+ * @brief  I2C Master detects a slave
+ *
+ * @note   Long description of function
+ *
+ * @param  Description of parameter
+ *
+ * @return Description of return parameters
+ */
+
+int
+I2CMaster_Detect( I2C_TypeDef *i2c, uint16_t addr ) {
+    i2c->CR2 =   (i2c->CR2 & ~(
+                     I2C_CR2_SADD_Msk
+                    |I2C_CR2_NBYTES_Msk
+                    |I2C_CR2_ADD10
+                    |I2C_CR2_RD_WRN
+                    |I2C_CR2_HEAD10R
+                    |I2C_CR2_RELOAD
+                    |I2C_CR2_AUTOEND
+                    |I2C_CR2_STOP
+                    )
+                 )
+                |((addr<<I2C_CR2_SADD_Pos)&I2C_CR2_START|I2C_CR2_STOP)
+                |((0<<I2C_CR2_NBYTES_Pos)&I2C_CR2_NBYTES_Msk)
+                |I2C_CR2_AUTOEND;
+
+#ifdef USE_POLLING
+    // There should be a timeout!!
+    while ( (i2c->ISR&I2C_ISR_BUSY) == 1 ) {}
+    if( (i2c->ISR&I2C_ISR_NACKF) == 1 ) {
+        return -1;
+    }
+#endif
+    return 0;
+}
+
+
+/**
+ * @brief I2C Master write to a slave
  *
  * @note  Send the *n* bytes in the *data array* to slave *addr*
  *
- * @param i2c
- * @param address
- * @param data
- * @param n
- * @return int
+ * @note  Should have a timeout
+
+ * @param i2c:      I2C peripheral to be used
+ * @param address:  I2C address of slave
+ * @param data:     pointer to data to be transmitted
+ * @param n:        Number of bytes to be transmitted
+ * @return int:     0 if OK, else negative number
  */
 int
 I2CMaster_Write( I2C_TypeDef *i2c, uint16_t addr, uint8_t *data, uint16_t nbytes) {
 uint8_t *p = data;
+
+    if( nbytes > 255 )
+        return -1;
 
     i2c->CR2 =   (i2c->CR2 & ~(
                      I2C_CR2_SADD_Msk
@@ -509,22 +729,28 @@ uint8_t *p = data;
                     |I2C_CR2_RD_WRN
                     |I2C_CR2_HEAD10R
                     |I2C_CR2_RELOAD
+                    |I2C_CR2_AUTOEND
+                    |I2C_CR2_STOP
                     )
                  )
-                |((addr<<I2C_CR2_SADD_Pos)&I2C_CR2_START_Msk)
+                |((addr<<I2C_CR2_SADD_Pos)&I2C_CR2_START)
                 |((nbytes<<I2C_CR2_NBYTES_Pos)&I2C_CR2_NBYTES_Msk)
                 |I2C_CR2_AUTOEND;
 #ifdef USE_POLLING
-    i2c->TXDR = *p++;
     i2c->CR2 |= I2C_CR2_START;
+    i2c->TXDR = *p++;
+
     while(1) {
-        while( (i2c->ISR&I2C_ISR_TXIS) == 0 ) {}
+        while( (i2c->ISR&I2C_ISR_TXIE) == 0 ) {}     // Block!!!!!
+        // TBD: Test error conditions
+
         nbytes--;
-        if( nbytes == 0 )
+        if( nbytes == 1 )
             break;
         i2c->TXDR = *p++;
     }
-    i2c->CR2 |= I2C_CR2_STOP;  // should be set before last byte ?
+    i2c->CR2 |= I2C_CR2_STOP;  // should be set with the last byte
+    i2c->TXDR = *p++;
 #endif
     return 0;
 }
@@ -543,6 +769,7 @@ uint8_t *p = data;
 int
 I2CMaster_Read( I2C_TypeDef *i2c, uint16_t addr, uint8_t *data, uint16_t nbytes) {
 uint8_t *p = data;
+int ninitial = nbytes;
 
     i2c->CR2 =   (i2c->CR2 & ~(
                      I2C_CR2_SADD_Msk
@@ -558,10 +785,11 @@ uint8_t *p = data;
                 |I2C_CR2_RD_WRN;
 #ifdef USE_POLLING
     i2c->CR2 |= I2C_CR2_START;
-    while(nbytes--) {
-        while( (i2c->ISR&I2C_ISR_RXNE) == 0 ) {}
+    n = 0;
+    while( ((i2c->CR2&I2C_CR2_STOPF)==0)&&(n<nbytes) ) {
+        while( (i2c->ISR&I2C_ISR_RXNE) == 0 ) {}     // Block!!!!!
         *p++ = i2c->RXDR;
-        nbytes--;
+        n++;
     }
 #endif
 

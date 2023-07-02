@@ -10,9 +10,10 @@ The touch sensor is based on the FT5336GQQ device from Focal Tech incorporated i
 
 The FT5336 can be customized by the LCD manufacturer. There is no clear data sheet for software interfacing to the touch controller.
 
-Some functionalities can be derived from other similar products of the same manufacturer.
+Some functionalities can be derived from other similar products of the same manufacturer. Some
+information can be found by reverse engineering, looking code from ST or other libraries.
 
-One important difference is that the FT5336 can only handle 5 touch points.
+One important difference is that the FT5336 implementation on the RK043FN48H can only handle 5 touch points.
 
 Touchscreen connection
 ----------------------
@@ -69,9 +70,10 @@ Additional lines (EXTI16 to EXTI23) correspond to other exceptions sources as sh
 
 To enable an interrupt:
 
-1. Set the corresponding bit in EXTI_IMR
-2. Configure trigger selection (rising or falling) in EXTI\_RTSR or EXTI\_FTSR.
-3. Enable the corresponding IRQn in NVIC.
+1. Configure GPIO pin as input (Enable clock for its GPIO)
+2. Set the corresponding bit in EXTI_IMR
+3. Configure trigger selection (rising or falling) in EXTI\_RTSR or EXTI\_FTSR.
+4. Enable the corresponding IRQn in NVIC.
 
 
 Interfacing to the FT5336

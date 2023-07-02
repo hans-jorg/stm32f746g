@@ -18,11 +18,50 @@
 
 #include "stm32f746xx.h"
 #include "system_stm32f746.h"
+#include "gpio.h"
 #include "i2c-master.h"
 #include "ftxxxx.h"
 
-
 /**
+ * @brief  FT5336 Interface
+ *
+ * @note   FT5336 can have many implementations, with different interface lije SPI and I2C.
+ *         The interface used in the STM32 Discovery Boards is I2C.
+ *
+ * @note   In the STM32F746 Discovery board, the interface uses 4 pins
+ *
+ *         |  Signal           | Pin  |
+ *         |-------------------|------|
+ *         | LCD_SDA/AUDIO_SDA | PH8  |
+ *         | LCD_SCL/AUDIO_SCL | PH7  |
+ *         | LCD_INT           | PJ13 |
+ *         | LCD_RST           | NRST |
+ *
+ * @note   The I2C address for the FT5336 device is 01110000 (=0x70). This is a 8-bit value.
+ *         But this is the content of the address byte for a write operation. For a read operation
+ *         the content is 01110001 (=0x71). The lowest order bit is the operation flag. This is
+ *         a common usage, but the actual I2C address is 0111000 (=038), which is a 7-bit value.
+ *
+ * @note   The LCD_INT pin is connected to the pin 13 of the GPIOJ peripheral. GPIO pins generates
+ *         interrupts thru a *Extended interrupts and events controller* (EXTI) peripheral.
+ *         The EXTI groups all GPIO pins with the same number.
+ *         So PA0, PB0, PC0, PD0, PE0, PF0, PG0, PH0, PI0, PJ0 generated the EXTI0 interrupt and
+ *         so on. So, there are 16 EXTI interrupt sources.
+ *
+ * @note   The EXTI can generate the following interrupts. Note that some interrupts are grouped.
+ *
+ *         | EXTn  | IRQn | IRQ_Handler                |
+ *         |-------|------|----------------------------|
+ *         |    0  |   6  | EXTI0_IRQHandler           |
+ *         |    1  |   7  | EXTI1_IRQHandler           |
+ *         |    2  |   8  | EXTI2_IRQHandler           |
+ *         |    3  |   9  | EXTI3_IRQHandler           |
+ *         |    4  |  10  | EXTI4_IRQHandler           |
+ *         |  5-9  |  23  | EXTI9_5_IRQHandler         |
+ *         | 10-15 |  40  | EXTI15_10_IRQHandler       |
+ *
+ *-------------------------------------------------------------------------------------------------
+ *
  * @brief Touch info from FT5336 (see FT5x06_register.pdf)
  *
  * @note  The device manages up to 10(?) simultaneous touch point. The number of
@@ -90,7 +129,7 @@
  *
  *  |  #  | -  | Symbol            | Bits| Description                        |
  *  |-----|----|-------------------|-----|------------------------------------|
- *  | 01h | RO | Touch_ID          | 7:0 |                                    |
+ *  | 01h | RO | FTXXXX_ID          | 7:0 |                                    |
  *  | 02h | RO | Touch Points      | 7:0 | # of touch points                  |
  *  | 03h | RO | TOUCH1_Event_Flag | 7:6 |                                    |
  *  | 03h | RO | TOUCH1_XH         | 3:0 | Upper 4 bits of X touch coordinate |
@@ -218,26 +257,153 @@
 
 
 /**
- * Addresses of first register of touch info
+ * @brief Addresses of first register of touch info
+ *
+ * @note  Its size must be equal to maximum number of touch points
  */
 
 static uint16_t touchaddr[] = {
-    TOUCH_ADDR_TOUCH1_XH,
-    TOUCH_ADDR_TOUCH2_XH,
-    TOUCH_ADDR_TOUCH3_XH,
-    TOUCH_ADDR_TOUCH4_XH,
-    TOUCH_ADDR_TOUCH5_XH,
+    FTXXXX_REG_TOUCH1_XH,
+    FTXXXX_REG_TOUCH2_XH,
+    FTXXXX_REG_TOUCH3_XH,
+    FTXXXX_REG_TOUCH4_XH,
+    FTXXXX_REG_TOUCH5_XH,
 };
 
 static uint16_t touchmax = sizeof(touchaddr)/sizeof(uint16_t);
 
-#define I2C_INTERFACE   I2C3
-#define I2C_ADDRESS     0x70
-#define XMAX            511
-#define YMAX            511
+#define I2C_INTERFACE       I2C3
+#define I2C_ADDRESS         0x38
 
+#define LCD_INT_PIN         (13)
+#define LCD_INT_IRQ         (40)
+#define LCD_INT_PRIO        (15)
 
+#define LCD_WIDTH           (480)
+#define LCD_HEIGHT          (272)
+#define XMAX                (LCD_WIDTH-1)
+#define YMAX                (LCD_HEIGHT-1)
+
+/**
+ * @brief Static variables
+ */
 static uint16_t width,height;
+static int16_t  state = 0;
+static const uint32_t INTPINMASK = (1U<<LCD_INT_PIN);
+
+static const GPIO_PinConfiguration interruptpin = {
+    .gpio    =  GPIOJ,
+    .pin     =  LCD_INT_PIN,
+    .af      =  0,
+    .mode    =  0,
+    .otype   =  0,
+    .ospeed  =  0,
+    .pupd    =  0,
+    .initial =  0,
+} ;
+
+/**
+ * @brief Interrupt routine for the Touch Controller
+ *
+ * @note  All processin is done in the FTXXXX_Interrupt function. So a IRQ Handler can
+ *        implemented elsewhere can process this interrupt and the ones from the
+ *        other sources. In order to do this, FTXXX_Interrupt must be called from the
+ *        IRQ Handler.
+ *
+ *
+ * @note  When the I2C_DONT_IMPLEMENT_EXTI_IRQ compilation flag is defined, the IRQ Handler
+ *        is not implemented here and must be implemented elsewhere.
+ */
+
+///@{
+
+void FTXXXX_ProcessInterrupt(void) {
+
+    if( (EXTI->PR&INTPINMASK)!=0 ) {
+        state = 1;
+        EXTI->PR = INTPINMASK;
+    }
+}
+
+#ifndef I2C_DONT_IMPLEMENT_EXTI_IRQ
+
+void EXTI15_10_IRQHandler(void) {
+
+    FTXXXX_ProcessInterrupt();
+
+}
+
+#endif
+///@}
+
+
+/**
+ * @brief   Initialization of input pin
+ *
+ * @note    Uses GPIO module
+ */
+
+static void InitInterruptPin(void) {
+
+    // Configure pin (Enable GPIO clock, etc)
+    GPIO_ConfigureSinglePin(&interruptpin);
+
+    // clock for EXTI?
+    EXTI->IMR  |= INTPINMASK;   // Enable interrupt
+    EXTI->FTSR |= INTPINMASK;   // Only falling edge
+
+    // Configure interrupt
+    NVIC_SetPriority(LCD_INT_IRQ,LCD_INT_PRIO);
+    NVIC_EnableIRQ(LCD_INT_IRQ);
+
+}
+
+
+/**
+ * @brief   Read Interrupt Pin Status
+ *
+ * @note    The interrupt pin is maintained low while a touch is detected.
+ *
+ * @returns 0 if no touch, >0 if a touch is detected
+ */
+int
+FTXXX_ReadInterruptPinStatus(void) {
+uint32_t s;
+
+    s = interruptpin.gpio->IDR&INTPINMASK;
+
+    return s==0;
+}
+
+
+
+/**
+ * @brief  FTXXX Initialization
+ *
+ * @return 0 if OK, negative for error.
+ */
+
+
+
+int
+FTXXXX_Init(void) {
+int rc;
+
+    rc = I2CMaster_Init(I2C_INTERFACE, 0, 0);
+
+    rc = I2CMaster_Detect(I2C_INTERFACE,I2C_ADDRESS);
+
+    if( rc >= 0 ) {
+        // Configure interrupt from FT5336
+        InitInterruptPin();
+        // Get configuration data from device
+
+    }
+
+    return rc;
+}
+
+
 
 /**
  * @brief  Write data to Touch register
@@ -248,7 +414,7 @@ static uint16_t width,height;
  * @return 0: no errors
  */
 
-int Touch_WriteRegister(uint8_t reg, uint8_t data) {
+int FTXXXX_WriteRegister( uint8_t reg, uint8_t data ) {
 uint8_t v[2];
 int rc;
 
@@ -256,7 +422,7 @@ int rc;
     v[1] = data;
     rc = I2CMaster_Write( I2C_INTERFACE, I2C_ADDRESS, v, 2);
 
-    return 0;
+    return rc;
 }
 
 
@@ -267,11 +433,13 @@ int rc;
  *
  * @return Description of return parameters
  */
-int Touch_ReadRegister(uint8_t reg, uint8_t *pdata, int n) {
+int FTXXXX_ReadRegister( uint8_t reg, uint8_t *pdata ) {
+int rc;
 
-    rc = I2CMaster_Write( I2C_INTERFACE, I2C_ADDRESS, &reg, 1);
-    rc = I2CMaster_Read( I2C_INTERFACE, I2C_ADDRESS, pdata, n);
-    return 0;
+    rc = I2CMaster_Write( I2C_INTERFACE, I2C_ADDRESS, &reg, 1 );
+    rc = I2CMaster_Read( I2C_INTERFACE, I2C_ADDRESS, pdata, 1 );
+
+    return rc;
 }
 
 /**
@@ -281,11 +449,13 @@ int Touch_ReadRegister(uint8_t reg, uint8_t *pdata, int n) {
  *
  * @return Description of return parameters
  */
-int Touch_WriteSequentialRegisters( uint8_t startreg, uint8_t *pdata, int n) {
+int FTXXXX_WriteSequentialRegisters( uint8_t startreg, uint8_t *pdata, int n ) {
+int rc;
 
-    rc = I2CMaster_Write( I2C_INTERFACE, I2C_ADDRESS, &startreg, 1);
+    rc = I2CMaster_Write( I2C_INTERFACE, I2C_ADDRESS, &startreg, 1 );
+    rc = I2CMaster_Write( I2C_INTERFACE, I2C_ADDRESS, pdata, n );
 
-    return 0;
+    return rc;
 }
 
 /**
@@ -296,32 +466,16 @@ int Touch_WriteSequentialRegisters( uint8_t startreg, uint8_t *pdata, int n) {
  * @return Description of return parameters
  */
 
-int Touch_ReadSequentialRegisters( uint8_t startreg, uint8_t *pdata, int num) {
+int FTXXXX_ReadSequentialRegisters( uint8_t startreg, uint8_t *pdata, int n ) {
+int rc;
 
-    return 0;
+    rc = I2CMaster_Write( I2C_INTERFACE, I2C_ADDRESS, &startreg, 1 );
+    rc = I2CMaster_Read( I2C_INTERFACE, I2C_ADDRESS, pdata, n );
+
+    return rc;
 }
 
 
-/**
- * @brief  Short Description of Function
- *
- * @param  Description of parameter
- *
- * @return Description of return parameters
- */
-
-
-
-int
-Touch_Init(uint16_t w, uint16_t h) {
-
-    I2CMaster_Init(I2C_INTERFACE, 0, 0);
-
-    width = w;
-    height = h;
-
-    return 0;
-}
 
 
 
@@ -332,7 +486,7 @@ Touch_Init(uint16_t w, uint16_t h) {
  * @return the number of touches
  */
 int
-Touch_ReadTouchInfo(Touch_Info *touchinfo) {
+FTXXXX_ReadTouchInfo( FTXXXX_Info *touchinfo ) {
 unsigned char packet;
 
 

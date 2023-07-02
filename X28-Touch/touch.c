@@ -20,7 +20,7 @@
 #include "system_stm32f746.h"
 #include "touch.h"
 #include "i2c-master.h"
-#include "ftxxx.h"
+#include "ftxxxx.h"
 
 
 /**
@@ -36,7 +36,7 @@
 int
 Touch_Init(void) {
 
-    FTXXX_Init();
+    FTXXXX_Init();
 
     return 0;
 }
