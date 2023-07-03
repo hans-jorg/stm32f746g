@@ -24,34 +24,60 @@
 
 
 /**
- * @brief  Short Description of Function
+ * @brief  Touch Initialization
  *
- * @param  Description of parameter
- *
- * @return Description of return parameters
+ * @return Initialize Touch Controller
  */
-
-
 
 int
 Touch_Init(void) {
+int rc;
 
-    FTXXXX_Init();
+    rc = FTXXXX_Init();
 
-    return 0;
+    return rc;
 }
 
+/**
+ * @brief  Touch Detected
+ *
+ * @return Signalize that a touch is beeing detected
+ */
+
+int
+Touch_Detected(void) {
+int rc;
+
+    rc = FTXXXX_ReadInterruptPinStatus() || FTXXXX_GetStatus();
+
+    return rc;
+}
 
 
 /**
  * @brief Return touch info
  *
  * @param touchinfo a pointer to an array of touch info
+ *
  * @return the number of touches
  */
 int
-Touch_ReadTouchInfo(Touch_Info *touchinfo) {
-unsigned char packet;
+Touch_ReadInfo(Touch_Info *touchinfo, int nmax) {
+FTXXXX_Info buffer;
+int n = 0;
 
 
+    if( Touch_Detected() ) {
+        n = FTXXXX_ReadTouchInfo(&buffer);
+        if( n > 0 ) {
+            if( n > nmax ) n = nmax;
+            for(int i=0;i<n;i++) {
+                touchinfo[i].id    = buffer.gesture;
+                touchinfo[i].x     = buffer.points[i].x;
+                touchinfo[i].y     = buffer.points[i].y;
+                touchinfo[i].weight= buffer.points[i].w;
+            }
+        }
+    }
+    return n;
 }

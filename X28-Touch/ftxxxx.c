@@ -360,6 +360,22 @@ static void InitInterruptPin(void) {
 
 
 /**
+ * @brief  Short description of function
+ *
+ * @note   A touch interrupt was detected
+ *
+ * @return Status Indicator
+ */
+
+int FTXXXX_GetStatus(void) {
+int16_t t = state;
+
+    state = 0;
+    return t;
+}
+
+
+/**
  * @brief   Read Interrupt Pin Status
  *
  * @note    The interrupt pin is maintained low while a touch is detected.
@@ -482,12 +498,53 @@ int rc;
 /**
  * @brief Return touch info
  *
- * @param touchinfo a pointer to an array of touch info
+ * @param touchinfo a pointer to a TouchInfo struct
+ *
  * @return the number of touches
  */
 int
 FTXXXX_ReadTouchInfo( FTXXXX_Info *touchinfo ) {
-unsigned char packet;
+uint8_t r;
+int rc;
+uint8_t buffer[6];
+
+    // Get number of touch points
+    rc = FTXXXX_ReadRegister(FTXXXX_REG_TD_STATUS,&r);
+    if( rc < 0 )
+        goto error;
+    touchinfo->npoints = r&0xF;
+
+    // Test if there are touch points
+    if( r == 0 )
+        return 0;
+
+
+    rc = FTXXXX_ReadRegister(FTXXXX_REG_GEST_ID,&r);
+    if( rc < 0 )
+        goto error;
+    touchinfo->gesture = r;
+
+    /* For each touch point:
+     *    buffer[0]=TOUCHn_XH contains Event Flag, Highest 4-bit of X
+     *    buffer[1]=TOUCHn_XL contains lowest 8-bit of X
+     *    buffer[2]=TOUCHn_YH contains Touch ID, Highest 4-bit of Y
+     *    buffer[3]=TOUCHn_YL contains lowest 8-bit of Y
+     *    buffer[4]=TOUCHn_WEIGHT contains weigth
+     *    buffer[5]=TOUCHn_MISC containts contains Touch area, Direction, Speed;
+     */
+    for(int i=0;i<touchinfo->npoints;i++) {
+        rc = FTXXXX_ReadSequentialRegisters( touchaddr[i], buffer, 6 );
+        if( rc < 0 )
+            goto error;
+        touchinfo->points[i].x = (buffer[0]&0xF)<<8|buffer[1];
+        touchinfo->points[i].y = (buffer[2]&0xF)<<8|buffer[3];
+        touchinfo->points[i].w = buffer[4];
+    }
+
+    return touchinfo->npoints;
+
+error:
+    return -1;
 
 
 }

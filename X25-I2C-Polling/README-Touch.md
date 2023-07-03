@@ -84,12 +84,12 @@ The interface is done by accessing registers of the FT5336. A list is in [Annex 
 
 The format of the I2C packet for a write command is show below
 
-    START | I2C Addr W| Cmd Addr |  Value  | STOP 
+    START | I2C Addr,W | Cmd Addr |  Value  | STOP 
     
 To read a register, the following sequence is needed.
 
-    START | I2C Addr W| Cmd Addr | STOP 
-    START | I2C Addr R| Cmd Addr |  Value  | STOP 
+    START | I2C Addr,W | Cmd Addr | STOP 
+    START | I2C Addr,R | Cmd Addr |  Value  | STOP 
 
 
 Annex A 

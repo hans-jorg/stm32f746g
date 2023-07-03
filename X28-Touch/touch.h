@@ -17,7 +17,6 @@
 
 
 typedef struct {
-    uint16_t event;
     uint16_t id;
     uint16_t x;
     uint16_t y;
@@ -26,7 +25,7 @@ typedef struct {
 } Touch_Info;
 
 int Touch_Init(void);
-int Touch_Read(Touch_Info *touch);
+int Touch_ReadInfo(Touch_Info *touch, int nmax );
 int Touch_Detected(void);
 
 #endif // TOUCH_H
