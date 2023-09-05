@@ -4,7 +4,7 @@ Using the LCD
 Introduction
 ------------
 
-The board has a 4.3" LCD display with Capacitive Touch Panel (CTP). 
+The board has a 4.3" LCD display with Capacitive Touch Panel (CTP).
 
 The STM32F646 has a LCD control interface and an accelerator, called ChromeART (DMA2D).
 
@@ -22,7 +22,7 @@ It support the following formats.
 | AL44      |         8     |
 | AL88      |         8     |
 
-
+>> There are some flickers when transitioning!!!!!!!
 
 
 The display
@@ -31,7 +31,7 @@ The display
 It is produced by Rocktech under the code RK043FN48H-CT672B. Its resolution is 480x272 and can
  display 16777216 colors (RGB888 interface). The board uses a customized version of the commercial
  display (It uses other cable/connector).
- 
+
 The display builtin LCD controller is the OTA5180A and the CTP controller is a FT5336GQQ.
 
 > NOTE: There is a HT043c in the schematics!!!!
@@ -98,7 +98,7 @@ The LCD interface is compound of the following signals
 * LCD_HSYNC: horizontal synchonization signal
 
 
-The LCD interface uses 
+The LCD interface uses
 
 * HCLK: It is generated from the SYSCLK thru a prescaler (1-512 divider)
 * APB2: It is generated from the SYSCLK (up to 216 MHz) signal
@@ -123,8 +123,8 @@ $$ f_{PLLSAIP} = f_{VCOOUT}/P where R={ 2,4,6, 8} $$
 $$ f_{PLLSAIQ} = f_{VCOOUT}/Q where R={ 2,3,4,5,6,7,8,9,10,11,12,13,14,15 } $$
 $$ f_{PLLSAIR} = f_{VCOOUT}/R where R={ 2,3,4,5,6,7} $$
 
-It is also possible to set additional prescalers for these signals in the DCKCFGR1 to generate 
-the SAI1, SAI2 and LCD_CLK clock signals. The  LCD_CLK  is generated from the PLLSAIR signal thru 
+It is also possible to set additional prescalers for these signals in the DCKCFGR1 to generate
+the SAI1, SAI2 and LCD_CLK clock signals. The  LCD_CLK  is generated from the PLLSAIR signal thru
 the divider PLLSAIDIVR.
 
 $$ f_{LCD_CLK} = f_{PLLSAIR}/DIVR where DIVR={2,4,6,8} $$
@@ -134,7 +134,7 @@ Board LCD-Display interface
 ---------------------------
 
 The connection between LCD and display are:
- 
+
  LCD signal   | Board signal      | MCU signal             |
 --------------|-------------------|------------------------|
   CLK         | LCD_CLK           | PI14                   |
@@ -192,16 +192,16 @@ LCD Signal    |        |  Pin   |  Description
  LCD_DISP     | GPIO   | I12    |  Enable LCD
  LCD_INT      | GPIO   | I13    |  LCD Interrupt
  LCD_BL_CTRL  | GPIO   | K3     |  Backlight PWM
- 
+
 
 Capacitive Touch Panel (CTP) interface
 --------------------------------------
 
 
  The LCD display has a Capacitive Touch Display (CTP), controlled by HTC043C.
- 
+
  It uses an I2C interface shared with the Audio WM8994ECS/R  device.
- 
+
 | Board Signal    | Signal | Pin  | Description             |  Interface  |
 |-----------------|--------|------|-------------------------|-------------|
 |  LCD\_SCL       | SCL    | PH7  | Shared with AUDIO\_SCL  |   I2C3_SCL  |
@@ -209,8 +209,8 @@ Capacitive Touch Panel (CTP) interface
 |  LCD_INT        | INT    | PI13 | Interrupt               |   GPIOI 13  |
 
 
-As described in the schematics the I2C interface of the CTP uses the default 
-address 01110000 (=0x70). The Audio WM8994ECS/R uses the address 0x00110100 (=0x34), as in 
+As described in the schematics the I2C interface of the CTP uses the default
+address 01110000 (=0x70). The Audio WM8994ECS/R uses the address 0x00110100 (=0x34), as in
 the Discovery board or 0x00110110 (=0x36) according tho pin CS/ADDR, low or high, respectively.
 
 Polarity
@@ -219,7 +219,7 @@ Polarity
 The LCD controller supports display with different polarity of control signals. The polarity to be
 used can be set in register LTCD_GCR. The default is clock not inverted and all others active low.
 
-The Rk043 has the polarity of control signals shown below, as can be obtained from the example 
+The Rk043 has the polarity of control signals shown below, as can be obtained from the example
 implementation.
 
 | Display signal | LCD signal | Polarity      |   Symbol      |
@@ -265,7 +265,7 @@ The fields are:
 | HSW     | SSCR     | HSYNC-1               | 12 | Horizontal synchronization width
 | AHBP    | BPCR     | HSYNC+HBP-1           | 12 | Accumulated horizontal back porch
 | AAW     | AWCR     | HSYNC+HBP+HAW-1       | 12 | Accumulated active width
-| TOTALW  | TWCR     | HSYNC+HBP+HAW+HFP-1   | 12 | Total width 
+| TOTALW  | TWCR     | HSYNC+HBP+HAW+HFP-1   | 12 | Total width
 | VSW     | SSCR     | VSYNC-1               | 11 | Vertical synchronization width
 | AVBP    | BPCR     | VSYNBC+VBP-1          | 11 | Accumulated vertical back porch
 | AAH     | AWCR     | VSYNC+VBP+VAH-1       | 11 | Accumulated active height
@@ -305,8 +305,8 @@ A layer is configured in the following registers:
 |  WVPCR      |  WVSPPOS  | Vertical stop position of framebuffer   |
 |  WVPCR      |  WVSTPOS  | Vertical start position of framebuffer  |
 
-Restrictions:  
-WHSPPOS >= AHBP+1  
+Restrictions:
+WHSPPOS >= AHBP+1
 WHSTPOS <= AAW
 WVSPPOS >= AVBP+1
 WVSTPOS <= AAH
@@ -316,13 +316,13 @@ WVSTPOS <= AAH
 
 The size of the framebuffer depends on the resolution (width and heigth) and pixel format.
 
-For the 480x272 LCD (with 480x272=130560 pixels) used in the Discovery board, 
+For the 480x272 LCD (with 480x272=130560 pixels) used in the Discovery board,
 
-| Pixel format |Pixel size|  Framebuffer size in bytes  |  Framebuffer size in KBytes 
+| Pixel format |Pixel size|  Framebuffer size in bytes  |  Framebuffer size in KBytes
 |--------------|----------|-----------------------------|----------------------------
 | ARGB888      |     4    |             522240          |             510
 | RGB888       |     3    |             391680          |             383
-| RGB565       |     2    |             261120          |             255      
+| RGB565       |     2    |             261120          |             255
 | ARGB1555     |     2    |             261120          |             255
 | ARGB4444     |     2    |             261120          |             255
 | L8           |     1    |             130560          |             128
@@ -331,9 +331,9 @@ For the 480x272 LCD (with 480x272=130560 pixels) used in the Discovery board,
 
 
 The framebuffer can be in internal RAM ou in an external RAM using the FMC interface,
- like the SDRAM. 
+ like the SDRAM.
 
-> NOTE: External RAM run at a clock frequency half or third of the system frequency. This limits the memory bandwidth. 
+> NOTE: External RAM run at a clock frequency half or third of the system frequency. This limits the memory bandwidth.
 
 > NOTE: The LCD interface pushes the memory usage (bandwidth) to the limit.
 
@@ -349,7 +349,7 @@ According the AN4861, there are two solutions:
 
 * Add dummy bytes at the end of every line. In the 480 width example, adding 96 bytes to the line width, one get a line with 1536 bytes. There are still 22 64-bytes bursts and a 32 byte burst at the first line. At the second line, this repeats. And so every two lines.
 
-The device can handle lines greater than the active width. There are two factors to define the line in 
+The device can handle lines greater than the active width. There are two factors to define the line in
 
 
 
@@ -367,7 +367,7 @@ Implementation
 --------------
 
 The HSE clock signal is generated from an external 25 MHz crystal oscillator. To get a 200 MHz clock
-signal needed for the SDRAM, it must be divided by 25, multiplied by 400 and then divided by 2, 
+signal needed for the SDRAM, it must be divided by 25, multiplied by 400 and then divided by 2,
 since the minimum for Q is 2.
 
 $$ f_{HCLK} = (( f_{HSI}/M )*N / Q ) $$
@@ -405,24 +405,18 @@ Working backwards
 
 
 The combination of parameters N, R, PLLDIVR depends on the other uses of the PLLSAI signals,
-SAI1 and SAI2 clock signals, used by DMA, Serial Audio Interface (SAI) 1 and 2. 
+SAI1 and SAI2 clock signals, used by DMA, Serial Audio Interface (SAI) 1 and 2.
 
 
  References
  ----------
- 
+
 1. [STM32F75xxx and STM32F74xxx advanced Arm ® -based 32-bit MCUs Reference Manual - RM0385](https://www.st.com/resource/en/reference_manual/dm00124865-stm32f75xxx-and-stm32f74xxx-advanced-arm-based-32-bit-mcus-stmicroelectronics.pdf)
 2. [STM32F746NG Data sheet](https://www.st.com/resource/en/datasheet/stm32f746ng.pdf)
-3. [AN4861 - LCD-TFT display controller (LTDC) on STM32 MCUs](https://www.st.com/resource/en/application_note/dm00287603-lcdtft-display-controller-ltdc-on-stm32-mcus-stmicroelectronics.pdf) 
+3. [AN4861 - LCD-TFT display controller (LTDC) on STM32 MCUs](https://www.st.com/resource/en/application_note/dm00287603-lcdtft-display-controller-ltdc-on-stm32-mcus-stmicroelectronics.pdf)
 4. [RK043FN48H-CT672B Datasheet](https://mikrocontroller.bplaced.net/wordpress/wp-content/uploads/2018/01/RK043FN48H-CT672B-V1.0.pdf)
 5. [OTA5180A Datasaheet](https://www.newhavendisplay.com/resources_dataFiles/datasheets/LCDs/OTA5180A.pdf)
 6. [FTA5336GQQ Datasheet](https://www.newhavendisplay.com/resources_dataFiles/datasheets/touchpanel/FT5336.pdf)
 7. [A little about graphics subsystem internals on microcontrollers](https://alexkalmuk.medium.com/a-little-about-graphics-subsystem-internals-on-microcontrollers-d952cfd0966a)
 8. [Source for FT5336 driver](https://os.mbed.com/teams/ST/code/BSP_DISCO_F746NG/file/c9112f0c67e3/ft5336.h/)
 9. [Info about RK043FN66HS-CTG](https://community.st.com/s/question/0D50X0000B5H5uf/display-rk043fn66hsctg-from-rocktech)
-
-
- 
- 
- 
- 
