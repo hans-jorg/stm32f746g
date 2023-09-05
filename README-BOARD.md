@@ -180,7 +180,10 @@ There is a PLL unit to generate clock signal for the SAI unit and another one fo
 
 There is one LED under direct control of software. It is the LD1 (Green) connected to PI1 and to the PIN 6 of CN7 (Arduino D13).
 
-There is a button (USER/WAKE-UP) connected to the board signal B_USER and to the PI11 (Active low)
+There is a **blue** button (USER/WAKE-UP) connected to the board signal B_USER and to the PI11 (Active low).
+
+The **black** button (RESET) is connected to the NRST board line and NRST MCU input.
+
 
 The other LEDs (not controlled by software) are:
 
@@ -189,10 +192,9 @@ The other LEDs (not controlled by software) are:
 * LD4 : USB HS power switch (Green)
 * LD5 : USB FS power switch (Green)
 * LD6 : USB FS overcurrent (Red)
-* LD7 : Controlled by the STLINK (Red/Green)
+* LD7 : Controlled by the STLINK MCU (Red/Green)
 
 
-The other button (RESET) is connected to the NRST board line and NRST MCU input.
 
 ### Serial
 

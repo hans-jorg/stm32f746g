@@ -118,7 +118,7 @@ or in a short form
 
 Different GDB servers use different port numbers.
 
-Commands to control the device can be found with the monitor help command. 
+Commands to control the device can be found with the *monitor help* command. 
 Generally, the commands below are accepted.
 
 mon halt      (mon hal)
