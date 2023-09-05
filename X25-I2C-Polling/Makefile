@@ -113,7 +113,7 @@ PREFIX:=arm-none-eabi
 #
 # Option 1: No floating point (TESTED)
 #
-CPUFLAGS= -mthumb  -mcpu=cortex-m7+nofp -Wall  -Wextra
+CPUFLAGS= -mthumb  -mcpu=cortex-m7+nofp
 #
 # Option 2: Floating point using hardware but using softfp ABI
 #           STM32F746 only has hardware support for single precision FP
@@ -180,6 +180,7 @@ CERRORFLAGS=                                        \
             -std=c11                                \
             -pedantic                               \
 
+# -Wall  -Wextra
 
 #
 # Terminal application (used to open new windows in debug)
