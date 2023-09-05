@@ -145,10 +145,15 @@ CPUFLAGS= -mthumb  -mcpu=cortex-m7+nofp
 SPECFLAGS= --specs=nano.specs
 
 #
-# Folder for object files
+# Folder for object files. These are only transient files on it. It can easily generated
+# by using the *make build* command,
+# Some files must be in the home folder. They must be included in the TRANSIENTFILES variable
+# so it can be deleted by *make clean*
+# When using docs, the directories html and/or docs can created. *make clean* gets rid of them.
 #
 OBJDIR=gcc
 
+TRANSIENTFILES= *.svd *.ini
 
 #
 # Use sections to optimize code generation.
@@ -175,6 +180,7 @@ CERRORFLAGS=                                        \
             -std=c11                                \
             -pedantic                               \
 
+# -Wall  -Wextra
 
 #
 # Terminal application (used to open new windows in debug)
@@ -260,7 +266,8 @@ endif
 #   gdb:        Another curses interface to GDB
 #   ddd:        A X-Windows based GUI interface to GDB
 #   nemiver:    A GTK+ GUI based interface to GDB
-#
+#   gede        Another GUI based interface (Work in progress)
+#   seer        Another one (Work in progress)
 #
 debug: gdb
 
@@ -294,7 +301,7 @@ gdbserver:gdbserver-stutil
 #
 
 #
-# Flash parameters using cp do STM32F746 MSD
+# Flash parameters using cp to STM32F746 (MSD Interface)
 #
 # Status: tested OK
 DEVICENAME=DIS_F746NG
@@ -597,6 +604,11 @@ usage:
 	@echo " ddd:        enter a debug session using ddd (GUI)"
 	@echo " nemiver:    enter a debug session using nemiver (GUI)"
 	@echo " tui:        enter a debug session using gdb in text UI"
+	@echo " gdbgui:     enter a debug session using a browser base frontend"
+ifneq (${HOSTOS},Windows)
+	@echo " seer:       enter a debug session using seer"
+	@echo " gede:       enter a debug session using gede"
+endif
 	@echo "doxygen:     generate doc files (alias=docs)"
 	@echo "term:        starts a new window with a terminal connected to board"
 	@echo "clean:       clean all generated files"
@@ -612,7 +624,7 @@ build: ${OBJDIR} ${OBJDIR}/${PROGNAME}.bin ${OBJDIR}/${PART}.svd
 # The rule to clean out all the build products.
 #
 clean:
-	rm -rf ${OBJDIR} ${wildcard *~} html latex docs  null.* && echo "Done."
+	rm -rf ${OBJDIR} ${wildcard *~} ${TRANSIENTFILES} html latex docs  null.* && echo "Done."
 
 #
 # Rules for building binary file from the ${PROGNAME}.axf executable file.
@@ -707,13 +719,44 @@ tui: ${OBJDIR}/${PROGNAME}.bin ${GDBINIT}
 cgdb: ${OBJDIR}/${PROGNAME}.bin ${GDBINIT}
 	cgdb -d `which ${GDB}`  -x ${OBJDIR}/gdbinit ${OBJDIR}/${PROGNAME}.axf
 
-
 #
-# Debug using GUI
+# Debug using an outdated GUI
 #
 ddd: ${OBJDIR}/${PROGNAME}.bin ${GDBINIT}
 	ddd --debugger "${GDB} ${GDBFLAGS}" ${OBJDIR}/${PROGNAME}.axf
 
+
+
+#
+# Debug using a browser based GUI
+#
+gdbgui: ${OBJDIR}/${PROGNAME}.bin ${GDBINIT}
+	echo "gdbgui: TBD"
+
+
+#
+# Debug using a QT5 based GUI called seer (Linux only)
+#
+ifneq (${HOSTOS},Windows)
+seer: ${OBJDIR}/${PROGNAME}.bin ${SEDEINI}
+	echo "Seer: TBD"
+	seer --connect localhost:${GDBPORT} --bf main  ${OBJDIR}/${PROGNAME}.bin
+endif
+
+
+#
+# Debug using a QT5 based GUI called gede (Linux only)
+#
+ifneq (${HOSTOS},Windows)
+gede: ${OBJDIR}/${PROGNAME}.bin ${GEDEINI}
+	echo "GdpPath=arm-none-eabi-gdb"              > ${GEDEINI}more
+	echo "LastProgram=${OBJDIR}/${PROGNAME}.bin"  >> ${GEDEINI}
+	echo "TcpHost=localhost"                      >> ${GEDEINI}
+	echo "TcpPort=${GDBPORT}"                     >> ${GEDEINI}
+	echo "InitialBreakpoint=\"main\""             >> ${GEDEINI}
+	echo "Gede: TBD"
+	gede --projconfig ${GDBINIT}
+endif
 #
 # Debug using kdbg GUI
 #
@@ -726,6 +769,8 @@ ddd: ${OBJDIR}/${PROGNAME}.bin ${GDBINIT}
 nemiver: ${OBJDIR}/${PROGNAME}.bin ${GDBINIT}
 	nemiver  --remote=localhost:${GDBPORT}  \
 	         --gdb-binary=`which ${GDB}`     ${OBJDIR}/${PROGNAME}.axf
+
+
 
 #
 # Start debug demon
